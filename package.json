@@ -4,7 +4,7 @@
   "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.",
   "main": "index.js",
   "scripts": {
-    "build": "tsc src/index.ts",
+    "build": "npx tsc",
     "inspect": "npx @modelcontextprotocol/inspector build/index.js"
   },
   "keywords": [],
