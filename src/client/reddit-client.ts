@@ -1,5 +1,11 @@
-import axios, { AxiosInstance } from 'axios';
-import { RedditClientConfig, RedditUser, RedditPost, RedditComment, RedditSubreddit } from '../types';
+import axios, { AxiosInstance } from "axios";
+import {
+  RedditClientConfig,
+  RedditUser,
+  RedditPost,
+  RedditComment,
+  RedditSubreddit,
+} from "../types";
 
 export class RedditClient {
   private clientId: string;
@@ -18,12 +24,12 @@ export class RedditClient {
     this.userAgent = config.userAgent;
     this.username = config.username;
     this.password = config.password;
-    
+
     this.api = axios.create({
-      baseURL: 'https://oauth.reddit.com',
+      baseURL: "https://oauth.reddit.com",
       headers: {
-        'User-Agent': this.userAgent,
-      }
+        "User-Agent": this.userAgent,
+      },
     });
 
     // Add response interceptor to handle token refresh
@@ -33,7 +39,9 @@ export class RedditClient {
         if (error.response?.status === 401 && this.authenticated) {
           await this.authenticate();
           const originalRequest = error.config;
-          originalRequest.headers['Authorization'] = `Bearer ${this.accessToken}`;
+          originalRequest.headers[
+            "Authorization"
+          ] = `Bearer ${this.accessToken}`;
           return this.api(originalRequest);
         }
         return Promise.reject(error);
@@ -48,17 +56,21 @@ export class RedditClient {
         return;
       }
 
-      const authUrl = 'https://www.reddit.com/api/v1/access_token';
+      const authUrl = "https://www.reddit.com/api/v1/access_token";
       const authData = new URLSearchParams();
-      
+
       if (this.username && this.password) {
-        console.log(`[Auth] Authenticating with user credentials for ${this.username}`);
-        authData.append('grant_type', 'password');
-        authData.append('username', this.username);
-        authData.append('password', this.password);
+        console.log(
+          `[Auth] Authenticating with user credentials for ${this.username}`
+        );
+        authData.append("grant_type", "password");
+        authData.append("username", this.username);
+        authData.append("password", this.password);
       } else {
-        console.log('[Auth] Authenticating with client credentials (read-only)');
-        authData.append('grant_type', 'client_credentials');
+        console.log(
+          "[Auth] Authenticating with client credentials (read-only)"
+        );
+        authData.append("grant_type", "client_credentials");
       }
 
       const response = await axios.post(authUrl, authData, {
@@ -67,20 +79,22 @@ export class RedditClient {
           password: this.clientSecret,
         },
         headers: {
-          'User-Agent': this.userAgent,
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "User-Agent": this.userAgent,
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       });
 
       this.accessToken = response.data.access_token;
-      this.tokenExpiry = now + (response.data.expires_in * 1000);
+      this.tokenExpiry = now + response.data.expires_in * 1000;
       this.authenticated = true;
-      this.api.defaults.headers.common['Authorization'] = `Bearer ${this.accessToken}`;
-      
-      console.log('[Auth] Successfully authenticated with Reddit API');
+      this.api.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${this.accessToken}`;
+
+      console.log("[Auth] Successfully authenticated with Reddit API");
     } catch (error) {
-      console.error('[Auth] Authentication error:', error);
-      throw new Error('Failed to authenticate with Reddit API');
+      console.error("[Auth] Authentication error:", error);
+      throw new Error("Failed to authenticate with Reddit API");
     }
   }
 
@@ -101,18 +115,18 @@ export class RedditClient {
     try {
       const response = await this.api.get(`/user/${username}/about.json`);
       const data = response.data.data;
-      
+
       return {
         name: data.name,
         id: data.id,
         commentKarma: data.comment_karma,
         linkKarma: data.link_karma,
-        totalKarma: data.total_karma || (data.comment_karma + data.link_karma),
+        totalKarma: data.total_karma || data.comment_karma + data.link_karma,
         isMod: data.is_mod,
         isGold: data.is_gold,
         isEmployee: data.is_employee,
         createdUtc: data.created_utc,
-        profileUrl: `https://reddit.com/user/${data.name}`
+        profileUrl: `https://reddit.com/user/${data.name}`,
       };
     } catch (error) {
       console.error(`[Error] Failed to get user info for ${username}:`, error);
@@ -125,36 +139,43 @@ export class RedditClient {
     try {
       const response = await this.api.get(`/r/${subredditName}/about.json`);
       const data = response.data.data;
-      
+
       return {
         displayName: data.display_name,
         title: data.title,
-        description: data.description || '',
-        publicDescription: data.public_description || '',
+        description: data.description || "",
+        publicDescription: data.public_description || "",
         subscribers: data.subscribers,
         activeUserCount: data.active_user_count,
         createdUtc: data.created_utc,
         over18: data.over18,
         subredditType: data.subreddit_type,
-        url: data.url
+        url: data.url,
       };
     } catch (error) {
-      console.error(`[Error] Failed to get subreddit info for ${subredditName}:`, error);
+      console.error(
+        `[Error] Failed to get subreddit info for ${subredditName}:`,
+        error
+      );
       throw new Error(`Failed to get subreddit info for ${subredditName}`);
     }
   }
 
-  async getTopPosts(subreddit: string, timeFilter: string = 'week', limit: number = 10): Promise<RedditPost[]> {
+  async getTopPosts(
+    subreddit: string,
+    timeFilter: string = "week",
+    limit: number = 10
+  ): Promise<RedditPost[]> {
     await this.authenticate();
     try {
-      const endpoint = subreddit ? `/r/${subreddit}/top.json` : '/top.json';
+      const endpoint = subreddit ? `/r/${subreddit}/top.json` : "/top.json";
       const response = await this.api.get(endpoint, {
         params: {
           t: timeFilter,
-          limit
-        }
+          limit,
+        },
       });
-      
+
       return response.data.data.children.map((child: any) => {
         const post = child.data;
         return {
@@ -173,24 +194,27 @@ export class RedditClient {
           edited: !!post.edited,
           isSelf: post.is_self,
           linkFlairText: post.link_flair_text,
-          permalink: post.permalink
+          permalink: post.permalink,
         };
       });
     } catch (error) {
-      console.error(`[Error] Failed to get top posts for ${subreddit || 'home'}:`, error);
-      throw new Error(`Failed to get top posts for ${subreddit || 'home'}`);
+      console.error(
+        `[Error] Failed to get top posts for ${subreddit || "home"}:`,
+        error
+      );
+      throw new Error(`Failed to get top posts for ${subreddit || "home"}`);
     }
   }
 
   async getPost(postId: string, subreddit?: string): Promise<RedditPost> {
     await this.authenticate();
     try {
-      const endpoint = subreddit 
+      const endpoint = subreddit
         ? `/r/${subreddit}/comments/${postId}.json`
         : `/api/info.json?id=t3_${postId}`;
-      
+
       const response = await this.api.get(endpoint);
-      
+
       let post;
       if (subreddit) {
         // When using the comments endpoint
@@ -202,7 +226,7 @@ export class RedditClient {
         }
         post = response.data.data.children[0].data;
       }
-      
+
       return {
         id: post.id,
         title: post.title,
@@ -219,7 +243,7 @@ export class RedditClient {
         edited: !!post.edited,
         isSelf: post.is_self,
         linkFlairText: post.link_flair_text,
-        permalink: post.permalink
+        permalink: post.permalink,
       };
     } catch (error) {
       console.error(`[Error] Failed to get post with ID ${postId}:`, error);
@@ -230,44 +254,51 @@ export class RedditClient {
   async getTrendingSubreddits(limit: number = 5): Promise<string[]> {
     await this.authenticate();
     try {
-      const response = await this.api.get('/subreddits/popular.json', {
-        params: { limit }
+      const response = await this.api.get("/subreddits/popular.json", {
+        params: { limit },
       });
-      
-      return response.data.data.children.map((child: any) => child.data.display_name);
+
+      return response.data.data.children.map(
+        (child: any) => child.data.display_name
+      );
     } catch (error) {
-      console.error('[Error] Failed to get trending subreddits:', error);
-      throw new Error('Failed to get trending subreddits');
+      console.error("[Error] Failed to get trending subreddits:", error);
+      throw new Error("Failed to get trending subreddits");
     }
   }
 
-  async createPost(subreddit: string, title: string, content: string, isSelf: boolean = true): Promise<RedditPost> {
+  async createPost(
+    subreddit: string,
+    title: string,
+    content: string,
+    isSelf: boolean = true
+  ): Promise<RedditPost> {
     await this.authenticate();
-    
+
     if (!this.username || !this.password) {
-      throw new Error('User authentication required for posting');
+      throw new Error("User authentication required for posting");
     }
-    
+
     try {
-      const kind = isSelf ? 'self' : 'link';
+      const kind = isSelf ? "self" : "link";
       const params = new URLSearchParams();
-      params.append('sr', subreddit);
-      params.append('kind', kind);
-      params.append('title', title);
-      params.append(isSelf ? 'text' : 'url', content);
-      
-      const response = await this.api.post('/api/submit', params, {
+      params.append("sr", subreddit);
+      params.append("kind", kind);
+      params.append("title", title);
+      params.append(isSelf ? "text" : "url", content);
+
+      const response = await this.api.post("/api/submit", params, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       });
-      
+
       if (response.data.success) {
         // Get the newly created post
         const postId = response.data.data.id;
         return await this.getPost(postId);
       } else {
-        throw new Error('Failed to create post');
+        throw new Error("Failed to create post");
       }
     } catch (error) {
       console.error(`[Error] Failed to create post in ${subreddit}:`, error);
@@ -287,26 +318,28 @@ export class RedditClient {
 
   async replyToPost(postId: string, content: string): Promise<RedditComment> {
     await this.authenticate();
-    
+
     if (!this.username || !this.password) {
-      throw new Error('User authentication required for posting replies');
+      throw new Error("User authentication required for posting replies");
     }
-    
+
     try {
       if (!(await this.checkPostExists(postId))) {
-        throw new Error(`Post with ID ${postId} does not exist or is not accessible`);
+        throw new Error(
+          `Post with ID ${postId} does not exist or is not accessible`
+        );
       }
-      
+
       const params = new URLSearchParams();
-      params.append('thing_id', `t3_${postId}`);
-      params.append('text', content);
-      
-      const response = await this.api.post('/api/comment', params, {
+      params.append("thing_id", `t3_${postId}`);
+      params.append("text", content);
+
+      const response = await this.api.post("/api/comment", params, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       });
-      
+
       // Extract comment data from response
       const commentData = response.data;
       return {
@@ -320,7 +353,7 @@ export class RedditClient {
         createdUtc: Date.now() / 1000,
         edited: false,
         isSubmitter: false,
-        permalink: commentData.permalink
+        permalink: commentData.permalink,
       };
     } catch (error) {
       console.error(`[Error] Failed to reply to post ${postId}:`, error);
@@ -332,11 +365,13 @@ export class RedditClient {
 // Create and export singleton instance
 let redditClient: RedditClient | null = null;
 
-export function initializeRedditClient(config: RedditClientConfig): RedditClient {
+export function initializeRedditClient(
+  config: RedditClientConfig
+): RedditClient {
   redditClient = new RedditClient(config);
   return redditClient;
 }
 
 export function getRedditClient(): RedditClient | null {
   return redditClient;
-} 
+}
