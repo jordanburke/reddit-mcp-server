@@ -2,7 +2,9 @@
 
 A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.
 
-## 📃 Available Tools (Features)
+![Video](https://github.com/user-attachments/assets/03952d15-80d3-458e-a74d-8242965f13d8)
+
+## 🔧 Available Tools (Features)
 
 **Read-only Tools (Client Credentials):**
 
@@ -16,6 +18,12 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 - `create_post(subreddit, title, content, flair, is_self)` - Create an optimized post
 - `reply_to_post(post_id, content, subreddit)` - Add a reply with engagement insights
 - `reply_to_comment(comment_id, content, subreddit)` - Add a strategic reply
+
+## 📃 Available Commands
+
+- `npm run dev` - Builds and runs inspection server (allows you to test MCP without an agent)
+- `npm run build` - Builds the server for production
+- `npm run start` - Starts the server in production mode
 
 ## 📚 Credits
 
