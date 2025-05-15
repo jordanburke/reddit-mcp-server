@@ -6,9 +6,9 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 ## 🧑‍💻 About
 
-![image](https://github.com/user-attachments/assets/aedc0966-75d4-45c4-a384-df03d232e29d)
-
 https://www.linkedin.com/feed/update/urn:li:activity:7328864060534419457/
+
+![image](https://github.com/user-attachments/assets/aedc0966-75d4-45c4-a384-df03d232e29d)
 
 ## 🔧 Available Tools (Features)
 
@@ -25,11 +25,48 @@ https://www.linkedin.com/feed/update/urn:li:activity:7328864060534419457/
 - `reply_to_post(post_id, content, subreddit)` - Add a reply with engagement insights
 - `reply_to_comment(comment_id, content, subreddit)` - Add a strategic reply
 
-## 📃 Available Commands
+## 🔌 Installation
 
-- `npm run dev` - Builds and runs inspection server (allows you to test MCP without an agent)
-- `npm run build` - Builds the server for production
-- `npm run start` - Starts the server in production mode
+1. `git clone https://github.com/alexandros-lekkas/reddit-mcp-server`
+
+2. Create a Reddit app [here](https://www.reddit.com/prefs/apps)
+
+![image](https://github.com/user-attachments/assets/bb7582d6-abf2-4282-a102-bd2e0f2c1c41)
+
+Make sure to select "script"!
+
+3. Copy the client ID and client secret
+
+4. Create a `.env` file based on `.env.example`
+
+Do this with your `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`
+
+If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDIT_PASSWORD` (don't worry, I won't steal them 😜)
+
+5. Run with `npm run dev` and open the inspection server (http://127.0.0.1:6274/)
+
+![image](https://github.com/user-attachments/assets/705c63ef-5d3c-4a68-8d3b-18dfda0a29f2)
+
+6. If the connection works, add this to your MCP config (for Cursor or Claude, depending on which agent you are using)
+
+```json
+  "mcpServers": {
+    "reddit": {
+      "command": "node",
+      "args": [
+        "C:\\path\\to\\reddit-mcp-server\\build\\index.js" // Replace this with your local path to build/index.js
+      ],
+      "env": {
+        "REDDIT_CLIENT_ID": "😜",
+        "REDDIT_CLIENT_SECRET": "😜",
+        "REDDIT_USERNAME": "😜",
+        "REDDIT_PASSWORD": "😜"
+      }
+    }
+  }
+```
+
+(Make sure to replace the environmental variables with your actual keys, not the 😜 emoji)
 
 ## 📚 Credits
 
