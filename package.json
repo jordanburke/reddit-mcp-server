@@ -7,7 +7,7 @@
     "build": "npx tsc",
     "inspect": "npx @modelcontextprotocol/inspector build/index.js",
     "dev": "npm run build && npm run inspect",
-    "start": "node build/index.js"
+    "start": "npm run build && node build/index.js"
   },
   "keywords": [],
   "author": "",
