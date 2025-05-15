@@ -2,6 +2,14 @@
 
 A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.
 
+![image](https://github.com/user-attachments/assets/705c63ef-5d3c-4a68-8d3b-18dfda0a29f2)
+
+## 🧑‍💻 About
+
+https://www.linkedin.com/feed/update/urn:li:activity:7328864060534419457/
+
+![image](https://github.com/user-attachments/assets/687e9075-0ea2-4211-a1f2-71af1e6824e4)
+
 ## 🔧 Available Tools (Features)
 
 **Read-only Tools (Client Credentials):**
