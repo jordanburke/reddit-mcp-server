@@ -233,7 +233,7 @@ class RedditServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         const toolName = request.params.name;
-        const toolParams = request.params.parameters || {};
+        const toolParams = request.params.arguments || {};
 
         console.log(`[Request] Tool call: ${toolName}`, toolParams);
 
