@@ -6,10 +6,8 @@ import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
-  ListToolsResultSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import axios, { AxiosInstance, request } from "axios";
 
 class RedditServer {
   private server: Server;
@@ -39,16 +37,12 @@ class RedditServer {
 
   private setupToolHandlers() {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: {
-        name: "test-reddit-mcp-server",
-        description: "Test the Reddit MCP Server",
-        inputSchema: {
-          type: "object",
-          properties: {
-            // No input parameters, this will just return a test message
-          },
+      tools: [
+        {
+          name: "test-reddit-mcp-server",
+          description: "Test the Reddit MCP Server",
         },
-      },
+      ],
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
