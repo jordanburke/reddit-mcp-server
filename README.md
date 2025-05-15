@@ -4,14 +4,14 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 ## 📃 Available Tools (Features)
 
-** Read-only Tools (Client Credentials): **
+**Read-only Tools (Client Credentials):**
 
 - `get_user_info(username)` - Get detailed user analysis with engagement insights
 - `get_top_posts(subreddit, time_filter, limit)` - Get and analyze top posts
 - `get_subreddit_stats(subreddit)` - Get comprehensive subreddit analysis
 - `get_trending_subreddits()` - Get list of trending subreddits
 
-** Read-write Tools (User Credentials): **
+**Read-write Tools (User Credentials):**
 
 - `create_post(subreddit, title, content, flair, is_self)` - Create an optimized post
 - `reply_to_post(post_id, content, subreddit)` - Add a reply with engagement insights
