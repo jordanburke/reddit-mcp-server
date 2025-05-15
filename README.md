@@ -2,6 +2,10 @@
 
 A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.
 
+https://medium.com/@eugenesh4work/how-to-build-an-mcp-server-fast-a-step-by-step-tutorial-e09faa5f7e3b
+
+https://github.com/Arindam200/reddit-mcp
+
 ## 🔌 Installation
 
 ```bash
