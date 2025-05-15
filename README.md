@@ -6,9 +6,9 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 ## 🧑‍💻 About
 
-https://www.linkedin.com/feed/update/urn:li:activity:7328864060534419457/
+![image](https://github.com/user-attachments/assets/aedc0966-75d4-45c4-a384-df03d232e29d)
 
-![image](https://github.com/user-attachments/assets/687e9075-0ea2-4211-a1f2-71af1e6824e4)
+https://www.linkedin.com/feed/update/urn:li:activity:7328864060534419457/
 
 ## 🔧 Available Tools (Features)
 
