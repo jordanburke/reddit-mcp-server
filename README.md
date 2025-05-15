@@ -61,7 +61,16 @@ If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDI
         "REDDIT_CLIENT_SECRET": "😜",
         "REDDIT_USERNAME": "😜",
         "REDDIT_PASSWORD": "😜"
-      }
+      },
+      "autoApprove": [
+        "get_reddit_post",
+        "get_top_posts",
+        "get_user_info",
+        "get_subreddit_info",
+        "get_trending_subreddits",
+        "create_post",
+        "reply_to_post"
+      ] // You don't need to add this, but it makes it so that you don't have to keep clicking approve
     }
   }
 ```
