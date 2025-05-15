@@ -249,25 +249,48 @@ class RedditServer {
             };
 
           case "get_reddit_post":
-            return await tools.getRedditPost(toolParams as { subreddit: string; post_id: string });
+            return await tools.getRedditPost(
+              toolParams as { subreddit: string; post_id: string }
+            );
 
           case "get_top_posts":
-            return await tools.getTopPosts(toolParams as { subreddit: string; time_filter?: string; limit?: number });
+            return await tools.getTopPosts(
+              toolParams as {
+                subreddit: string;
+                time_filter?: string;
+                limit?: number;
+              }
+            );
 
           case "get_user_info":
             return await tools.getUserInfo(toolParams as { username: string });
 
           case "get_subreddit_info":
-            return await tools.getSubredditInfo(toolParams as { subreddit_name: string });
+            return await tools.getSubredditInfo(
+              toolParams as { subreddit_name: string }
+            );
 
           case "get_trending_subreddits":
             return await tools.getTrendingSubreddits();
 
           case "create_post":
-            return await tools.createPost(toolParams as { subreddit: string; title: string; content: string; is_self?: boolean });
+            return await tools.createPost(
+              toolParams as {
+                subreddit: string;
+                title: string;
+                content: string;
+                is_self?: boolean;
+              }
+            );
 
           case "reply_to_post":
-            return await tools.replyToPost(toolParams as { post_id: string; content: string; subreddit?: string });
+            return await tools.replyToPost(
+              toolParams as {
+                post_id: string;
+                content: string;
+                subreddit?: string;
+              }
+            );
 
           default:
             throw new McpError(
