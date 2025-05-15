@@ -143,4 +143,4 @@ export interface FormattedCommentInfo {
   };
   link: string;
   commentAnalysis: string;
-} 
+}
