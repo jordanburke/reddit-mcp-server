@@ -1,0 +1,37 @@
+# Smithery configuration file: https://smithery.ai/docs/build/project-config
+
+startCommand:
+  type: stdio
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'node', args: ['build/index.js'], env: { REDDIT_CLIENT_ID: config.redditClientId, REDDIT_CLIENT_SECRET: config.redditClientSecret, REDDIT_USER_AGENT: config.redditUserAgent ?? 'RedditMCPServer/0.1.0', ...(config.redditUsername ? { REDDIT_USERNAME: config.redditUsername } : {}), ...(config.redditPassword ? { REDDIT_PASSWORD: config.redditPassword } : {}) } })
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - redditClientId
+      - redditClientSecret
+    properties:
+      redditClientId:
+        type: string
+        description: Reddit Application Client ID
+      redditClientSecret:
+        type: string
+        description: Reddit Application Client Secret
+      redditUserAgent:
+        type: string
+        default: RedditMCPServer/0.1.0
+        description: User-Agent header for Reddit API requests
+      redditUsername:
+        type: string
+        description: Optional Reddit username for authenticated actions
+      redditPassword:
+        type: string
+        description: Optional Reddit password for authenticated actions
+  exampleConfig:
+    redditClientId: abc123xyz
+    redditClientSecret: secretvalue
+    redditUserAgent: MyRedditAgent/1.0.0
+    redditUsername: my_reddit_user
+    redditPassword: supersecret

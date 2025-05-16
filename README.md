@@ -2,6 +2,7 @@
 
 A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.
 
+[![smithery badge](https://smithery.ai/badge/@alexandros-lekkas/reddit-mcp-server)](https://smithery.ai/server/@alexandros-lekkas/reddit-mcp-server)
 ![image](https://github.com/user-attachments/assets/705c63ef-5d3c-4a68-8d3b-18dfda0a29f2)
 
 ## 🧑‍💻 About
@@ -27,6 +28,15 @@ https://www.linkedin.com/feed/update/urn:li:activity:7328864060534419457/
 
 ## 🔌 Installation
 
+### Installing via Smithery
+
+To install Reddit Content Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@alexandros-lekkas/reddit-mcp-server):
+
+```bash
+npx -y @smithery/cli install @alexandros-lekkas/reddit-mcp-server --client claude
+```
+
+### Manual Installation
 1. `git clone https://github.com/alexandros-lekkas/reddit-mcp-server`
 
 2. Create a Reddit app [here](https://www.reddit.com/prefs/apps)
