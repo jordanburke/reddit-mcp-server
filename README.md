@@ -3,6 +3,7 @@
 A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.
 
 [![smithery badge](https://smithery.ai/badge/@alexandros-lekkas/reddit-mcp-server)](https://smithery.ai/server/@alexandros-lekkas/reddit-mcp-server)
+
 ![image](https://github.com/user-attachments/assets/705c63ef-5d3c-4a68-8d3b-18dfda0a29f2)
 
 ## 🧑‍💻 About
