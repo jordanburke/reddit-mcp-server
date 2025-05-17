@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 [![smithery badge](https://smithery.ai/badge/@alexandros-lekkas/reddit-mcp-server)](https://smithery.ai/server/@alexandros-lekkas/reddit-mcp-server)
 
-![image](https://github.com/user-attachments/assets/705c63ef-5d3c-4a68-8d3b-18dfda0a29f2)
+https://github.com/user-attachments/assets/caa37704-7c92-4bf8-b7e8-56d02ccb4983
 
 ## 🧑‍💻 About
 
