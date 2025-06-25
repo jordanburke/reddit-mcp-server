@@ -1,12 +1,12 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: {
+    index: 'src/index.ts',
+    bin: 'src/bin.ts'
+  },
   format: ['cjs'],
   dts: true,
   clean: true,
   shims: true,
-  banner: {
-    js: '#!/usr/bin/env node',
-  },
 });

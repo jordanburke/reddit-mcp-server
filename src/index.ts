@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js"
@@ -299,5 +297,10 @@ class RedditServer {
   }
 }
 
-const server = new RedditServer()
-server.run().catch(console.error)
+// Only run if this is the main module
+if (require.main === module) {
+  const server = new RedditServer()
+  server.run().catch(console.error)
+}
+
+export { RedditServer }
