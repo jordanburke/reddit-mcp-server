@@ -1,22 +1,19 @@
-import { getRedditClient } from "../client/reddit-client";
-import { formatUserInfo } from "../utils/formatters";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { getRedditClient } from "../client/reddit-client"
+import { formatUserInfo } from "../utils/formatters"
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
 
 export async function getUserInfo(params: { username: string }) {
-  const { username } = params;
-  const client = getRedditClient();
+  const { username } = params
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log(`[Tool] Getting info for u/${username}`);
-    const user = await client.getUser(username);
-    const formattedUser = formatUserInfo(user);
+    console.log(`[Tool] Getting info for u/${username}`)
+    const user = await client.getUser(username)
+    const formattedUser = formatUserInfo(user)
 
     return {
       content: [
@@ -43,12 +40,9 @@ export async function getUserInfo(params: { username: string }) {
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error getting user info: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to fetch user data: ${error}`
-    );
+    console.error(`[Error] Error getting user info: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch user data: ${error}`)
   }
 }

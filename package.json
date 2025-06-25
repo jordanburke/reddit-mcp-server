@@ -10,7 +10,9 @@
     "build": "tsup",
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "dev": "pnpm build && pnpm inspect",
-    "start": "pnpm build && npx reddit-mcp-server"
+    "start": "pnpm build && npx reddit-mcp-server",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\""
   },
   "keywords": [
     "mcp",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.33",
+    "prettier": "^3.6.1",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3"
   },

@@ -1,22 +1,19 @@
-import { getRedditClient } from "../client/reddit-client";
-import { formatSubredditInfo } from "../utils/formatters";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { getRedditClient } from "../client/reddit-client"
+import { formatSubredditInfo } from "../utils/formatters"
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
 
 export async function getSubredditInfo(params: { subreddit_name: string }) {
-  const { subreddit_name } = params;
-  const client = getRedditClient();
+  const { subreddit_name } = params
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log(`[Tool] Getting info for r/${subreddit_name}`);
-    const subreddit = await client.getSubredditInfo(subreddit_name);
-    const formattedSubreddit = formatSubredditInfo(subreddit);
+    console.log(`[Tool] Getting info for r/${subreddit_name}`)
+    const subreddit = await client.getSubredditInfo(subreddit_name)
+    const formattedSubreddit = formatSubredditInfo(subreddit)
 
     return {
       content: [
@@ -57,29 +54,23 @@ ${formattedSubreddit.description.full}
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error getting subreddit info: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to fetch subreddit data: ${error}`
-    );
+    console.error(`[Error] Error getting subreddit info: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch subreddit data: ${error}`)
   }
 }
 
 export async function getTrendingSubreddits() {
-  const client = getRedditClient();
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log("[Tool] Getting trending subreddits");
-    const trendingSubreddits = await client.getTrendingSubreddits();
+    console.log("[Tool] Getting trending subreddits")
+    const trendingSubreddits = await client.getTrendingSubreddits()
 
     return {
       content: [
@@ -88,18 +79,13 @@ export async function getTrendingSubreddits() {
           text: `
 # Trending Subreddits
 
-${trendingSubreddits
-  .map((subreddit, index) => `${index + 1}. r/${subreddit}`)
-  .join("\n")}
+${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).join("\n")}
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error getting trending subreddits: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to fetch trending subreddits: ${error}`
-    );
+    console.error(`[Error] Error getting trending subreddits: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch trending subreddits: ${error}`)
   }
 }

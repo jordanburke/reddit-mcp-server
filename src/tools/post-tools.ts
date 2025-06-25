@@ -1,25 +1,19 @@
-import { getRedditClient } from "../client/reddit-client";
-import { formatPostInfo, formatCommentInfo } from "../utils/formatters";
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { getRedditClient } from "../client/reddit-client"
+import { formatPostInfo, formatCommentInfo } from "../utils/formatters"
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
 
-export async function getRedditPost(params: {
-  subreddit: string;
-  post_id: string;
-}) {
-  const { subreddit, post_id } = params;
-  const client = getRedditClient();
+export async function getRedditPost(params: { subreddit: string; post_id: string }) {
+  const { subreddit, post_id } = params
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log(`[Tool] Getting post ${post_id} from r/${subreddit}`);
-    const post = await client.getPost(post_id, subreddit);
-    const formattedPost = formatPostInfo(post);
+    console.log(`[Tool] Getting post ${post_id} from r/${subreddit}`)
+    const post = await client.getPost(post_id, subreddit)
+    const formattedPost = formatPostInfo(post)
 
     return {
       content: [
@@ -43,11 +37,7 @@ ${formattedPost.content}
 
 ## Metadata
 - Posted: ${formattedPost.metadata.posted}
-- Flags: ${
-            formattedPost.metadata.flags.length
-              ? formattedPost.metadata.flags.join(", ")
-              : "None"
-          }
+- Flags: ${formattedPost.metadata.flags.length ? formattedPost.metadata.flags.join(", ") : "None"}
 - Flair: ${formattedPost.metadata.flair}
 
 ## Links
@@ -62,50 +52,38 @@ ${formattedPost.bestTimeToEngage}
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error getting post: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to fetch post data: ${error}`
-    );
+    console.error(`[Error] Error getting post: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch post data: ${error}`)
   }
 }
 
-export async function getTopPosts(params: {
-  subreddit: string;
-  time_filter?: string;
-  limit?: number;
-}) {
-  const { subreddit, time_filter = "week", limit = 10 } = params;
-  const client = getRedditClient();
+export async function getTopPosts(params: { subreddit: string; time_filter?: string; limit?: number }) {
+  const { subreddit, time_filter = "week", limit = 10 } = params
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log(`[Tool] Getting top posts from r/${subreddit}`);
-    const posts = await client.getTopPosts(subreddit, time_filter, limit);
-    const formattedPosts = posts.map(formatPostInfo);
+    console.log(`[Tool] Getting top posts from r/${subreddit}`)
+    const posts = await client.getTopPosts(subreddit, time_filter, limit)
+    const formattedPosts = posts.map(formatPostInfo)
 
     const postSummaries = formattedPosts
       .map(
         (post, index) => `
 ### ${index + 1}. ${post.title}
 - Author: u/${post.author}
-- Score: ${post.stats.score.toLocaleString()} (${(
-          post.stats.upvoteRatio * 100
-        ).toFixed(1)}% upvoted)
+- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.stats.comments.toLocaleString()}
 - Posted: ${post.metadata.posted}
 - Link: ${post.links.shortLink}
-    `
+    `,
       )
-      .join("\n");
+      .join("\n")
 
     return {
       content: [
@@ -118,38 +96,25 @@ ${postSummaries}
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error getting top posts: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to fetch top posts: ${error}`
-    );
+    console.error(`[Error] Error getting top posts: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch top posts: ${error}`)
   }
 }
 
-export async function createPost(params: {
-  subreddit: string;
-  title: string;
-  content: string;
-  is_self?: boolean;
-}) {
-  const { subreddit, title, content, is_self = true } = params;
-  const client = getRedditClient();
+export async function createPost(params: { subreddit: string; title: string; content: string; is_self?: boolean }) {
+  const { subreddit, title, content, is_self = true } = params
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log(
-      `[Tool] Creating ${is_self ? "text" : "link"} post in r/${subreddit}`
-    );
-    const post = await client.createPost(subreddit, title, content, is_self);
-    const formattedPost = formatPostInfo(post);
+    console.log(`[Tool] Creating ${is_self ? "text" : "link"} post in r/${subreddit}`)
+    const post = await client.createPost(subreddit, title, content, is_self)
+    const formattedPost = formatPostInfo(post)
 
     return {
       content: [
@@ -168,35 +133,25 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error creating post: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to create post: ${error}`
-    );
+    console.error(`[Error] Error creating post: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to create post: ${error}`)
   }
 }
 
-export async function replyToPost(params: {
-  post_id: string;
-  content: string;
-  subreddit?: string;
-}) {
-  const { post_id, content, subreddit } = params;
-  const client = getRedditClient();
+export async function replyToPost(params: { post_id: string; content: string; subreddit?: string }) {
+  const { post_id, content, subreddit } = params
+  const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      "Reddit client not initialized"
-    );
+    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
   }
 
   try {
-    console.log(`[Tool] Replying to post ${post_id}`);
-    const comment = await client.replyToPost(post_id, content);
-    const formattedComment = formatCommentInfo(comment);
+    console.log(`[Tool] Replying to post ${post_id}`)
+    const comment = await client.replyToPost(post_id, content)
+    const formattedComment = formatCommentInfo(comment)
 
     return {
       content: [
@@ -215,12 +170,9 @@ Your reply has been successfully posted.
           `,
         },
       ],
-    };
+    }
   } catch (error) {
-    console.error(`[Error] Error replying to post: ${error}`);
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to reply to post: ${error}`
-    );
+    console.error(`[Error] Error replying to post: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to reply to post: ${error}`)
   }
 }

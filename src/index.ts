@@ -1,28 +1,23 @@
 #!/usr/bin/env node
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
-import { initializeRedditClient } from "./client/reddit-client";
-import * as tools from "./tools";
-import dotenv from "dotenv";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
+import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js"
+import { initializeRedditClient } from "./client/reddit-client"
+import * as tools from "./tools"
+import dotenv from "dotenv"
 
 // Load environment variables
-dotenv.config();
+dotenv.config()
 
 class RedditServer {
-  private server: Server;
+  private server: Server
 
   constructor() {
-    console.log("[Setup] Initializing Reddit Server...");
+    console.log("[Setup] Initializing Reddit Server...")
 
     // Initialize the Reddit client
-    this.initializeRedditClient();
+    this.initializeRedditClient()
 
     this.server = new Server(
       {
@@ -33,31 +28,30 @@ class RedditServer {
         capabilities: {
           tools: {},
         },
-      }
-    );
+      },
+    )
 
-    this.setupToolHandlers();
+    this.setupToolHandlers()
 
-    this.server.onerror = (error) =>
-      console.error("[Error] Server error:", error);
+    this.server.onerror = (error) => console.error("[Error] Server error:", error)
     process.on("SIGINT", async () => {
-      await this.server.close();
-      process.exit(0);
-    });
+      await this.server.close()
+      process.exit(0)
+    })
   }
 
   private initializeRedditClient() {
-    const clientId = process.env.REDDIT_CLIENT_ID;
-    const clientSecret = process.env.REDDIT_CLIENT_SECRET;
-    const userAgent = process.env.REDDIT_USER_AGENT || "RedditMCPServer/0.1.0";
-    const username = process.env.REDDIT_USERNAME;
-    const password = process.env.REDDIT_PASSWORD;
+    const clientId = process.env.REDDIT_CLIENT_ID
+    const clientSecret = process.env.REDDIT_CLIENT_SECRET
+    const userAgent = process.env.REDDIT_USER_AGENT || "RedditMCPServer/0.1.0"
+    const username = process.env.REDDIT_USERNAME
+    const password = process.env.REDDIT_PASSWORD
 
     if (!clientId || !clientSecret) {
       console.error(
-        "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables."
-      );
-      process.exit(1);
+        "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
+      )
+      process.exit(1)
     }
 
     try {
@@ -67,19 +61,17 @@ class RedditServer {
         userAgent,
         username,
         password,
-      });
+      })
 
-      console.log("[Setup] Reddit client initialized");
+      console.log("[Setup] Reddit client initialized")
       if (username && password) {
-        console.log(`[Setup] Authenticated as user: ${username}`);
+        console.log(`[Setup] Authenticated as user: ${username}`)
       } else {
-        console.log(
-          "[Setup] Running in read-only mode (no user authentication)"
-        );
+        console.log("[Setup] Running in read-only mode (no user authentication)")
       }
     } catch (error) {
-      console.error("[Error] Failed to initialize Reddit client:", error);
-      process.exit(1);
+      console.error("[Error] Failed to initialize Reddit client:", error)
+      process.exit(1)
     }
   }
 
@@ -126,8 +118,7 @@ class RedditServer {
               },
               time_filter: {
                 type: "string",
-                description:
-                  "Time period to filter posts (e.g. 'day', 'week', 'month', 'year', 'all')",
+                description: "Time period to filter posts (e.g. 'day', 'week', 'month', 'year', 'all')",
                 enum: ["day", "week", "month", "year", "all"],
                 default: "week",
               },
@@ -192,13 +183,11 @@ class RedditServer {
               },
               content: {
                 type: "string",
-                description:
-                  "Content of the post (text for self posts, URL for link posts)",
+                description: "Content of the post (text for self posts, URL for link posts)",
               },
               is_self: {
                 type: "boolean",
-                description:
-                  "Whether this is a self (text) post (true) or link post (false)",
+                description: "Whether this is a self (text) post (true) or link post (false)",
                 default: true,
               },
             },
@@ -228,14 +217,14 @@ class RedditServer {
           },
         },
       ],
-    }));
+    }))
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
-        const toolName = request.params.name;
-        const toolParams = request.params.arguments || {};
+        const toolName = request.params.name
+        const toolParams = request.params.arguments || {}
 
-        console.log(`[Request] Tool call: ${toolName}`, toolParams);
+        console.log(`[Request] Tool call: ${toolName}`, toolParams)
 
         switch (toolName) {
           case "test_reddit_mcp_server":
@@ -246,79 +235,69 @@ class RedditServer {
                   text: "Hello, world! The Reddit MCP Server is working correctly.",
                 },
               ],
-            };
+            }
 
           case "get_reddit_post":
-            return await tools.getRedditPost(
-              toolParams as { subreddit: string; post_id: string }
-            );
+            return await tools.getRedditPost(toolParams as { subreddit: string; post_id: string })
 
           case "get_top_posts":
             return await tools.getTopPosts(
               toolParams as {
-                subreddit: string;
-                time_filter?: string;
-                limit?: number;
-              }
-            );
+                subreddit: string
+                time_filter?: string
+                limit?: number
+              },
+            )
 
           case "get_user_info":
-            return await tools.getUserInfo(toolParams as { username: string });
+            return await tools.getUserInfo(toolParams as { username: string })
 
           case "get_subreddit_info":
-            return await tools.getSubredditInfo(
-              toolParams as { subreddit_name: string }
-            );
+            return await tools.getSubredditInfo(toolParams as { subreddit_name: string })
 
           case "get_trending_subreddits":
-            return await tools.getTrendingSubreddits();
+            return await tools.getTrendingSubreddits()
 
           case "create_post":
             return await tools.createPost(
               toolParams as {
-                subreddit: string;
-                title: string;
-                content: string;
-                is_self?: boolean;
-              }
-            );
+                subreddit: string
+                title: string
+                content: string
+                is_self?: boolean
+              },
+            )
 
           case "reply_to_post":
             return await tools.replyToPost(
               toolParams as {
-                post_id: string;
-                content: string;
-                subreddit?: string;
-              }
-            );
+                post_id: string
+                content: string
+                subreddit?: string
+              },
+            )
 
           default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Tool with name ${toolName} not found`
-            );
+            throw new McpError(ErrorCode.MethodNotFound, `Tool with name ${toolName} not found`)
         }
       } catch (error: unknown) {
         if (error instanceof Error) {
-          console.error("[Error] Error calling tool:", error.message);
+          console.error("[Error] Error calling tool:", error.message)
 
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Failed to fetch data: ${error.message}`
-          );
+          throw new McpError(ErrorCode.InternalError, `Failed to fetch data: ${error.message}`)
         }
 
-        throw error;
+        throw error
       }
-    });
+    })
   }
 
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.log("[Server] Server is running");
+    const transport = new StdioServerTransport()
+    await this.server.connect(transport)
+    console.log("[Server] Server is running")
   }
 }
 
-const server = new RedditServer();
-server.run().catch(console.error);
+const server = new RedditServer()
+server.run().catch(console.error)
