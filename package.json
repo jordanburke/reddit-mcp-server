@@ -1,23 +1,34 @@
 {
   "name": "reddit-mcp-server",
   "version": "1.0.0",
-  "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.",
-  "main": "index.js",
-  "scripts": {
-    "build": "npx tsc",
-    "inspect": "npx @modelcontextprotocol/inspector build/index.js",
-    "dev": "npm run build && npm run inspect",
-    "start": "npm run build && node build/index.js"
+  "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content. Fork of the alexandros-lekkas/reddit-mcp-server.",
+  "main": "dist/index.js",
+  "bin": {
+    "reddit-mcp-server": "dist/index.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "build": "tsup",
+    "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
+    "dev": "pnpm build && pnpm inspect",
+    "start": "pnpm build && npx reddit-mcp-server"
+  },
+  "keywords": [
+    "mcp",
+    "reddit",
+    "api",
+    "model-context-protocol"
+  ],
+  "author": "Jordan Burke <jordan.burke@gmail.com>",
   "license": "ISC",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.3",
-    "axios": "^1.9.0"
+    "@modelcontextprotocol/sdk": "^1.13.1",
+    "axios": "^1.10.0",
+    "dotenv": "^16.5.0"
   },
   "devDependencies": {
-    "@types/node": "^22.15.18",
+    "@types/node": "^22.15.33",
+    "tsup": "^8.5.0",
     "typescript": "^5.8.3"
-  }
+  },
+  "packageManager": "pnpm@10.12.3+sha512.467df2c586056165580ad6dfb54ceaad94c5a30f80893ebdec5a44c5aa73c205ae4a5bb9d5ed6bb84ea7c249ece786642bbb49d06a307df218d03da41c317417"
 }
