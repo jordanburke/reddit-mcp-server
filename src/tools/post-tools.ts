@@ -141,7 +141,7 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.
 }
 
 export async function replyToPost(params: { post_id: string; content: string; subreddit?: string }) {
-  const { post_id, content, subreddit } = params
+  const { post_id, content } = params
   const client = getRedditClient()
 
   if (!client) {

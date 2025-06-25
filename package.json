@@ -12,7 +12,9 @@
     "dev": "pnpm build && pnpm inspect",
     "start": "pnpm build && npx reddit-mcp-server",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix"
   },
   "keywords": [
     "mcp",
@@ -28,7 +30,13 @@
     "dotenv": "^16.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.29.0",
     "@types/node": "^22.15.33",
+    "@typescript-eslint/eslint-plugin": "^8.35.0",
+    "@typescript-eslint/parser": "^8.35.0",
+    "eslint": "^9.29.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.1",
     "prettier": "^3.6.1",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3"

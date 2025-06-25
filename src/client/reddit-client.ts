@@ -89,7 +89,7 @@ export class RedditClient {
       try {
         await this.authenticate()
         return true
-      } catch (error) {
+      } catch {
         return false
       }
     }
@@ -278,7 +278,7 @@ export class RedditClient {
     try {
       const response = await this.api.get(`/api/info.json?id=t3_${postId}`)
       return response.data.data.children.length > 0
-    } catch (error) {
+    } catch {
       return false
     }
   }

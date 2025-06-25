@@ -23,6 +23,18 @@ pnpm dev
 
 # Build and start the server via npx
 pnpm start
+
+# Format code with Prettier
+pnpm format
+
+# Check code formatting
+pnpm format:check
+
+# Lint code with ESLint
+pnpm lint
+
+# Fix linting issues
+pnpm lint:fix
 ```
 
 ## Architecture
