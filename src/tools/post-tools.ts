@@ -11,7 +11,7 @@ export async function getRedditPost(params: { subreddit: string; post_id: string
   }
 
   try {
-    console.log(`[Tool] Getting post ${post_id} from r/${subreddit}`)
+    console.error(`[Tool] Getting post ${post_id} from r/${subreddit}`)
     const post = await client.getPost(post_id, subreddit)
     const formattedPost = formatPostInfo(post)
 
@@ -68,7 +68,7 @@ export async function getTopPosts(params: { subreddit: string; time_filter?: str
   }
 
   try {
-    console.log(`[Tool] Getting top posts from r/${subreddit}`)
+    console.error(`[Tool] Getting top posts from r/${subreddit}`)
     const posts = await client.getTopPosts(subreddit, time_filter, limit)
     const formattedPosts = posts.map(formatPostInfo)
 
@@ -112,7 +112,7 @@ export async function createPost(params: { subreddit: string; title: string; con
   }
 
   try {
-    console.log(`[Tool] Creating ${is_self ? "text" : "link"} post in r/${subreddit}`)
+    console.error(`[Tool] Creating ${is_self ? "text" : "link"} post in r/${subreddit}`)
     const post = await client.createPost(subreddit, title, content, is_self)
     const formattedPost = formatPostInfo(post)
 
@@ -149,7 +149,7 @@ export async function replyToPost(params: { post_id: string; content: string; su
   }
 
   try {
-    console.log(`[Tool] Replying to post ${post_id}`)
+    console.error(`[Tool] Replying to post ${post_id}`)
     const comment = await client.replyToPost(post_id, content)
     const formattedComment = formatCommentInfo(comment)
 

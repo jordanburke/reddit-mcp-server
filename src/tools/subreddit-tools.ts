@@ -11,7 +11,7 @@ export async function getSubredditInfo(params: { subreddit_name: string }) {
   }
 
   try {
-    console.log(`[Tool] Getting info for r/${subreddit_name}`)
+    console.error(`[Tool] Getting info for r/${subreddit_name}`)
     const subreddit = await client.getSubredditInfo(subreddit_name)
     const formattedSubreddit = formatSubredditInfo(subreddit)
 
@@ -69,7 +69,7 @@ export async function getTrendingSubreddits() {
   }
 
   try {
-    console.log("[Tool] Getting trending subreddits")
+    console.error("[Tool] Getting trending subreddits")
     const trendingSubreddits = await client.getTrendingSubreddits()
 
     return {

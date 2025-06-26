@@ -11,7 +11,7 @@ export async function getUserInfo(params: { username: string }) {
   }
 
   try {
-    console.log(`[Tool] Getting info for u/${username}`)
+    console.error(`[Tool] Getting info for u/${username}`)
     const user = await client.getUser(username)
     const formattedUser = formatUserInfo(user)
 

@@ -52,12 +52,12 @@ export class RedditClient {
       const authData = new URLSearchParams()
 
       if (this.username && this.password) {
-        console.log(`[Auth] Authenticating with user credentials for ${this.username}`)
+        console.error(`[Auth] Authenticating with user credentials for ${this.username}`)
         authData.append("grant_type", "password")
         authData.append("username", this.username)
         authData.append("password", this.password)
       } else {
-        console.log("[Auth] Authenticating with client credentials (read-only)")
+        console.error("[Auth] Authenticating with client credentials (read-only)")
         authData.append("grant_type", "client_credentials")
       }
 
@@ -77,7 +77,7 @@ export class RedditClient {
       this.authenticated = true
       this.api.defaults.headers.common["Authorization"] = `Bearer ${this.accessToken}`
 
-      console.log("[Auth] Successfully authenticated with Reddit API")
+      console.error("[Auth] Successfully authenticated with Reddit API")
     } catch (error) {
       console.error("[Auth] Authentication error:", error)
       throw new Error("Failed to authenticate with Reddit API")

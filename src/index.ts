@@ -12,7 +12,7 @@ class RedditServer {
   private server: Server
 
   constructor() {
-    console.log("[Setup] Initializing Reddit Server...")
+    console.error("[Setup] Initializing Reddit Server...")
 
     // Initialize the Reddit client
     this.initializeRedditClient()
@@ -61,11 +61,11 @@ class RedditServer {
         password,
       })
 
-      console.log("[Setup] Reddit client initialized")
+      console.error("[Setup] Reddit client initialized")
       if (username && password) {
-        console.log(`[Setup] Authenticated as user: ${username}`)
+        console.error(`[Setup] Authenticated as user: ${username}`)
       } else {
-        console.log("[Setup] Running in read-only mode (no user authentication)")
+        console.error("[Setup] Running in read-only mode (no user authentication)")
       }
     } catch (error) {
       console.error("[Error] Failed to initialize Reddit client:", error)
@@ -222,7 +222,7 @@ class RedditServer {
         const toolName = request.params.name
         const toolParams = request.params.arguments || {}
 
-        console.log(`[Request] Tool call: ${toolName}`, toolParams)
+        console.error(`[Request] Tool call: ${toolName}`, toolParams)
 
         switch (toolName) {
           case "test_reddit_mcp_server":
@@ -293,7 +293,7 @@ class RedditServer {
   async run() {
     const transport = new StdioServerTransport()
     await this.server.connect(transport)
-    console.log("[Server] Server is running")
+    console.error("[Server] Server is running")
   }
 }
 
