@@ -52,12 +52,12 @@ export class RedditClient {
       const authData = new URLSearchParams()
 
       if (this.username && this.password) {
-        console.error(`[Auth] Authenticating with user credentials for ${this.username}`)
+        // Authenticating with user credentials
         authData.append("grant_type", "password")
         authData.append("username", this.username)
         authData.append("password", this.password)
       } else {
-        console.error("[Auth] Authenticating with client credentials (read-only)")
+        // Authenticating with client credentials (read-only)
         authData.append("grant_type", "client_credentials")
       }
 
@@ -77,9 +77,9 @@ export class RedditClient {
       this.authenticated = true
       this.api.defaults.headers.common["Authorization"] = `Bearer ${this.accessToken}`
 
-      console.error("[Auth] Successfully authenticated with Reddit API")
+      // Successfully authenticated with Reddit API
     } catch (error) {
-      console.error("[Auth] Authentication error:", error)
+      // Authentication error occurred
       throw new Error("Failed to authenticate with Reddit API")
     }
   }
@@ -115,7 +115,7 @@ export class RedditClient {
         profileUrl: `https://reddit.com/user/${data.name}`,
       }
     } catch (error) {
-      console.error(`[Error] Failed to get user info for ${username}:`, error)
+      // Failed to get user info
       throw new Error(`Failed to get user info for ${username}`)
     }
   }
@@ -139,7 +139,7 @@ export class RedditClient {
         url: data.url,
       }
     } catch (error) {
-      console.error(`[Error] Failed to get subreddit info for ${subredditName}:`, error)
+      // Failed to get subreddit info
       throw new Error(`Failed to get subreddit info for ${subredditName}`)
     }
   }
@@ -177,7 +177,7 @@ export class RedditClient {
         }
       })
     } catch (error) {
-      console.error(`[Error] Failed to get top posts for ${subreddit || "home"}:`, error)
+      // Failed to get top posts
       throw new Error(`Failed to get top posts for ${subreddit || "home"}`)
     }
   }
@@ -220,7 +220,7 @@ export class RedditClient {
         permalink: post.permalink,
       }
     } catch (error) {
-      console.error(`[Error] Failed to get post with ID ${postId}:`, error)
+      // Failed to get post
       throw new Error(`Failed to get post with ID ${postId}`)
     }
   }
@@ -234,7 +234,7 @@ export class RedditClient {
 
       return response.data.data.children.map((child: any) => child.data.display_name)
     } catch (error) {
-      console.error("[Error] Failed to get trending subreddits:", error)
+      // Failed to get trending subreddits
       throw new Error("Failed to get trending subreddits")
     }
   }
@@ -268,7 +268,7 @@ export class RedditClient {
         throw new Error("Failed to create post")
       }
     } catch (error) {
-      console.error(`[Error] Failed to create post in ${subreddit}:`, error)
+      // Failed to create post
       throw new Error(`Failed to create post in ${subreddit}`)
     }
   }
@@ -321,7 +321,7 @@ export class RedditClient {
         permalink: commentData.permalink,
       }
     } catch (error) {
-      console.error(`[Error] Failed to reply to post ${postId}:`, error)
+      // Failed to reply to post
       throw new Error(`Failed to reply to post ${postId}`)
     }
   }

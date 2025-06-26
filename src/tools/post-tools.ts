@@ -11,7 +11,7 @@ export async function getRedditPost(params: { subreddit: string; post_id: string
   }
 
   try {
-    console.error(`[Tool] Getting post ${post_id} from r/${subreddit}`)
+    // Getting post
     const post = await client.getPost(post_id, subreddit)
     const formattedPost = formatPostInfo(post)
 
@@ -54,7 +54,7 @@ ${formattedPost.bestTimeToEngage}
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error getting post: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to fetch post data: ${error}`)
   }
 }
@@ -68,7 +68,7 @@ export async function getTopPosts(params: { subreddit: string; time_filter?: str
   }
 
   try {
-    console.error(`[Tool] Getting top posts from r/${subreddit}`)
+    // Getting top posts
     const posts = await client.getTopPosts(subreddit, time_filter, limit)
     const formattedPosts = posts.map(formatPostInfo)
 
@@ -98,7 +98,7 @@ ${postSummaries}
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error getting top posts: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to fetch top posts: ${error}`)
   }
 }
@@ -112,7 +112,7 @@ export async function createPost(params: { subreddit: string; title: string; con
   }
 
   try {
-    console.error(`[Tool] Creating ${is_self ? "text" : "link"} post in r/${subreddit}`)
+    // Creating post
     const post = await client.createPost(subreddit, title, content, is_self)
     const formattedPost = formatPostInfo(post)
 
@@ -135,7 +135,7 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error creating post: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to create post: ${error}`)
   }
 }
@@ -149,7 +149,7 @@ export async function replyToPost(params: { post_id: string; content: string; su
   }
 
   try {
-    console.error(`[Tool] Replying to post ${post_id}`)
+    // Replying to post
     const comment = await client.replyToPost(post_id, content)
     const formattedComment = formatCommentInfo(comment)
 
@@ -172,7 +172,7 @@ Your reply has been successfully posted.
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error replying to post: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to reply to post: ${error}`)
   }
 }

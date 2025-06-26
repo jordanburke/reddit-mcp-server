@@ -11,7 +11,7 @@ export async function getSubredditInfo(params: { subreddit_name: string }) {
   }
 
   try {
-    console.error(`[Tool] Getting info for r/${subreddit_name}`)
+    // Getting subreddit info
     const subreddit = await client.getSubredditInfo(subreddit_name)
     const formattedSubreddit = formatSubredditInfo(subreddit)
 
@@ -56,7 +56,7 @@ ${formattedSubreddit.description.full}
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error getting subreddit info: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to fetch subreddit data: ${error}`)
   }
 }
@@ -69,7 +69,7 @@ export async function getTrendingSubreddits() {
   }
 
   try {
-    console.error("[Tool] Getting trending subreddits")
+    // Getting trending subreddits
     const trendingSubreddits = await client.getTrendingSubreddits()
 
     return {
@@ -85,7 +85,7 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error getting trending subreddits: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to fetch trending subreddits: ${error}`)
   }
 }

@@ -12,11 +12,6 @@ class RedditServer {
   private server: Server
 
   constructor() {
-    console.error("[Setup] Initializing Reddit Server...")
-
-    // Initialize the Reddit client
-    this.initializeRedditClient()
-
     this.server = new Server(
       {
         name: "reddit-mcp-server",
@@ -29,9 +24,19 @@ class RedditServer {
       },
     )
 
+    // Initialize the Reddit client
+    this.initializeRedditClient()
+
     this.setupToolHandlers()
 
-    this.server.onerror = (error) => console.error("[Error] Server error:", error)
+    this.server.onerror = async (error) => {
+      await this.server.sendLoggingMessage({
+        level: "error",
+        logger: "reddit-server",
+        data: `Server error: ${error}`,
+      })
+    }
+    
     process.on("SIGINT", async () => {
       await this.server.close()
       process.exit(0)
@@ -46,6 +51,8 @@ class RedditServer {
     const password = process.env.REDDIT_PASSWORD
 
     if (!clientId || !clientSecret) {
+      // Can't use server logging here as server isn't initialized yet
+      // Using console.error is OK for startup failures
       console.error(
         "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
       )
@@ -61,13 +68,9 @@ class RedditServer {
         password,
       })
 
-      console.error("[Setup] Reddit client initialized")
-      if (username && password) {
-        console.error(`[Setup] Authenticated as user: ${username}`)
-      } else {
-        console.error("[Setup] Running in read-only mode (no user authentication)")
-      }
+      // Client initialized successfully
     } catch (error) {
+      // Can't use server logging here as server isn't connected yet
       console.error("[Error] Failed to initialize Reddit client:", error)
       process.exit(1)
     }
@@ -222,7 +225,12 @@ class RedditServer {
         const toolName = request.params.name
         const toolParams = request.params.arguments || {}
 
-        console.error(`[Request] Tool call: ${toolName}`, toolParams)
+        // Log tool call
+        await this.server.sendLoggingMessage({
+          level: "debug",
+          logger: "reddit-server",
+          data: `Tool call: ${toolName}`,
+        })
 
         switch (toolName) {
           case "test_reddit_mcp_server":
@@ -280,7 +288,11 @@ class RedditServer {
         }
       } catch (error: unknown) {
         if (error instanceof Error) {
-          console.error("[Error] Error calling tool:", error.message)
+          await this.server.sendLoggingMessage({
+            level: "error",
+            logger: "reddit-server",
+            data: `Error calling tool: ${error.message}`,
+          })
 
           throw new McpError(ErrorCode.InternalError, `Failed to fetch data: ${error.message}`)
         }
@@ -293,7 +305,24 @@ class RedditServer {
   async run() {
     const transport = new StdioServerTransport()
     await this.server.connect(transport)
-    console.error("[Server] Server is running")
+    
+    // Log server startup
+    await this.server.sendLoggingMessage({
+      level: "info",
+      logger: "reddit-server",
+      data: "Reddit MCP Server is running",
+    })
+    
+    // Log authentication status
+    const username = process.env.REDDIT_USERNAME
+    const password = process.env.REDDIT_PASSWORD
+    await this.server.sendLoggingMessage({
+      level: "info",
+      logger: "reddit-server",
+      data: username && password 
+        ? `Authenticated as user: ${username}`
+        : "Running in read-only mode (no user authentication)",
+    })
   }
 }
 

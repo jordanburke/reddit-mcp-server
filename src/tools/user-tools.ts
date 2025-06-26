@@ -11,7 +11,7 @@ export async function getUserInfo(params: { username: string }) {
   }
 
   try {
-    console.error(`[Tool] Getting info for u/${username}`)
+    // Getting user info
     const user = await client.getUser(username)
     const formattedUser = formatUserInfo(user)
 
@@ -42,7 +42,7 @@ export async function getUserInfo(params: { username: string }) {
       ],
     }
   } catch (error) {
-    console.error(`[Error] Error getting user info: ${error}`)
+    // Error will be logged by the server
     throw new McpError(ErrorCode.InternalError, `Failed to fetch user data: ${error}`)
   }
 }
