@@ -297,3 +297,20 @@ export function formatCommentInfo(comment: RedditComment): FormattedCommentInfo 
     commentAnalysis: analyzeCommentImpact(comment.score, comment.edited, comment.isSubmitter),
   }
 }
+
+// Simple formatter for posts (used in search and comment tools)
+export function formatPost(post: RedditPost) {
+  return {
+    title: post.title,
+    author: post.author,
+    subreddit: post.subreddit,
+    score: post.score,
+    upvoteRatio: Math.round(post.upvoteRatio * 100),
+    numComments: post.numComments,
+    createdAt: formatTimestamp(post.createdUtc),
+    selftext: post.selftext,
+    permalink: post.permalink,
+    nsfw: post.over18,
+    spoiler: post.spoiler,
+  }
+}

@@ -50,6 +50,8 @@ export interface RedditComment {
   edited: boolean
   isSubmitter: boolean
   permalink: string
+  depth?: number
+  parentId?: string
 }
 
 export interface RedditSubreddit {

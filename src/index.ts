@@ -214,6 +214,146 @@ class RedditServer {
             required: ["post_id", "content"],
           },
         },
+        {
+          name: "search_reddit",
+          description: "Search for posts on Reddit",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query",
+              },
+              subreddit: {
+                type: "string",
+                description: "Search within a specific subreddit (optional)",
+              },
+              sort: {
+                type: "string",
+                description: "Sort order: relevance, hot, top, new, comments",
+                enum: ["relevance", "hot", "top", "new", "comments"],
+                default: "relevance",
+              },
+              time_filter: {
+                type: "string",
+                description: "Time filter: hour, day, week, month, year, all",
+                enum: ["hour", "day", "week", "month", "year", "all"],
+                default: "all",
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of results to return",
+                minimum: 1,
+                maximum: 100,
+                default: 10,
+              },
+              type: {
+                type: "string",
+                description: "Type of content: link (posts), sr (subreddits), user (users)",
+                enum: ["link", "sr", "user"],
+                default: "link",
+              },
+            },
+            required: ["query"],
+          },
+        },
+        {
+          name: "get_post_comments",
+          description: "Get comments for a specific Reddit post",
+          inputSchema: {
+            type: "object",
+            properties: {
+              post_id: {
+                type: "string",
+                description: "The ID of the post",
+              },
+              subreddit: {
+                type: "string",
+                description: "The subreddit where the post is located",
+              },
+              sort: {
+                type: "string",
+                description: "Comment sort order: best, top, new, controversial, old, qa",
+                enum: ["best", "top", "new", "controversial", "old", "qa"],
+                default: "best",
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of comments to load",
+                minimum: 1,
+                maximum: 500,
+                default: 100,
+              },
+            },
+            required: ["post_id", "subreddit"],
+          },
+        },
+        {
+          name: "get_user_posts",
+          description: "Get posts submitted by a specific user",
+          inputSchema: {
+            type: "object",
+            properties: {
+              username: {
+                type: "string",
+                description: "The username to get posts for",
+              },
+              sort: {
+                type: "string",
+                description: "Sort order: new, hot, top, controversial",
+                enum: ["new", "hot", "top", "controversial"],
+                default: "new",
+              },
+              time_filter: {
+                type: "string",
+                description: "Time filter for top/controversial: hour, day, week, month, year, all",
+                enum: ["hour", "day", "week", "month", "year", "all"],
+                default: "all",
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of posts to return",
+                minimum: 1,
+                maximum: 100,
+                default: 10,
+              },
+            },
+            required: ["username"],
+          },
+        },
+        {
+          name: "get_user_comments",
+          description: "Get comments made by a specific user",
+          inputSchema: {
+            type: "object",
+            properties: {
+              username: {
+                type: "string",
+                description: "The username to get comments for",
+              },
+              sort: {
+                type: "string",
+                description: "Sort order: new, hot, top, controversial",
+                enum: ["new", "hot", "top", "controversial"],
+                default: "new",
+              },
+              time_filter: {
+                type: "string",
+                description: "Time filter for top/controversial: hour, day, week, month, year, all",
+                enum: ["hour", "day", "week", "month", "year", "all"],
+                default: "all",
+              },
+              limit: {
+                type: "number",
+                description: "Maximum number of comments to return",
+                minimum: 1,
+                maximum: 100,
+                default: 10,
+              },
+            },
+            required: ["username"],
+          },
+        },
       ],
     }))
 
@@ -277,6 +417,48 @@ class RedditServer {
                 post_id: string
                 content: string
                 subreddit?: string
+              },
+            )
+
+          case "search_reddit":
+            return await tools.searchReddit(
+              toolParams as {
+                query: string
+                subreddit?: string
+                sort?: string
+                time_filter?: string
+                limit?: number
+                type?: string
+              },
+            )
+
+          case "get_post_comments":
+            return await tools.getPostComments(
+              toolParams as {
+                post_id: string
+                subreddit: string
+                sort?: string
+                limit?: number
+              },
+            )
+
+          case "get_user_posts":
+            return await tools.getUserPosts(
+              toolParams as {
+                username: string
+                sort?: string
+                time_filter?: string
+                limit?: number
+              },
+            )
+
+          case "get_user_comments":
+            return await tools.getUserComments(
+              toolParams as {
+                username: string
+                sort?: string
+                time_filter?: string
+                limit?: number
               },
             )
 

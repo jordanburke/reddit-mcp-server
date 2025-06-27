@@ -383,6 +383,246 @@ export class RedditClient {
       throw new Error(`Failed to reply to post ${postId}`)
     }
   }
+
+  async searchReddit(
+    query: string,
+    options: {
+      subreddit?: string
+      sort?: string
+      timeFilter?: string
+      limit?: number
+      type?: string
+    } = {},
+  ): Promise<RedditPost[]> {
+    await this.authenticate()
+    try {
+      const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
+      const endpoint = subreddit ? `/r/${subreddit}/search.json` : "/search.json"
+
+      const params = new URLSearchParams({
+        q: query,
+        sort,
+        t: timeFilter,
+        limit: limit.toString(),
+        type,
+        ...(subreddit && { restrict_sr: "true" }),
+      })
+
+      const response = await this.makeRequest(`${endpoint}?${params}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: { children: any[] } }
+
+      return json.data.children
+        .filter((child: any) => child.kind === "t3") // Only posts
+        .map((child: any) => {
+          const post = child.data
+          return {
+            id: post.id,
+            title: post.title,
+            author: post.author,
+            subreddit: post.subreddit,
+            selftext: post.selftext || "",
+            url: post.url,
+            score: post.score,
+            upvoteRatio: post.upvote_ratio,
+            numComments: post.num_comments,
+            createdUtc: post.created_utc,
+            over18: post.over_18,
+            spoiler: post.spoiler,
+            edited: !!post.edited,
+            isSelf: post.is_self,
+            linkFlairText: post.link_flair_text,
+            permalink: post.permalink,
+          }
+        })
+    } catch {
+      throw new Error(`Failed to search Reddit for: ${query}`)
+    }
+  }
+
+  async getPostComments(
+    postId: string,
+    subreddit: string,
+    options: {
+      sort?: string
+      limit?: number
+    } = {},
+  ): Promise<{ post: RedditPost; comments: RedditComment[] }> {
+    await this.authenticate()
+    try {
+      const { sort = "best", limit = 100 } = options
+      const params = new URLSearchParams({
+        sort,
+        limit: limit.toString(),
+      })
+
+      const response = await this.makeRequest(`/r/${subreddit}/comments/${postId}.json?${params}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as any[]
+
+      // First element is the post, second is the comments
+      const postData = json[0].data.children[0].data
+      const post: RedditPost = {
+        id: postData.id,
+        title: postData.title,
+        author: postData.author,
+        subreddit: postData.subreddit,
+        selftext: postData.selftext || "",
+        url: postData.url,
+        score: postData.score,
+        upvoteRatio: postData.upvote_ratio,
+        numComments: postData.num_comments,
+        createdUtc: postData.created_utc,
+        over18: postData.over_18,
+        spoiler: postData.spoiler,
+        edited: !!postData.edited,
+        isSelf: postData.is_self,
+        linkFlairText: postData.link_flair_text,
+        permalink: postData.permalink,
+      }
+
+      const comments: RedditComment[] = []
+      const parseComments = (commentData: any[], depth: number = 0) => {
+        for (const item of commentData) {
+          if (item.kind === "t1" && item.data.body) {
+            comments.push({
+              id: item.data.id,
+              author: item.data.author,
+              body: item.data.body,
+              score: item.data.score,
+              controversiality: item.data.controversiality,
+              subreddit: item.data.subreddit,
+              submissionTitle: post.title,
+              createdUtc: item.data.created_utc,
+              edited: !!item.data.edited,
+              isSubmitter: item.data.is_submitter,
+              permalink: item.data.permalink,
+              depth,
+              parentId: item.data.parent_id,
+            })
+
+            // Parse replies recursively
+            if (item.data.replies && item.data.replies.data && item.data.replies.data.children) {
+              parseComments(item.data.replies.data.children, depth + 1)
+            }
+          }
+        }
+      }
+
+      if (json[1] && json[1].data && json[1].data.children) {
+        parseComments(json[1].data.children)
+      }
+
+      return { post, comments }
+    } catch {
+      throw new Error(`Failed to get comments for post ${postId}`)
+    }
+  }
+
+  async getUserPosts(
+    username: string,
+    options: {
+      sort?: string
+      timeFilter?: string
+      limit?: number
+    } = {},
+  ): Promise<RedditPost[]> {
+    await this.authenticate()
+    try {
+      const { sort = "new", timeFilter = "all", limit = 25 } = options
+      const params = new URLSearchParams({
+        sort,
+        t: timeFilter,
+        limit: limit.toString(),
+      })
+
+      const response = await this.makeRequest(`/user/${username}/submitted.json?${params}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: { children: any[] } }
+
+      return json.data.children
+        .filter((child: any) => child.kind === "t3")
+        .map((child: any) => {
+          const post = child.data
+          return {
+            id: post.id,
+            title: post.title,
+            author: post.author,
+            subreddit: post.subreddit,
+            selftext: post.selftext || "",
+            url: post.url,
+            score: post.score,
+            upvoteRatio: post.upvote_ratio,
+            numComments: post.num_comments,
+            createdUtc: post.created_utc,
+            over18: post.over_18,
+            spoiler: post.spoiler,
+            edited: !!post.edited,
+            isSelf: post.is_self,
+            linkFlairText: post.link_flair_text,
+            permalink: post.permalink,
+          }
+        })
+    } catch {
+      throw new Error(`Failed to get posts for user ${username}`)
+    }
+  }
+
+  async getUserComments(
+    username: string,
+    options: {
+      sort?: string
+      timeFilter?: string
+      limit?: number
+    } = {},
+  ): Promise<RedditComment[]> {
+    await this.authenticate()
+    try {
+      const { sort = "new", timeFilter = "all", limit = 25 } = options
+      const params = new URLSearchParams({
+        sort,
+        t: timeFilter,
+        limit: limit.toString(),
+      })
+
+      const response = await this.makeRequest(`/user/${username}/comments.json?${params}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: { children: any[] } }
+
+      return json.data.children
+        .filter((child: any) => child.kind === "t1")
+        .map((child: any) => {
+          const comment = child.data
+          return {
+            id: comment.id,
+            author: comment.author,
+            body: comment.body,
+            score: comment.score,
+            controversiality: comment.controversiality,
+            subreddit: comment.subreddit,
+            submissionTitle: comment.link_title || "",
+            createdUtc: comment.created_utc,
+            edited: !!comment.edited,
+            isSubmitter: comment.is_submitter,
+            permalink: comment.permalink,
+          }
+        })
+    } catch {
+      throw new Error(`Failed to get comments for user ${username}`)
+    }
+  }
 }
 
 // Create and export singleton instance

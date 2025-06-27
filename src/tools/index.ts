@@ -1,3 +1,5 @@
 export * from "./user-tools"
 export * from "./post-tools"
 export * from "./subreddit-tools"
+export * from "./search-tools"
+export * from "./comment-tools"
