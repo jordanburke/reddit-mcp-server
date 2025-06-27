@@ -66,7 +66,7 @@ class RedditServer {
       })
 
       // Client initialized successfully
-    } catch (error) {
+    } catch {
       // Can't use server logging here as server isn't connected yet
       // Exit silently with error code
       process.exit(1)

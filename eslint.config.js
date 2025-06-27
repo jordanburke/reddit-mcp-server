@@ -19,6 +19,7 @@ module.exports = [
         require: 'readonly',
         global: 'readonly',
         URL: 'readonly',
+        fetch: 'readonly',
       },
     },
   },
@@ -43,6 +44,7 @@ module.exports = [
         require: 'readonly',
         global: 'readonly',
         URL: 'readonly',
+        fetch: 'readonly',
       },
     },
     plugins: {
