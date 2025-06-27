@@ -43,6 +43,6 @@ export async function getUserInfo(params: { username: string }) {
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch user data: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch user data: ${String(error)}`)
   }
 }

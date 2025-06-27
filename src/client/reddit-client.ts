@@ -78,7 +78,7 @@ export class RedditClient {
       this.api.defaults.headers.common["Authorization"] = `Bearer ${this.accessToken}`
 
       // Successfully authenticated with Reddit API
-    } catch (error) {
+    } catch {
       // Authentication error occurred
       throw new Error("Failed to authenticate with Reddit API")
     }
@@ -114,7 +114,7 @@ export class RedditClient {
         createdUtc: data.created_utc,
         profileUrl: `https://reddit.com/user/${data.name}`,
       }
-    } catch (error) {
+    } catch {
       // Failed to get user info
       throw new Error(`Failed to get user info for ${username}`)
     }
@@ -138,7 +138,7 @@ export class RedditClient {
         subredditType: data.subreddit_type,
         url: data.url,
       }
-    } catch (error) {
+    } catch {
       // Failed to get subreddit info
       throw new Error(`Failed to get subreddit info for ${subredditName}`)
     }
@@ -176,7 +176,7 @@ export class RedditClient {
           permalink: post.permalink,
         }
       })
-    } catch (error) {
+    } catch {
       // Failed to get top posts
       throw new Error(`Failed to get top posts for ${subreddit || "home"}`)
     }
@@ -219,7 +219,7 @@ export class RedditClient {
         linkFlairText: post.link_flair_text,
         permalink: post.permalink,
       }
-    } catch (error) {
+    } catch {
       // Failed to get post
       throw new Error(`Failed to get post with ID ${postId}`)
     }
@@ -233,7 +233,7 @@ export class RedditClient {
       })
 
       return response.data.data.children.map((child: any) => child.data.display_name)
-    } catch (error) {
+    } catch {
       // Failed to get trending subreddits
       throw new Error("Failed to get trending subreddits")
     }
@@ -267,7 +267,7 @@ export class RedditClient {
       } else {
         throw new Error("Failed to create post")
       }
-    } catch (error) {
+    } catch {
       // Failed to create post
       throw new Error(`Failed to create post in ${subreddit}`)
     }
@@ -320,7 +320,7 @@ export class RedditClient {
         isSubmitter: false,
         permalink: commentData.permalink,
       }
-    } catch (error) {
+    } catch {
       // Failed to reply to post
       throw new Error(`Failed to reply to post ${postId}`)
     }

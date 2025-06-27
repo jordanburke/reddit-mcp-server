@@ -55,7 +55,7 @@ ${formattedPost.bestTimeToEngage}
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch post data: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch post data: ${String(error)}`)
   }
 }
 
@@ -99,7 +99,7 @@ ${postSummaries}
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch top posts: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch top posts: ${String(error)}`)
   }
 }
 
@@ -136,7 +136,7 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to create post: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to create post: ${String(error)}`)
   }
 }
 
@@ -173,6 +173,6 @@ Your reply has been successfully posted.
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to reply to post: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to reply to post: ${String(error)}`)
   }
 }

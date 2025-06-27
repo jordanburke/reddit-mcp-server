@@ -57,7 +57,7 @@ ${formattedSubreddit.description.full}
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch subreddit data: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch subreddit data: ${String(error)}`)
   }
 }
 
@@ -86,6 +86,6 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch trending subreddits: ${error}`)
+    throw new McpError(ErrorCode.InternalError, `Failed to fetch trending subreddits: ${String(error)}`)
   }
 }

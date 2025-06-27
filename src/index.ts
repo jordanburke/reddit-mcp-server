@@ -36,7 +36,7 @@ class RedditServer {
         data: `Server error: ${error}`,
       })
     }
-    
+
     process.on("SIGINT", async () => {
       await this.server.close()
       process.exit(0)
@@ -305,23 +305,24 @@ class RedditServer {
   async run() {
     const transport = new StdioServerTransport()
     await this.server.connect(transport)
-    
+
     // Log server startup
     await this.server.sendLoggingMessage({
       level: "info",
       logger: "reddit-server",
       data: "Reddit MCP Server is running",
     })
-    
+
     // Log authentication status
     const username = process.env.REDDIT_USERNAME
     const password = process.env.REDDIT_PASSWORD
     await this.server.sendLoggingMessage({
       level: "info",
       logger: "reddit-server",
-      data: username && password 
-        ? `Authenticated as user: ${username}`
-        : "Running in read-only mode (no user authentication)",
+      data:
+        username && password
+          ? `Authenticated as user: ${username}`
+          : "Running in read-only mode (no user authentication)",
     })
   }
 }
