@@ -2,4 +2,6 @@
 import { RedditServer } from "./index"
 
 const server = new RedditServer()
-server.run().catch(console.error)
+server.run().catch(() => {
+  process.exit(1)
+})
