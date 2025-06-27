@@ -8,14 +8,16 @@
   },
   "scripts": {
     "build": "tsup",
-    "prepublishOnly": "pnpm run lint && pnpm run format:check && pnpm run build",
+    "prepublishOnly": "pnpm run lint && pnpm run format:check && pnpm run test && pnpm run build",
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "dev": "pnpm build && pnpm inspect",
     "start": "pnpm build && npx reddit-mcp-server",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix"
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "mcp",
@@ -31,16 +33,18 @@
     "dotenv": "^16.6.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.29.0",
+    "@eslint/js": "^9.30.0",
     "@types/node": "^22.15.33",
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
-    "eslint": "^9.29.0",
+    "eslint": "^9.30.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.1",
+    "msw": "^2.10.2",
     "prettier": "^3.6.2",
     "tsup": "^8.5.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@10.12.3+sha512.467df2c586056165580ad6dfb54ceaad94c5a30f80893ebdec5a44c5aa73c205ae4a5bb9d5ed6bb84ea7c249ece786642bbb49d06a307df218d03da41c317417"
 }
