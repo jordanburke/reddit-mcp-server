@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from "axios"
 import { RedditClientConfig, RedditUser, RedditPost, RedditComment, RedditSubreddit } from "../types"
 
 export class RedditClient {
@@ -9,7 +8,7 @@ export class RedditClient {
   private password?: string
   private accessToken?: string
   private tokenExpiry: number = 0
-  private api: AxiosInstance
+  private baseUrl: string = "https://oauth.reddit.com"
   private authenticated: boolean = false
 
   constructor(config: RedditClientConfig) {
@@ -18,27 +17,40 @@ export class RedditClient {
     this.userAgent = config.userAgent
     this.username = config.username
     this.password = config.password
+  }
 
-    this.api = axios.create({
-      baseURL: "https://oauth.reddit.com",
-      headers: {
-        "User-Agent": this.userAgent,
-      },
+  private async makeRequest(path: string, options: RequestInit = {}): Promise<Response> {
+    // Check if we need to refresh token
+    if (Date.now() >= this.tokenExpiry || !this.authenticated) {
+      await this.authenticate()
+    }
+
+    const url = `${this.baseUrl}${path}`
+    const headers = {
+      "User-Agent": this.userAgent,
+      Authorization: `Bearer ${this.accessToken}`,
+      ...options.headers,
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
     })
 
-    // Add response interceptor to handle token refresh
-    this.api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 401 && this.authenticated) {
-          await this.authenticate()
-          const originalRequest = error.config
-          originalRequest.headers["Authorization"] = `Bearer ${this.accessToken}`
-          return this.api(originalRequest)
-        }
-        return Promise.reject(error)
-      },
-    )
+    // If unauthorized, try to refresh token and retry once
+    if (response.status === 401 && this.authenticated) {
+      await this.authenticate()
+      const retryHeaders = {
+        ...headers,
+        Authorization: `Bearer ${this.accessToken}`,
+      }
+      return fetch(url, {
+        ...options,
+        headers: retryHeaders,
+      })
+    }
+
+    return response
   }
 
   async authenticate(): Promise<void> {
@@ -61,21 +73,25 @@ export class RedditClient {
         authData.append("grant_type", "client_credentials")
       }
 
-      const response = await axios.post(authUrl, authData, {
-        auth: {
-          username: this.clientId,
-          password: this.clientSecret,
-        },
+      const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64")
+      const response = await fetch(authUrl, {
+        method: "POST",
         headers: {
           "User-Agent": this.userAgent,
           "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${credentials}`,
         },
+        body: authData.toString(),
       })
 
-      this.accessToken = response.data.access_token
-      this.tokenExpiry = now + response.data.expires_in * 1000
+      if (!response.ok) {
+        throw new Error(`Authentication failed: ${response.status}`)
+      }
+
+      const data = (await response.json()) as { access_token: string; expires_in: number }
+      this.accessToken = data.access_token
+      this.tokenExpiry = now + data.expires_in * 1000
       this.authenticated = true
-      this.api.defaults.headers.common["Authorization"] = `Bearer ${this.accessToken}`
 
       // Successfully authenticated with Reddit API
     } catch {
@@ -99,8 +115,13 @@ export class RedditClient {
   async getUser(username: string): Promise<RedditUser> {
     await this.authenticate()
     try {
-      const response = await this.api.get(`/user/${username}/about.json`)
-      const data = response.data.data
+      const response = await this.makeRequest(`/user/${username}/about.json`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: any }
+      const data = json.data
 
       return {
         name: data.name,
@@ -123,8 +144,13 @@ export class RedditClient {
   async getSubredditInfo(subredditName: string): Promise<RedditSubreddit> {
     await this.authenticate()
     try {
-      const response = await this.api.get(`/r/${subredditName}/about.json`)
-      const data = response.data.data
+      const response = await this.makeRequest(`/r/${subredditName}/about.json`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: any }
+      const data = json.data
 
       return {
         displayName: data.display_name,
@@ -148,14 +174,19 @@ export class RedditClient {
     await this.authenticate()
     try {
       const endpoint = subreddit ? `/r/${subreddit}/top.json` : "/top.json"
-      const response = await this.api.get(endpoint, {
-        params: {
-          t: timeFilter,
-          limit,
-        },
+      const params = new URLSearchParams({
+        t: timeFilter,
+        limit: limit.toString(),
       })
 
-      return response.data.data.children.map((child: any) => {
+      const response = await this.makeRequest(`${endpoint}?${params}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: { children: any[] } }
+
+      return json.data.children.map((child: any) => {
         const post = child.data
         return {
           id: post.id,
@@ -186,19 +217,24 @@ export class RedditClient {
     await this.authenticate()
     try {
       const endpoint = subreddit ? `/r/${subreddit}/comments/${postId}.json` : `/api/info.json?id=t3_${postId}`
+      const response = await this.makeRequest(endpoint)
 
-      const response = await this.api.get(endpoint)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as any
 
       let post
       if (subreddit) {
         // When using the comments endpoint
-        post = response.data[0].data.children[0].data
+        post = json[0].data.children[0].data
       } else {
         // When using the info endpoint
-        if (!response.data.data.children.length) {
+        if (!json.data.children.length) {
           throw new Error(`Post with ID ${postId} not found`)
         }
-        post = response.data.data.children[0].data
+        post = json.data.children[0].data
       }
 
       return {
@@ -228,11 +264,15 @@ export class RedditClient {
   async getTrendingSubreddits(limit: number = 5): Promise<string[]> {
     await this.authenticate()
     try {
-      const response = await this.api.get("/subreddits/popular.json", {
-        params: { limit },
-      })
+      const params = new URLSearchParams({ limit: limit.toString() })
+      const response = await this.makeRequest(`/subreddits/popular.json?${params}`)
 
-      return response.data.data.children.map((child: any) => child.data.display_name)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { data: { children: any[] } }
+      return json.data.children.map((child: any) => child.data.display_name)
     } catch {
       // Failed to get trending subreddits
       throw new Error("Failed to get trending subreddits")
@@ -254,15 +294,22 @@ export class RedditClient {
       params.append("title", title)
       params.append(isSelf ? "text" : "url", content)
 
-      const response = await this.api.post("/api/submit", params, {
+      const response = await this.makeRequest("/api/submit", {
+        method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
+        body: params.toString(),
       })
 
-      if (response.data.success) {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as { success: boolean; data: { id: string } }
+      if (json.success) {
         // Get the newly created post
-        const postId = response.data.data.id
+        const postId = json.data.id
         return await this.getPost(postId)
       } else {
         throw new Error("Failed to create post")
@@ -276,8 +323,13 @@ export class RedditClient {
   async checkPostExists(postId: string): Promise<boolean> {
     await this.authenticate()
     try {
-      const response = await this.api.get(`/api/info.json?id=t3_${postId}`)
-      return response.data.data.children.length > 0
+      const response = await this.makeRequest(`/api/info.json?id=t3_${postId}`)
+      if (!response.ok) {
+        return false
+      }
+
+      const json = (await response.json()) as { data: { children: any[] } }
+      return json.data.children.length > 0
     } catch {
       return false
     }
@@ -299,14 +351,20 @@ export class RedditClient {
       params.append("thing_id", `t3_${postId}`)
       params.append("text", content)
 
-      const response = await this.api.post("/api/comment", params, {
+      const response = await this.makeRequest("/api/comment", {
+        method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
+        body: params.toString(),
       })
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
       // Extract comment data from response
-      const commentData = response.data
+      const commentData = (await response.json()) as any
       return {
         id: commentData.id,
         author: this.username,
