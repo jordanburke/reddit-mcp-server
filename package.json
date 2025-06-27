@@ -1,6 +1,6 @@
 {
   "name": "reddit-mcp-server",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content. Fork of the alexandros-lekkas/reddit-mcp-server.",
   "main": "dist/index.js",
   "bin": {
@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "pnpm run lint && pnpm run format:check && pnpm run build",
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "dev": "pnpm build && pnpm inspect",
     "start": "pnpm build && npx reddit-mcp-server",
