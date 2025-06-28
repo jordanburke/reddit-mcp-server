@@ -55,7 +55,7 @@ class RedditServer {
       // Can't use server logging here as server isn't initialized yet
       // Using console.error is OK for startup failures
       console.error(
-          "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
+        "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
       )
       process.exit(1)
     }

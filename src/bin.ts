@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
 // Read package.json dynamically
-const fs = require('fs')
-const path = require('path')
-const packageJsonPath = path.join(__dirname, '..', 'package.json')
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'))
+import fs from "fs"
+import path from "path"
+const packageJsonPath = path.join(__dirname, "..", "package.json")
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"))
 
 // Handle command line arguments BEFORE any other imports
 const args = process.argv.slice(2)
 
-if (args.includes('--version') || args.includes('-v')) {
+if (args.includes("--version") || args.includes("-v")) {
   console.log(packageJson.version)
   process.exit(0)
 }
 
-if (args.includes('--help') || args.includes('-h')) {
+if (args.includes("--help") || args.includes("-h")) {
   console.log(`
 Reddit MCP Server v${packageJson.version}
 
