@@ -1,6 +1,6 @@
 {
   "name": "reddit-mcp-server",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content. Fork of the alexandros-lekkas/reddit-mcp-server.",
   "main": "dist/index.js",
   "bin": {
@@ -33,6 +33,14 @@
   ],
   "author": "Jordan Burke <jordan.burke@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jordanburke/reddit-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jordanburke/reddit-mcp-server/issues"
+  },
+  "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.2",
     "dotenv": "^16.6.1"
