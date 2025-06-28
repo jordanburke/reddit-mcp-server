@@ -52,7 +52,10 @@ class RedditServer {
 
     if (!clientId || !clientSecret) {
       // Can't use server logging here as server isn't initialized yet
-      // Exit silently with error code
+      // Using console.error is OK for startup failures
+      console.error(
+          "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
+      )
       process.exit(1)
     }
 
@@ -65,10 +68,14 @@ class RedditServer {
         password,
       })
 
-      // Client initialized successfully
-    } catch {
-      // Can't use server logging here as server isn't connected yet
-      // Exit silently with error code
+      console.error("[Setup] Reddit client initialized")
+      if (username && password) {
+        console.error(`[Setup] Authenticated as user: ${username}`)
+      } else {
+        console.error("[Setup] Running in read-only mode (no user authentication)")
+      }
+    } catch (error) {
+      console.error("[Error] Failed to initialize Reddit client:", error)
       process.exit(1)
     }
   }
@@ -509,10 +516,11 @@ class RedditServer {
 // Only run if this is the main module
 if (require.main === module) {
   const server = new RedditServer()
-  server.run().catch(() => {
+  server.run().catch((error) => {
     // Exit silently on error
+    console.error(error)
     process.exit(1)
-  })
+  }).catch(console.error)
 }
 
 export { RedditServer }
