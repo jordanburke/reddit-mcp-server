@@ -20,6 +20,7 @@ class RedditServer {
       {
         capabilities: {
           tools: {},
+          logging: {},
         },
       },
     )
@@ -511,16 +512,6 @@ class RedditServer {
           : "Running in read-only mode (no user authentication)",
     })
   }
-}
-
-// Only run if this is the main module
-if (require.main === module) {
-  const server = new RedditServer()
-  server.run().catch((error) => {
-    // Exit silently on error
-    console.error(error)
-    process.exit(1)
-  }).catch(console.error)
 }
 
 export { RedditServer }

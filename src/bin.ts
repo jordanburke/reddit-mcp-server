@@ -40,9 +40,10 @@ For more information, visit: https://github.com/jordanburke/reddit-mcp-server
 async function main() {
   const { RedditServer } = await import("./index.js")
   const server = new RedditServer()
-  server.run().catch(() => {
+  server.run().catch((error) => {
+    console.error(error)
     process.exit(1)
   })
 }
 
-main()
+main().then()
