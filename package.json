@@ -1,6 +1,6 @@
 {
   "name": "reddit-mcp-server",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content. Fork of the alexandros-lekkas/reddit-mcp-server.",
   "main": "dist/index.js",
   "bin": {
