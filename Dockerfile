@@ -16,7 +16,8 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (skip DTS for Docker)
+ENV SKIP_DTS=true
 RUN pnpm build
 
 # Production stage

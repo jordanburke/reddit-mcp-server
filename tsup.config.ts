@@ -7,7 +7,9 @@ export default defineConfig({
     server: 'src/server.ts'
   },
   format: ['cjs'],
-  dts: true,
+  dts: process.env.SKIP_DTS !== 'true',
   clean: true,
   shims: true,
+  skipNodeModulesBundle: true,
+  target: 'node16',
 });
