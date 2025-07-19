@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  reddit-mcp:
+    build: .
+    # Or use the published image:
+    # image: ghcr.io/jordanburke/reddit-mcp-server:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    # Or use environment variables directly:
+    # environment:
+    #   - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+    #   - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+    #   - REDDIT_USERNAME=${REDDIT_USERNAME}
+    #   - REDDIT_PASSWORD=${REDDIT_PASSWORD}
+    #   - REDDIT_USER_AGENT=${REDDIT_USER_AGENT:-RedditMCPServer/1.0}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

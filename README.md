@@ -131,6 +131,96 @@ npx reddit-mcp-server --version
 npx reddit-mcp-server --help
 ```
 
+### Streamable MCP Endpoint (Hono Server)
+
+In addition to the standard npx execution, this server also supports a Streamable MCP endpoint via Hono for direct HTTP integration:
+
+```bash
+# Start the Hono server on port 3000 (default)
+pnpm serve
+
+# Start with custom port
+PORT=8080 pnpm serve
+
+# Development mode with auto-reload
+pnpm serve:dev
+```
+
+The server will be available at `http://localhost:3000` with the MCP endpoint at `http://localhost:3000/mcp`.
+
+This allows integration with systems that support HTTP-based MCP communication, similar to the cq-api and agent-todo implementations.
+
+## 🐳 Docker Usage
+
+### Pull from GitHub Container Registry
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/jordanburke/reddit-mcp-server:latest
+
+# Pull a specific version
+docker pull ghcr.io/jordanburke/reddit-mcp-server:v1.0.10
+```
+
+### Run with Docker
+
+```bash
+# Run the HTTP server (recommended)
+docker run -d \
+  --name reddit-mcp \
+  -p 3000:3000 \
+  -e REDDIT_CLIENT_ID=your_client_id \
+  -e REDDIT_CLIENT_SECRET=your_client_secret \
+  -e REDDIT_USERNAME=your_username \
+  -e REDDIT_PASSWORD=your_password \
+  ghcr.io/jordanburke/reddit-mcp-server:latest
+
+# Run with custom port
+docker run -d \
+  --name reddit-mcp \
+  -p 8080:3000 \
+  --env-file .env \
+  ghcr.io/jordanburke/reddit-mcp-server:latest
+
+# Run as stdio MCP server (for direct integration)
+docker run -it \
+  --env-file .env \
+  ghcr.io/jordanburke/reddit-mcp-server:latest \
+  node dist/index.js
+```
+
+### Build Locally
+
+```bash
+# Build the image
+docker build -t reddit-mcp-server .
+
+# Run the locally built image
+docker run -d \
+  --name reddit-mcp \
+  -p 3000:3000 \
+  --env-file .env \
+  reddit-mcp-server
+```
+
+### Docker Compose Example
+
+```yaml
+version: '3.8'
+
+services:
+  reddit-mcp:
+    image: ghcr.io/jordanburke/reddit-mcp-server:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - REDDIT_USERNAME=${REDDIT_USERNAME}
+      - REDDIT_PASSWORD=${REDDIT_PASSWORD}
+    restart: unless-stopped
+```
+
 ## 📚 Credits
 
 - This is a fork of the original [reddit-mcp-server](https://github.com/alexandros-lekkas/reddit-mcp-server) by Alexandros Lekkas.
