@@ -4,8 +4,6 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 > **Note**: This is a fork of the original [reddit-mcp-server](https://github.com/alexandros-lekkas/reddit-mcp-server) by Alexandros Lekkas, updated with pnpm, tsup build system, and npx execution support.
 
-https://github.com/user-attachments/assets/caa37704-7c92-4bf8-b7e8-56d02ccb4983
-
 ## 🔧 Available Tools (Features)
 
 **Read-only Tools (Client Credentials):**
@@ -50,7 +48,7 @@ Make sure to select "script"!
 
 Do this with your `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`
 
-If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDIT_PASSWORD` (don't worry, I won't steal them 😜)
+If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDIT_PASSWORD`
 
 5. Install dependencies with `pnpm install`
 
@@ -92,8 +90,6 @@ If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDI
   }
 ```
 
-(Make sure to replace the environmental variables with your actual keys, not the 😜 emoji)
-
 ## 🛠️ Development
 
 ### Commands
@@ -129,6 +125,9 @@ npx reddit-mcp-server --version
 
 # Show help
 npx reddit-mcp-server --help
+
+# Generate OAuth token for HTTP server
+npx reddit-mcp-server --generate-token
 ```
 
 ### Streamable MCP Endpoint (Hono Server)
@@ -147,6 +146,37 @@ pnpm serve:dev
 ```
 
 The server will be available at `http://localhost:3000` with the MCP endpoint at `http://localhost:3000/mcp`.
+
+#### OAuth Security (Optional)
+
+The HTTP server supports optional OAuth protection to secure your endpoints:
+
+**Generate a secure token:**
+```bash
+npx reddit-mcp-server --generate-token
+# Output: Generated OAuth token: A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j
+```
+
+**Enable OAuth with generated token:**
+```bash
+export OAUTH_ENABLED=true
+export OAUTH_TOKEN="A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j"
+pnpm serve
+```
+
+**Make authenticated requests:**
+```bash
+curl -H "Authorization: Bearer A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j" \
+     -H "Content-Type: application/json" \
+     -d '{"method":"tools/list","params":{}}' \
+     http://localhost:3000/mcp
+```
+
+**OAuth Configuration:**
+- `OAUTH_ENABLED=true` - Enables OAuth protection (disabled by default)
+- `OAUTH_TOKEN=your-token` - Your custom token (or use `--generate-token`)
+- Without OAuth, the server is accessible without authentication
+- Health check (`/`) is always unprotected; only `/mcp` requires authentication
 
 This allows integration with systems that support HTTP-based MCP communication, similar to the cq-api and agent-todo implementations.
 
@@ -175,12 +205,27 @@ docker run -d \
   -e REDDIT_PASSWORD=your_password \
   ghcr.io/jordanburke/reddit-mcp-server:latest
 
+# Run with OAuth enabled (secure)
+docker run -d \
+  --name reddit-mcp \
+  -p 3000:3000 \
+  -e REDDIT_CLIENT_ID=your_client_id \
+  -e REDDIT_CLIENT_SECRET=your_client_secret \
+  -e OAUTH_ENABLED=true \
+  -e OAUTH_TOKEN=your_generated_token \
+  ghcr.io/jordanburke/reddit-mcp-server:latest
+
 # Run with custom port
 docker run -d \
   --name reddit-mcp \
   -p 8080:3000 \
   --env-file .env \
   ghcr.io/jordanburke/reddit-mcp-server:latest
+
+# Generate token using Docker
+docker run --rm \
+  ghcr.io/jordanburke/reddit-mcp-server:latest \
+  node dist/bin.js --generate-token
 
 # Run as stdio MCP server (for direct integration)
 docker run -it \
@@ -218,6 +263,9 @@ services:
       - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
       - REDDIT_USERNAME=${REDDIT_USERNAME}
       - REDDIT_PASSWORD=${REDDIT_PASSWORD}
+      # Optional OAuth settings
+      - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+      - OAUTH_TOKEN=${OAUTH_TOKEN}
     restart: unless-stopped
 ```
 

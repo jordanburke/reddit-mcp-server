@@ -6,12 +6,31 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError } from "@modelcontextprotocol/sdk/types.js"
 import { initializeRedditClient } from "./client/reddit-client"
 import * as tools from "./tools"
+import { createAuthMiddleware, generateRandomToken } from "./middleware/auth"
 import dotenv from "dotenv"
 
 // Load environment variables
 dotenv.config()
 
 const app = new Hono()
+
+// Configure OAuth
+const authToken = process.env.OAUTH_TOKEN || (process.env.OAUTH_ENABLED === "true" ? generateRandomToken() : undefined)
+const authConfig = {
+  enabled: process.env.OAUTH_ENABLED === "true",
+  token: authToken,
+}
+
+// Log auth configuration on startup
+if (authConfig.enabled) {
+  if (process.env.OAUTH_TOKEN) {
+    console.log("[Auth] OAuth enabled with provided token")
+  } else {
+    console.log(`[Auth] OAuth enabled with generated token: ${authToken}`)
+  }
+} else {
+  console.log("[Auth] OAuth disabled - server accessible without authentication")
+}
 
 // Add CORS middleware
 app.use(
@@ -23,6 +42,9 @@ app.use(
   }),
 )
 
+// Add OAuth middleware (applies to all protected routes)
+app.use("/mcp", createAuthMiddleware(authConfig))
+
 // Health check endpoint
 app.get("/", (c) => {
   return c.json({
@@ -30,6 +52,10 @@ app.get("/", (c) => {
     service: "Reddit MCP Server",
     endpoint: "/mcp",
     version: "1.0.10",
+    auth: {
+      enabled: authConfig.enabled,
+      ...(authConfig.enabled && { token_provided: !!process.env.OAUTH_TOKEN }),
+    },
   })
 })
 

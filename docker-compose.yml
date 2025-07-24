@@ -16,6 +16,8 @@ services:
     #   - REDDIT_USERNAME=${REDDIT_USERNAME}
     #   - REDDIT_PASSWORD=${REDDIT_PASSWORD}
     #   - REDDIT_USER_AGENT=${REDDIT_USER_AGENT:-RedditMCPServer/1.0}
+    #   - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
+    #   - OAUTH_TOKEN=${OAUTH_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]

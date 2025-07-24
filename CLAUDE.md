@@ -69,6 +69,26 @@ REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/0.1.0"
 REDDIT_USERNAME=your_username     # Optional, for write operations
 REDDIT_PASSWORD=your_password     # Optional, for write operations
+
+# OAuth Authentication (for HTTP server)
+OAUTH_ENABLED=true                # Set to "true" to enable OAuth protection
+OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not provided
+```
+
+### OAuth Security
+
+The HTTP server (`src/server.ts`) supports optional OAuth protection:
+
+- **Disabled by default**: The server runs without authentication
+- **Enable with**: `OAUTH_ENABLED=true`
+- **Token options**:
+  - Provide your own: `OAUTH_TOKEN=your-secure-token`
+  - Auto-generate: Server creates a random 32-character token on startup
+- **Usage**: Include `Authorization: Bearer <token>` header in requests to `/mcp`
+
+Example request with OAuth:
+```bash
+curl -H "Authorization: Bearer your-token" http://localhost:3000/mcp
 ```
 
 ## Key Implementation Details
