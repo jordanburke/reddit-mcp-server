@@ -24,9 +24,15 @@ if (args.includes("--generate-token")) {
     console.log(`export OAUTH_TOKEN="${token}"`)
     console.log(`export OAUTH_ENABLED=true`)
     console.log(`\nThen start the HTTP server with: pnpm serve`)
+    process.exit(0)
   }
-  generateToken().then(() => process.exit(0))
-  return
+  generateToken().catch((error) => {
+    console.error("Failed to generate token:", error)
+    process.exit(1)
+  })
+} else {
+  // Only import and start server if not showing version/help/generate-token
+  main().then()
 }
 
 if (args.includes("--help") || args.includes("-h")) {
@@ -56,7 +62,7 @@ For more information, visit: https://github.com/jordanburke/reddit-mcp-server
   process.exit(0)
 }
 
-// Only import and start server if not showing version/help
+// Only import and start server if not showing version/help/generate-token
 async function main() {
   const { RedditServer } = await import("./index.js")
   const server = new RedditServer()
@@ -65,5 +71,3 @@ async function main() {
     process.exit(1)
   })
 }
-
-main().then()
