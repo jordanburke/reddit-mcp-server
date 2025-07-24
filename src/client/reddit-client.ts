@@ -1,4 +1,14 @@
-import { RedditClientConfig, RedditUser, RedditPost, RedditComment, RedditSubreddit } from "../types"
+import {
+  RedditClientConfig,
+  RedditUser,
+  RedditPost,
+  RedditComment,
+  RedditSubreddit,
+  RedditApiUserResponse,
+  RedditApiSubredditResponse,
+  RedditApiListingResponse,
+  RedditApiPostData,
+} from "../types"
 
 export class RedditClient {
   private clientId: string
@@ -120,7 +130,7 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: any }
+      const json = (await response.json()) as RedditApiUserResponse
       const data = json.data
 
       return {
@@ -149,7 +159,7 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: any }
+      const json = (await response.json()) as RedditApiSubredditResponse
       const data = json.data
 
       return {
@@ -158,7 +168,7 @@ export class RedditClient {
         description: data.description || "",
         publicDescription: data.public_description || "",
         subscribers: data.subscribers,
-        activeUserCount: data.active_user_count,
+        activeUserCount: data.active_user_count ?? undefined,
         createdUtc: data.created_utc,
         over18: data.over18,
         subredditType: data.subreddit_type,
@@ -184,9 +194,9 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: { children: any[] } }
+      const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
-      return json.data.children.map((child: any) => {
+      return json.data.children.map((child) => {
         const post = child.data
         return {
           id: post.id,
@@ -203,7 +213,7 @@ export class RedditClient {
           spoiler: post.spoiler,
           edited: !!post.edited,
           isSelf: post.is_self,
-          linkFlairText: post.link_flair_text,
+          linkFlairText: post.link_flair_text ?? undefined,
           permalink: post.permalink,
         }
       })
@@ -434,7 +444,7 @@ export class RedditClient {
             spoiler: post.spoiler,
             edited: !!post.edited,
             isSelf: post.is_self,
-            linkFlairText: post.link_flair_text,
+            linkFlairText: post.link_flair_text ?? undefined,
             permalink: post.permalink,
           }
         })
@@ -568,7 +578,7 @@ export class RedditClient {
             spoiler: post.spoiler,
             edited: !!post.edited,
             isSelf: post.is_self,
-            linkFlairText: post.link_flair_text,
+            linkFlairText: post.link_flair_text ?? undefined,
             permalink: post.permalink,
           }
         })

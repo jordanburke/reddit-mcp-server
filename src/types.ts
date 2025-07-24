@@ -146,3 +146,86 @@ export interface FormattedCommentInfo {
   link: string
   commentAnalysis: string
 }
+
+// Reddit API Response Types (Raw API structures)
+export interface RedditApiUserResponse {
+  data: {
+    name: string
+    id: string
+    comment_karma: number
+    link_karma: number
+    total_karma?: number // Optional since it may not exist
+    is_mod: boolean
+    is_gold: boolean
+    is_employee: boolean
+    created_utc: number
+    [key: string]: unknown // Allow additional properties
+  }
+}
+
+export interface RedditApiSubredditResponse {
+  data: {
+    display_name: string
+    title: string
+    description: string
+    public_description: string
+    subscribers: number
+    active_user_count: number | null
+    created_utc: number
+    over18: boolean
+    subreddit_type: string
+    url: string
+    [key: string]: unknown
+  }
+}
+
+export interface RedditApiPostData {
+  id: string
+  title: string
+  author: string
+  subreddit: string
+  selftext: string
+  url: string
+  score: number
+  upvote_ratio: number
+  num_comments: number
+  created_utc: number
+  over_18: boolean
+  spoiler: boolean
+  edited: boolean | number
+  is_self: boolean
+  link_flair_text: string | null
+  permalink: string
+  [key: string]: unknown
+}
+
+export interface RedditApiListingResponse<T> {
+  data: {
+    children: Array<{
+      kind: string
+      data: T
+    }>
+    [key: string]: unknown
+  }
+}
+
+export interface RedditApiCommentData {
+  id: string
+  author: string
+  body: string
+  score: number
+  controversiality: number
+  subreddit: string
+  link_title: string
+  created_utc: number
+  edited: boolean | number
+  is_submitter: boolean
+  permalink: string
+  [key: string]: unknown
+}
+
+// Generic Reddit API wrapper
+export interface RedditApiResponse<T = unknown> {
+  data: T
+  [key: string]: unknown
+}
