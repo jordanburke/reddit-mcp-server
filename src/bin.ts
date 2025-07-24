@@ -3,8 +3,13 @@
 // Read package.json dynamically
 import fs from "fs"
 import path from "path"
+
+interface PackageJson {
+  version: string
+}
+
 const packageJsonPath = path.join(__dirname, "..", "package.json")
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"))
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as PackageJson
 
 // Handle command line arguments BEFORE any other imports
 const args = process.argv.slice(2)
