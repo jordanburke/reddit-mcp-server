@@ -27,7 +27,7 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 ### Installing via Smithery
 
-To install Reddit Content Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@alexandros-lekkas/reddit-mcp-server):
+To install Reddit Content Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@jordanburke/reddit-mcp-server):
 
 ```bash
 npx -y @smithery/cli install reddit-mcp-server --client claude
