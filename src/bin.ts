@@ -69,10 +69,8 @@ For more information, visit: https://github.com/jordanburke/reddit-mcp-server
 
 // Only import and start server if not showing version/help/generate-token
 async function main() {
-  const { RedditServer } = await import("./index.js")
-  const server = new RedditServer()
-  server.run().catch((error) => {
-    console.error(error)
-    process.exit(1)
-  })
+  // Import and run the main function from the FastMCP server
+  const indexModule = await import("./index.js")
+  // The index.js exports main() directly, so we just need to execute the file
+  // The main() is already executed when the module is imported
 }

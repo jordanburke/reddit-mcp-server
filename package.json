@@ -4,8 +4,7 @@
   "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content. Fork of the alexandros-lekkas/reddit-mcp-server.",
   "main": "dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./server": "./dist/server.js"
+    ".": "./dist/index.js"
   },
   "bin": {
     "reddit-mcp-server": "dist/bin.js"
@@ -23,8 +22,8 @@
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "dev": "pnpm build && pnpm inspect",
     "start": "pnpm build && npx reddit-mcp-server",
-    "serve": "pnpm build && node dist/server.js",
-    "serve:dev": "tsx watch src/server.ts",
+    "serve": "pnpm build && node dist/index.js",
+    "serve:dev": "tsx watch src/index.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
@@ -51,11 +50,9 @@
   },
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
-    "@hono/mcp": "^0.1.0",
-    "@hono/node-server": "^1.17.1",
-    "@modelcontextprotocol/sdk": "^1.17.0",
     "dotenv": "^16.6.1",
-    "hono": "^4.8.9"
+    "fastmcp": "^3.11.0",
+    "zod": "^4.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
