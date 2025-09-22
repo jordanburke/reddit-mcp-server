@@ -66,14 +66,14 @@ describe("post-tools", () => {
         edited: false,
         isVideo: false,
         linkFlairText: "Discussion",
-        permalink: "/r/programming/comments/test123/test_post_title/"
+        permalink: "/r/programming/comments/test123/test_post_title/",
       }
 
       mockRedditClient.getPost.mockResolvedValue(mockPost)
 
       const result = await getRedditPost({
         subreddit: "programming",
-        post_id: "test123"
+        post_id: "test123",
       })
 
       expect(mockRedditClient.getPost).toHaveBeenCalledWith("test123", "programming")
@@ -88,7 +88,7 @@ describe("post-tools", () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
       await expect(getRedditPost({ subreddit: "test", post_id: "123" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
       )
     })
 
@@ -96,7 +96,7 @@ describe("post-tools", () => {
       mockRedditClient.getPost.mockRejectedValue(new Error("Post not found"))
 
       await expect(getRedditPost({ subreddit: "test", post_id: "123" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch post data: Error: Post not found")
+        new McpError(ErrorCode.InternalError, "Failed to fetch post data: Error: Post not found"),
       )
     })
   })
@@ -120,14 +120,14 @@ describe("post-tools", () => {
           edited: false,
           isVideo: false,
           linkFlairText: "Discussion",
-          permalink: "/r/programming/comments/post1/"
-        }
+          permalink: "/r/programming/comments/post1/",
+        },
       ]
 
       mockRedditClient.getTopPosts.mockResolvedValue(mockPosts)
 
       const result = await getTopPosts({
-        subreddit: "programming"
+        subreddit: "programming",
       })
 
       expect(mockRedditClient.getTopPosts).toHaveBeenCalledWith("programming", "week", 10)
@@ -142,8 +142,8 @@ describe("post-tools", () => {
 
       await getTopPosts({
         subreddit: "test",
-        time_filter: "day", 
-        limit: 5
+        time_filter: "day",
+        limit: 5,
       })
 
       expect(mockRedditClient.getTopPosts).toHaveBeenCalledWith("test", "day", 5)
@@ -153,7 +153,7 @@ describe("post-tools", () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
       await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
       )
     })
 
@@ -161,7 +161,7 @@ describe("post-tools", () => {
       mockRedditClient.getTopPosts.mockRejectedValue(new Error("Subreddit not found"))
 
       await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch top posts: Error: Subreddit not found")
+        new McpError(ErrorCode.InternalError, "Failed to fetch top posts: Error: Subreddit not found"),
       )
     })
   })

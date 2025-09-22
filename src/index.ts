@@ -1,7 +1,7 @@
 import { FastMCP } from "fastmcp"
 import { z } from "zod"
 import { initializeRedditClient, getRedditClient } from "./client/reddit-client"
-import { formatUserInfo, formatPostInfo, formatSubredditInfo, formatCommentInfo } from "./utils/formatters"
+import { formatUserInfo, formatPostInfo, formatSubredditInfo } from "./utils/formatters"
 import dotenv from "dotenv"
 
 // Load environment variables
@@ -17,7 +17,7 @@ async function setupRedditClient() {
 
   if (!clientId || !clientSecret) {
     console.error(
-      "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables."
+      "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
     )
     process.exit(1)
   }
@@ -57,7 +57,7 @@ Available capabilities:
 - Analyze engagement metrics and community insights
 
 For write operations (posting, replying), ensure REDDIT_USERNAME and REDDIT_PASSWORD are configured.`,
-  
+
   // Optional OAuth configuration for HTTP transport
   ...(process.env.OAUTH_ENABLED === "true" && {
     authenticate: async (request) => {
@@ -66,24 +66,26 @@ For write operations (posting, replying), ensure REDDIT_USERNAME and REDDIT_PASS
 
       if (!expectedToken) {
         // If OAuth is enabled but no token configured, generate one
-        const token = Array.from({ length: 32 }, () => 
-          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-            .charAt(Math.floor(Math.random() * 62))
-        ).join('')
+        const token = Array.from({ length: 32 }, () =>
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 62)),
+        ).join("")
         console.log(`[Auth] Generated OAuth token: ${token}`)
-        throw new Response(JSON.stringify({ 
-          error: "No OAuth token configured", 
-          generatedToken: token 
-        }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" }
-        })
+        throw new Response(
+          JSON.stringify({
+            error: "No OAuth token configured",
+            generatedToken: token,
+          }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          },
+        )
       }
 
       if (!authHeader?.startsWith("Bearer ")) {
         throw new Response(null, {
           status: 401,
-          statusText: "Missing or invalid Authorization header"
+          statusText: "Missing or invalid Authorization header",
         })
       }
 
@@ -91,13 +93,13 @@ For write operations (posting, replying), ensure REDDIT_USERNAME and REDDIT_PASS
       if (token !== expectedToken) {
         throw new Response(null, {
           status: 403,
-          statusText: "Invalid token"
+          statusText: "Invalid token",
         })
       }
 
       return { authenticated: true }
-    }
-  })
+    },
+  }),
 })
 
 // Test tool
@@ -109,7 +111,7 @@ server.addTool({
     const client = getRedditClient()
     const hasAuth = client ? "✓" : "✗"
     const hasWriteAccess = process.env.REDDIT_USERNAME && process.env.REDDIT_PASSWORD ? "✓" : "✗"
-    
+
     return `Reddit MCP Server Status:
 - Server: ✓ Running
 - Reddit Client: ${hasAuth} ${client ? "Initialized" : "Not initialized"}  
@@ -117,7 +119,7 @@ server.addTool({
 - Version: 1.1.0
 
 Ready to handle Reddit API requests!`
-  }
+  },
 })
 
 // User tools
@@ -125,7 +127,7 @@ server.addTool({
   name: "get_user_info",
   description: "Get detailed information about a Reddit user including karma, account status, and activity analysis",
   parameters: z.object({
-    username: z.string().describe("The Reddit username (without u/ prefix)")
+    username: z.string().describe("The Reddit username (without u/ prefix)"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -153,7 +155,7 @@ server.addTool({
 
 ## Recommendations
 - ${formattedUser.recommendations.replace(/\n  - /g, "\n- ")}`
-  }
+  },
 })
 
 server.addTool({
@@ -162,8 +164,11 @@ server.addTool({
   parameters: z.object({
     username: z.string().describe("The Reddit username (without u/ prefix)"),
     sort: z.enum(["new", "hot", "top"]).default("new").describe("Sort order for posts"),
-    time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all").describe("Time filter for top posts"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve")
+    time_filter: z
+      .enum(["hour", "day", "week", "month", "year", "all"])
+      .default("all")
+      .describe("Time filter for top posts"),
+    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -174,31 +179,30 @@ server.addTool({
     const posts = await client.getUserPosts(args.username, {
       sort: args.sort,
       timeFilter: args.time_filter,
-      limit: args.limit
+      limit: args.limit,
     })
 
     if (posts.length === 0) {
       return `No posts found for u/${args.username} with the specified filters.`
     }
 
-    const postSummaries = posts.map((post, index) => {
-      const flags = [
-        ...(post.over18 ? ["**NSFW**"] : []),
-        ...(post.spoiler ? ["**Spoiler**"] : [])
-      ]
-      
-      return `### ${index + 1}. ${post.title} ${flags.join(" ")}
+    const postSummaries = posts
+      .map((post, index) => {
+        const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler ? ["**Spoiler**"] : [])]
+
+        return `### ${index + 1}. ${post.title} ${flags.join(" ")}
 - Subreddit: r/${post.subreddit}
 - Score: ${post.score.toLocaleString()} (${(post.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.numComments.toLocaleString()}
 - Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
 - Link: https://reddit.com${post.permalink}`
-    }).join("\n\n")
+      })
+      .join("\n\n")
 
     return `# Posts by u/${args.username} (${args.sort} - ${args.time_filter})
 
 ${postSummaries}`
-  }
+  },
 })
 
 server.addTool({
@@ -207,8 +211,11 @@ server.addTool({
   parameters: z.object({
     username: z.string().describe("The Reddit username (without u/ prefix)"),
     sort: z.enum(["new", "hot", "top"]).default("new").describe("Sort order for comments"),
-    time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all").describe("Time filter for top comments"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of comments to retrieve")
+    time_filter: z
+      .enum(["hour", "day", "week", "month", "year", "all"])
+      .default("all")
+      .describe("Time filter for top comments"),
+    limit: z.number().min(1).max(100).default(10).describe("Number of comments to retrieve"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -219,24 +226,20 @@ server.addTool({
     const comments = await client.getUserComments(args.username, {
       sort: args.sort,
       timeFilter: args.time_filter,
-      limit: args.limit
+      limit: args.limit,
     })
 
     if (comments.length === 0) {
       return `No comments found for u/${args.username} with the specified filters.`
     }
 
-    const commentSummaries = comments.map((comment, index) => {
-      const truncatedBody = comment.body.length > 300 
-        ? comment.body.substring(0, 300) + "..."
-        : comment.body
-      
-      const flags = [
-        ...(comment.edited ? ["*(edited)*"] : []),
-        ...(comment.isSubmitter ? ["**OP**"] : [])
-      ]
+    const commentSummaries = comments
+      .map((comment, index) => {
+        const truncatedBody = comment.body.length > 300 ? comment.body.substring(0, 300) + "..." : comment.body
 
-      return `### ${index + 1}. Comment ${flags.join(" ")}
+        const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
+
+        return `### ${index + 1}. Comment ${flags.join(" ")}
 In r/${comment.subreddit} on "${comment.submissionTitle}"
 
 > ${truncatedBody}
@@ -244,21 +247,23 @@ In r/${comment.subreddit} on "${comment.submissionTitle}"
 - Score: ${comment.score.toLocaleString()}
 - Posted: ${new Date(comment.createdUtc * 1000).toLocaleString()}
 - Link: https://reddit.com${comment.permalink}`
-    }).join("\n\n")
+      })
+      .join("\n\n")
 
     return `# Comments by u/${args.username} (${args.sort} - ${args.time_filter})
 
 ${commentSummaries}`
-  }
+  },
 })
 
 // Post tools
 server.addTool({
   name: "get_reddit_post",
-  description: "Get detailed information about a specific Reddit post including content, stats, and engagement analysis",
+  description:
+    "Get detailed information about a specific Reddit post including content, stats, and engagement analysis",
   parameters: z.object({
     subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
-    post_id: z.string().describe("The Reddit post ID")
+    post_id: z.string().describe("The Reddit post ID"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -298,7 +303,7 @@ ${formattedPost.content}
 
 ## Best Time to Engage
 ${formattedPost.bestTimeToEngage}`
-  }
+  },
 })
 
 server.addTool({
@@ -306,8 +311,11 @@ server.addTool({
   description: "Get top posts from a subreddit or from the Reddit home feed",
   parameters: z.object({
     subreddit: z.string().optional().describe("The subreddit name (without r/ prefix). Leave empty for home feed"),
-    time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("week").describe("Time period for top posts"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve")
+    time_filter: z
+      .enum(["hour", "day", "week", "month", "year", "all"])
+      .default("week")
+      .describe("Time period for top posts"),
+    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -316,25 +324,29 @@ server.addTool({
     }
 
     const posts = await client.getTopPosts(args.subreddit || "", args.time_filter, args.limit)
-    
+
     if (posts.length === 0) {
       const location = args.subreddit ? `r/${args.subreddit}` : "home feed"
       return `No posts found in ${location} for the specified time period.`
     }
 
     const formattedPosts = posts.map(formatPostInfo)
-    const postSummaries = formattedPosts.map((post, index) => `### ${index + 1}. ${post.title}
+    const postSummaries = formattedPosts
+      .map(
+        (post, index) => `### ${index + 1}. ${post.title}
 - Author: u/${post.author}
 - Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.stats.comments.toLocaleString()}
 - Posted: ${post.metadata.posted}
-- Link: ${post.links.shortLink}`).join("\n\n")
+- Link: ${post.links.shortLink}`,
+      )
+      .join("\n\n")
 
     const location = args.subreddit ? `r/${args.subreddit}` : "Home Feed"
     return `# Top Posts from ${location} (${args.time_filter})
 
 ${postSummaries}`
-  }
+  },
 })
 
 // Subreddit tools
@@ -342,7 +354,7 @@ server.addTool({
   name: "get_subreddit_info",
   description: "Get detailed information about a subreddit including description, stats, and community analysis",
   parameters: z.object({
-    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)")
+    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -384,7 +396,7 @@ ${formattedSubreddit.description.full}
 
 ## Engagement Tips
 - ${formattedSubreddit.engagementTips.replace(/\n  - /g, "\n- ")}`
-  }
+  },
 })
 
 server.addTool({
@@ -402,7 +414,7 @@ server.addTool({
     return `# Trending Subreddits
 
 ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).join("\n")}`
-  }
+  },
 })
 
 // Search tools
@@ -415,7 +427,7 @@ server.addTool({
     sort: z.enum(["relevance", "hot", "top", "new", "comments"]).default("relevance").describe("Sort order"),
     time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all").describe("Time filter"),
     limit: z.number().min(1).max(100).default(10).describe("Number of results"),
-    type: z.enum(["link", "sr", "user"]).default("link").describe("Type of content to search")
+    type: z.enum(["link", "sr", "user"]).default("link").describe("Type of content to search"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -432,7 +444,7 @@ server.addTool({
       sort: args.sort,
       timeFilter: args.time_filter,
       limit: args.limit,
-      type: args.type
+      type: args.type,
     })
 
     if (posts.length === 0) {
@@ -440,20 +452,19 @@ server.addTool({
       return `No results found for "${args.query}"${searchLocation}.`
     }
 
-    const searchResults = posts.map((post, index) => {
-      const flags = [
-        ...(post.over18 ? ["**NSFW**"] : []),
-        ...(post.spoiler ? ["**Spoiler**"] : [])
-      ]
+    const searchResults = posts
+      .map((post, index) => {
+        const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler ? ["**Spoiler**"] : [])]
 
-      return `### ${index + 1}. ${post.title} ${flags.join(" ")}
+        return `### ${index + 1}. ${post.title} ${flags.join(" ")}
 - Subreddit: r/${post.subreddit}
 - Author: u/${post.author}
 - Score: ${post.score.toLocaleString()} (${(post.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.numComments.toLocaleString()}
 - Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
 - Link: https://reddit.com${post.permalink}`
-    }).join("\n\n")
+      })
+      .join("\n\n")
 
     const searchLocation = args.subreddit ? ` in r/${args.subreddit}` : ""
     return `# Reddit Search Results for: "${args.query}"${searchLocation}
@@ -461,7 +472,7 @@ server.addTool({
 Sorted by: ${args.sort} | Time: ${args.time_filter} | Type: ${args.type}
 
 ${searchResults}`
-  }
+  },
 })
 
 // Comment tools
@@ -472,7 +483,7 @@ server.addTool({
     post_id: z.string().describe("The Reddit post ID"),
     subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
     sort: z.enum(["best", "top", "new", "controversial", "old", "qa"]).default("best").describe("Comment sort order"),
-    limit: z.number().min(1).max(500).default(100).describe("Maximum number of comments to retrieve")
+    limit: z.number().min(1).max(500).default(100).describe("Maximum number of comments to retrieve"),
   }),
   execute: async (args) => {
     const client = getRedditClient()
@@ -486,7 +497,7 @@ server.addTool({
 
     const data = await client.getPostComments(args.post_id, args.subreddit, {
       sort: args.sort,
-      limit: args.limit
+      limit: args.limit,
     })
 
     const post = data.post
@@ -507,31 +518,33 @@ server.addTool({
       return response
     }
 
-    const commentSummaries = comments.map((comment, index) => {
-      const indent = "└─".repeat(Math.min(comment.depth || 0, 3))
-      const authorBadge = comment.isSubmitter ? " **[OP]**" : ""
-      const editedBadge = comment.edited ? " *(edited)*" : ""
+    const commentSummaries = comments
+      .map((comment) => {
+        const indent = "└─".repeat(Math.min(comment.depth || 0, 3))
+        const authorBadge = comment.isSubmitter ? " **[OP]**" : ""
+        const editedBadge = comment.edited ? " *(edited)*" : ""
 
-      return `${indent} **u/${comment.author}**${authorBadge}${editedBadge} (${comment.score.toLocaleString()} points)
+        return `${indent} **u/${comment.author}**${authorBadge}${editedBadge} (${comment.score.toLocaleString()} points)
 
 ${comment.body}
 
 ---`
-    }).join("\n\n")
+      })
+      .join("\n\n")
 
     response += commentSummaries
     return response
-  }
+  },
 })
 
 // Initialize and start server
 async function main() {
   try {
     await setupRedditClient()
-    
+
     // Start with stdio transport (for Claude Desktop)
     await server.start({
-      transportType: "stdio"
+      transportType: "stdio",
     })
   } catch (error) {
     console.error("[Error] Failed to start server:", error)

@@ -21,10 +21,7 @@ vi.mock("../../utils/formatters", () => ({
     },
     metadata: {
       created: new Date(subreddit.createdUtc * 1000).toISOString(),
-      flags: [
-        ...(subreddit.over18 ? ["NSFW"] : []),
-        ...(subreddit.subredditType === "private" ? ["Private"] : []),
-      ],
+      flags: [...(subreddit.over18 ? ["NSFW"] : []), ...(subreddit.subredditType === "private" ? ["Private"] : [])],
     },
     links: {
       subreddit: `https://reddit.com/r/${subreddit.displayName}`,
@@ -58,13 +55,13 @@ describe("subreddit-tools", () => {
         createdUtc: 1234567890,
         over18: false,
         subredditType: "public",
-        url: "/r/programming/"
+        url: "/r/programming/",
       }
 
       mockRedditClient.getSubredditInfo.mockResolvedValue(mockSubreddit)
 
       const result = await getSubredditInfo({
-        subreddit_name: "programming"
+        subreddit_name: "programming",
       })
 
       expect(mockRedditClient.getSubredditInfo).toHaveBeenCalledWith("programming")
@@ -78,7 +75,7 @@ describe("subreddit-tools", () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
       await expect(getSubredditInfo({ subreddit_name: "test" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
       )
     })
 
@@ -86,7 +83,7 @@ describe("subreddit-tools", () => {
       mockRedditClient.getSubredditInfo.mockRejectedValue(new Error("Subreddit not found"))
 
       await expect(getSubredditInfo({ subreddit_name: "nonexistent" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch subreddit data: Error: Subreddit not found")
+        new McpError(ErrorCode.InternalError, "Failed to fetch subreddit data: Error: Subreddit not found"),
       )
     })
 
@@ -95,19 +92,19 @@ describe("subreddit-tools", () => {
         displayName: "programming",
         title: "Programming",
         description: "A subreddit for programming discussions",
-        publicDescription: "Public description",  
+        publicDescription: "Public description",
         subscribers: 1000000,
         activeUserCount: null,
         createdUtc: 1234567890,
         over18: false,
         subredditType: "public",
-        url: "/r/programming/"
+        url: "/r/programming/",
       }
 
       mockRedditClient.getSubredditInfo.mockResolvedValue(mockSubreddit)
 
       const result = await getSubredditInfo({
-        subreddit_name: "programming"
+        subreddit_name: "programming",
       })
 
       expect(result.content[0].text).toContain("Active Users: N/A")
@@ -124,13 +121,13 @@ describe("subreddit-tools", () => {
         createdUtc: 1234567890,
         over18: true,
         subredditType: "public",
-        url: "/r/nsfw_subreddit/"
+        url: "/r/nsfw_subreddit/",
       }
 
       mockRedditClient.getSubredditInfo.mockResolvedValue(mockSubreddit)
 
       const result = await getSubredditInfo({
-        subreddit_name: "nsfw_subreddit"
+        subreddit_name: "nsfw_subreddit",
       })
 
       expect(result.content[0].text).toContain("NSFW")
@@ -157,7 +154,7 @@ describe("subreddit-tools", () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
       await expect(getTrendingSubreddits()).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
       )
     })
 
@@ -165,7 +162,7 @@ describe("subreddit-tools", () => {
       mockRedditClient.getTrendingSubreddits.mockRejectedValue(new Error("API Error"))
 
       await expect(getTrendingSubreddits()).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch trending subreddits: Error: API Error")
+        new McpError(ErrorCode.InternalError, "Failed to fetch trending subreddits: Error: API Error"),
       )
     })
 
