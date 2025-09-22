@@ -1,6 +1,6 @@
 import { getRedditClient } from "../client/reddit-client"
 import { formatPost } from "../utils/formatters"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 export async function searchReddit(params: {
   query: string
@@ -14,11 +14,11 @@ export async function searchReddit(params: {
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   if (!query || query.trim().length === 0) {
-    throw new McpError(ErrorCode.InvalidParams, "Search query cannot be empty")
+    throw new UserError("Search query cannot be empty")
   }
 
   try {
@@ -62,6 +62,6 @@ ${formatted.spoiler ? "- **Spoiler**" : ""}
       ],
     }
   } catch (error) {
-    throw new McpError(ErrorCode.InternalError, `Failed to search Reddit: ${String(error)}`)
+    throw new UserError(`Failed to search Reddit: ${String(error)}`)
   }
 }

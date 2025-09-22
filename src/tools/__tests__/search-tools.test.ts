@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { searchReddit } from "../search-tools"
 import { getRedditClient } from "../../client/reddit-client"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 vi.mock("../../client/reddit-client")
 
@@ -75,26 +75,20 @@ describe("searchReddit", () => {
   it("should throw error if Reddit client is not initialized", async () => {
     vi.mocked(getRedditClient).mockReturnValue(null)
 
-    await expect(searchReddit({ query: "test" })).rejects.toThrow(
-      new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
-    )
+    await expect(searchReddit({ query: "test" })).rejects.toThrow(new UserError("Reddit client not initialized"))
   })
 
   it("should throw error if query is empty", async () => {
-    await expect(searchReddit({ query: "" })).rejects.toThrow(
-      new McpError(ErrorCode.InvalidParams, "Search query cannot be empty"),
-    )
+    await expect(searchReddit({ query: "" })).rejects.toThrow(new UserError("Search query cannot be empty"))
 
-    await expect(searchReddit({ query: "   " })).rejects.toThrow(
-      new McpError(ErrorCode.InvalidParams, "Search query cannot be empty"),
-    )
+    await expect(searchReddit({ query: "   " })).rejects.toThrow(new UserError("Search query cannot be empty"))
   })
 
   it("should handle search errors", async () => {
     mockRedditClient.searchReddit.mockRejectedValue(new Error("API Error"))
 
     await expect(searchReddit({ query: "test" })).rejects.toThrow(
-      new McpError(ErrorCode.InternalError, "Failed to search Reddit: Error: API Error"),
+      new UserError("Failed to search Reddit: Error: API Error"),
     )
   })
 })

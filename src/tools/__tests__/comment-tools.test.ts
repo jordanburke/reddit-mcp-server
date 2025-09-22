@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { getPostComments } from "../comment-tools"
 import { getRedditClient } from "../../client/reddit-client"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 vi.mock("../../client/reddit-client")
 
@@ -95,17 +95,17 @@ describe("getPostComments", () => {
     vi.mocked(getRedditClient).mockReturnValue(null)
 
     await expect(getPostComments({ post_id: "test", subreddit: "test" })).rejects.toThrow(
-      new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
+      new UserError("Reddit client not initialized"),
     )
   })
 
   it("should throw error if required parameters are missing", async () => {
     await expect(getPostComments({ post_id: "", subreddit: "test" })).rejects.toThrow(
-      new McpError(ErrorCode.InvalidParams, "post_id and subreddit are required"),
+      new UserError("post_id and subreddit are required"),
     )
 
     await expect(getPostComments({ post_id: "test", subreddit: "" })).rejects.toThrow(
-      new McpError(ErrorCode.InvalidParams, "post_id and subreddit are required"),
+      new UserError("post_id and subreddit are required"),
     )
   })
 
@@ -113,7 +113,7 @@ describe("getPostComments", () => {
     mockRedditClient.getPostComments.mockRejectedValue(new Error("API Error"))
 
     await expect(getPostComments({ post_id: "test", subreddit: "test" })).rejects.toThrow(
-      new McpError(ErrorCode.InternalError, "Failed to fetch comments: Error: API Error"),
+      new UserError("Failed to fetch comments: Error: API Error"),
     )
   })
 })

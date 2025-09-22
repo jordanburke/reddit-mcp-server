@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { getRedditPost, getTopPosts } from "../post-tools"
 import { getRedditClient } from "../../client/reddit-client"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 vi.mock("../../client/reddit-client")
 vi.mock("../../utils/formatters")
@@ -88,7 +88,7 @@ describe("post-tools", () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
       await expect(getRedditPost({ subreddit: "test", post_id: "123" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
+        new UserError("Reddit client not initialized"),
       )
     })
 
@@ -96,7 +96,7 @@ describe("post-tools", () => {
       mockRedditClient.getPost.mockRejectedValue(new Error("Post not found"))
 
       await expect(getRedditPost({ subreddit: "test", post_id: "123" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch post data: Error: Post not found"),
+        new UserError("Failed to fetch post data: Error: Post not found"),
       )
     })
   })
@@ -152,16 +152,14 @@ describe("post-tools", () => {
     it("should throw error if Reddit client is not initialized", async () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
-      await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
-      )
+      await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(new UserError("Reddit client not initialized"))
     })
 
     it("should handle API errors", async () => {
       mockRedditClient.getTopPosts.mockRejectedValue(new Error("Subreddit not found"))
 
       await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch top posts: Error: Subreddit not found"),
+        new UserError("Failed to fetch top posts: Error: Subreddit not found"),
       )
     })
   })

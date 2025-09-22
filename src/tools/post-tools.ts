@@ -1,13 +1,13 @@
 import { getRedditClient } from "../client/reddit-client"
 import { formatPostInfo, formatCommentInfo } from "../utils/formatters"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 export async function getRedditPost(params: { subreddit: string; post_id: string }) {
   const { subreddit, post_id } = params
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -55,7 +55,7 @@ ${formattedPost.bestTimeToEngage}
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch post data: ${String(error)}`)
+    throw new UserError(`Failed to fetch post data: ${String(error)}`)
   }
 }
 
@@ -64,7 +64,7 @@ export async function getTopPosts(params: { subreddit: string; time_filter?: str
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -99,7 +99,7 @@ ${postSummaries}
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch top posts: ${String(error)}`)
+    throw new UserError(`Failed to fetch top posts: ${String(error)}`)
   }
 }
 
@@ -108,7 +108,7 @@ export async function createPost(params: { subreddit: string; title: string; con
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -136,7 +136,7 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to create post: ${String(error)}`)
+    throw new UserError(`Failed to create post: ${String(error)}`)
   }
 }
 
@@ -145,7 +145,7 @@ export async function replyToPost(params: { post_id: string; content: string; su
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -173,6 +173,6 @@ Your reply has been successfully posted.
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to reply to post: ${String(error)}`)
+    throw new UserError(`Failed to reply to post: ${String(error)}`)
   }
 }

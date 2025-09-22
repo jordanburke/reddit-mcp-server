@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { getSubredditInfo, getTrendingSubreddits } from "../subreddit-tools"
 import { getRedditClient } from "../../client/reddit-client"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 vi.mock("../../client/reddit-client")
 vi.mock("../../utils/formatters")
@@ -75,7 +75,7 @@ describe("subreddit-tools", () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
       await expect(getSubredditInfo({ subreddit_name: "test" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
+        new UserError("Reddit client not initialized"),
       )
     })
 
@@ -83,7 +83,7 @@ describe("subreddit-tools", () => {
       mockRedditClient.getSubredditInfo.mockRejectedValue(new Error("Subreddit not found"))
 
       await expect(getSubredditInfo({ subreddit_name: "nonexistent" })).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch subreddit data: Error: Subreddit not found"),
+        new UserError("Failed to fetch subreddit data: Error: Subreddit not found"),
       )
     })
 
@@ -153,16 +153,14 @@ describe("subreddit-tools", () => {
     it("should throw error if Reddit client is not initialized", async () => {
       vi.mocked(getRedditClient).mockReturnValue(null)
 
-      await expect(getTrendingSubreddits()).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Reddit client not initialized"),
-      )
+      await expect(getTrendingSubreddits()).rejects.toThrow(new UserError("Reddit client not initialized"))
     })
 
     it("should handle API errors", async () => {
       mockRedditClient.getTrendingSubreddits.mockRejectedValue(new Error("API Error"))
 
       await expect(getTrendingSubreddits()).rejects.toThrow(
-        new McpError(ErrorCode.InternalError, "Failed to fetch trending subreddits: Error: API Error"),
+        new UserError("Failed to fetch trending subreddits: Error: API Error"),
       )
     })
 

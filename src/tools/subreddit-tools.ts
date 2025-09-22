@@ -1,13 +1,13 @@
 import { getRedditClient } from "../client/reddit-client"
 import { formatSubredditInfo } from "../utils/formatters"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 export async function getSubredditInfo(params: { subreddit_name: string }) {
   const { subreddit_name } = params
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -57,7 +57,7 @@ ${formattedSubreddit.description.full}
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch subreddit data: ${String(error)}`)
+    throw new UserError(`Failed to fetch subreddit data: ${String(error)}`)
   }
 }
 
@@ -65,7 +65,7 @@ export async function getTrendingSubreddits() {
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -86,6 +86,6 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch trending subreddits: ${String(error)}`)
+    throw new UserError(`Failed to fetch trending subreddits: ${String(error)}`)
   }
 }

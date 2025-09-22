@@ -1,13 +1,13 @@
 import { getRedditClient } from "../client/reddit-client"
 import { formatUserInfo } from "../utils/formatters"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 export async function getUserInfo(params: { username: string }) {
   const { username } = params
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -43,7 +43,7 @@ export async function getUserInfo(params: { username: string }) {
     }
   } catch (error) {
     // Error will be logged by the server
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch user data: ${String(error)}`)
+    throw new UserError(`Failed to fetch user data: ${String(error)}`)
   }
 }
 
@@ -52,7 +52,7 @@ export async function getUserPosts(params: { username: string; sort?: string; ti
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -92,7 +92,7 @@ ${post.spoiler ? "- **Spoiler**" : ""}`
       ],
     }
   } catch (error) {
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch user posts: ${String(error)}`)
+    throw new UserError(`Failed to fetch user posts: ${String(error)}`)
   }
 }
 
@@ -106,7 +106,7 @@ export async function getUserComments(params: {
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   try {
@@ -142,6 +142,6 @@ ${body}`
       ],
     }
   } catch (error) {
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch user comments: ${String(error)}`)
+    throw new UserError(`Failed to fetch user comments: ${String(error)}`)
   }
 }

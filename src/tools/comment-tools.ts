@@ -1,17 +1,17 @@
 import { getRedditClient } from "../client/reddit-client"
 import { formatPost } from "../utils/formatters"
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+import { UserError } from "fastmcp"
 
 export async function getPostComments(params: { post_id: string; subreddit: string; sort?: string; limit?: number }) {
   const { post_id, subreddit, sort = "best", limit = 100 } = params
   const client = getRedditClient()
 
   if (!client) {
-    throw new McpError(ErrorCode.InternalError, "Reddit client not initialized")
+    throw new UserError("Reddit client not initialized")
   }
 
   if (!post_id || !subreddit) {
-    throw new McpError(ErrorCode.InvalidParams, "post_id and subreddit are required")
+    throw new UserError("post_id and subreddit are required")
   }
 
   try {
@@ -56,6 +56,6 @@ ${comments.map((comment) => formatComment(comment)).join("\n\n---\n\n")}`,
       ],
     }
   } catch (error) {
-    throw new McpError(ErrorCode.InternalError, `Failed to fetch comments: ${String(error)}`)
+    throw new UserError(`Failed to fetch comments: ${String(error)}`)
   }
 }
