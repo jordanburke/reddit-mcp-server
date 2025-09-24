@@ -34,7 +34,7 @@ jobs:
         run: pnpm run validate
 
       - name: Publish to npm
-        if: ${{ secrets.NPM_TOKEN }}
+        if: ${{ secrets.NPM_TOKEN != '' }}
         run: pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
