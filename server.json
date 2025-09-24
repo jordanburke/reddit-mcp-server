@@ -1,0 +1,126 @@
+{
+  "$schema": "https://schemas.modelcontextprotocol.io/server-configuration-v1.json",
+  "name": "io.github.jordanburke.reddit-mcp-server",
+  "description": "A Model Context Protocol (MCP) server that provides tools for interacting with the Reddit API. Supports fetching posts, subreddit information, user details, creating posts, and replying to comments.",
+  "version": "1.1.1",
+  "homepage": "https://github.com/jordanburke/reddit-mcp-server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jordanburke/reddit-mcp-server.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Jordan Burke",
+    "email": "jordan.burke@gmail.com"
+  },
+  "keywords": ["mcp", "reddit", "api", "social-media", "content-creation", "model-context-protocol"],
+  "categories": ["social-media", "api-integration", "content-management"],
+  "deployment": {
+    "type": "packages",
+    "packages": [
+      {
+        "type": "npm",
+        "name": "reddit-mcp-server",
+        "registry": "https://registry.npmjs.org"
+      }
+    ]
+  },
+  "mcpVersion": "2024-11-05",
+  "capabilities": {
+    "tools": [
+      {
+        "name": "get_reddit_post",
+        "description": "Get detailed information about a Reddit post by URL or post ID"
+      },
+      {
+        "name": "get_subreddit_info",
+        "description": "Get information about a subreddit including description, subscriber count, and rules"
+      },
+      {
+        "name": "get_subreddit_posts",
+        "description": "Get posts from a subreddit with various sorting options"
+      },
+      {
+        "name": "get_user_info",
+        "description": "Get information about a Reddit user including karma, account age, and recent activity"
+      },
+      {
+        "name": "create_post",
+        "description": "Create a new post in a subreddit (requires authentication)"
+      },
+      {
+        "name": "reply_to_post",
+        "description": "Reply to a Reddit post (requires authentication)"
+      },
+      {
+        "name": "reply_to_comment",
+        "description": "Reply to a Reddit comment (requires authentication)"
+      },
+      {
+        "name": "get_trending_subreddits",
+        "description": "Get a list of trending subreddits"
+      }
+    ]
+  },
+  "configuration": {
+    "environment": {
+      "REDDIT_CLIENT_ID": {
+        "description": "Reddit API client ID (required)",
+        "required": true,
+        "type": "string"
+      },
+      "REDDIT_CLIENT_SECRET": {
+        "description": "Reddit API client secret (required)",
+        "required": true,
+        "type": "string"
+      },
+      "REDDIT_USER_AGENT": {
+        "description": "User agent string for Reddit API requests",
+        "required": false,
+        "type": "string",
+        "default": "RedditMCPServer/1.1.1"
+      },
+      "REDDIT_USERNAME": {
+        "description": "Reddit username (required for write operations)",
+        "required": false,
+        "type": "string"
+      },
+      "REDDIT_PASSWORD": {
+        "description": "Reddit password (required for write operations)",
+        "required": false,
+        "type": "string"
+      }
+    }
+  },
+  "usage": {
+    "instructions": "This server provides Reddit API integration for MCP clients. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables. For write operations (creating posts, replying), also set REDDIT_USERNAME and REDDIT_PASSWORD.",
+    "examples": [
+      {
+        "description": "Get information about a Reddit post",
+        "tool": "get_reddit_post",
+        "arguments": {
+          "url": "https://www.reddit.com/r/programming/comments/abc123/example_post/"
+        }
+      },
+      {
+        "description": "Get posts from a subreddit",
+        "tool": "get_subreddit_posts",
+        "arguments": {
+          "subreddit": "programming",
+          "sort": "hot",
+          "limit": 10
+        }
+      },
+      {
+        "description": "Create a new post",
+        "tool": "create_post",
+        "arguments": {
+          "subreddit": "test",
+          "title": "Hello from MCP!",
+          "content": "This is a test post created via MCP",
+          "type": "text"
+        }
+      }
+    ]
+  }
+}
