@@ -54,7 +54,7 @@
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
     "dotenv": "^16.6.1",
-    "fastmcp": "^3.17.0",
+    "fastmcp": "^3.18.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {

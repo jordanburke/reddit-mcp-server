@@ -12,8 +12,8 @@ importers:
         specifier: ^16.6.1
         version: 16.6.1
       fastmcp:
-        specifier: ^3.17.0
-        version: 3.17.0
+        specifier: ^3.18.0
+        version: 3.18.0
       zod:
         specifier: ^4.1.11
         version: 4.1.11
@@ -1018,8 +1018,8 @@ packages:
   fast-levenshtein@2.0.6:
     resolution: {integrity: sha512-DCXu6Ifhqcks7TZKY3Hxp3y6qphY5SJZmrWMDrKcERSOXWQdMhU9Ig/PYrzyw/ul9jOIyh0N4M0tbC5hodg8dw==}
 
-  fastmcp@3.17.0:
-    resolution: {integrity: sha512-mNSPP/oG0qXFkPMA5TFXde8Zg5IjBvZE6QP/TMqcMpYYLTRJX1UJGDG7WyCKaPDF8JtgTWJigi1Osqo5rri+6A==}
+  fastmcp@3.18.0:
+    resolution: {integrity: sha512-Td8+QMHmA8WeLTczlMIvV+/Xvk164d/047Hku3kwExuwm3tgMTrwmTI10euP04lNE5WCFZ1xdF9XISnMxeJ3yw==}
     hasBin: true
 
   fastq@1.19.1:
@@ -3017,7 +3017,7 @@ snapshots:
 
   fast-levenshtein@2.0.6: {}
 
-  fastmcp@3.17.0:
+  fastmcp@3.18.0:
     dependencies:
       '@modelcontextprotocol/sdk': 1.18.1
       '@standard-schema/spec': 1.0.0
