@@ -34,6 +34,7 @@ npx -y @smithery/cli install reddit-mcp-server --client claude
 ```
 
 ### Manual Installation
+
 1. `git clone https://github.com/jordanburke/reddit-mcp-server`
 
 2. Create a Reddit app [here](https://www.reddit.com/prefs/apps)
@@ -152,12 +153,14 @@ The server will be available at `http://localhost:3000` with the MCP endpoint at
 The HTTP server supports optional OAuth protection to secure your endpoints:
 
 **Generate a secure token:**
+
 ```bash
 npx reddit-mcp-server --generate-token
 # Output: Generated OAuth token: A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j
 ```
 
 **Enable OAuth with generated token:**
+
 ```bash
 export OAUTH_ENABLED=true
 export OAUTH_TOKEN="A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j"
@@ -165,6 +168,7 @@ pnpm serve
 ```
 
 **Make authenticated requests:**
+
 ```bash
 curl -H "Authorization: Bearer A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j" \
      -H "Content-Type: application/json" \
@@ -173,6 +177,7 @@ curl -H "Authorization: Bearer A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j" \
 ```
 
 **OAuth Configuration:**
+
 - `OAUTH_ENABLED=true` - Enables OAuth protection (disabled by default)
 - `OAUTH_TOKEN=your-token` - Your custom token (or use `--generate-token`)
 - Without OAuth, the server is accessible without authentication
@@ -183,61 +188,68 @@ curl -H "Authorization: Bearer A8f2Kp9x3NmQ7vR4tL6eZ1sW5yB8hC2j" \
 For MCP clients connecting to an OAuth-protected server, configure according to the [MCP Authorization specification](https://modelcontextprotocol.io/specification/draft/basic/authorization):
 
 **HTTP-based MCP Clients (e.g., web applications):**
+
 ```javascript
 // Example using fetch API
-const response = await fetch('http://localhost:3000/mcp', {
-  method: 'POST',
+const response = await fetch("http://localhost:3000/mcp", {
+  method: "POST",
   headers: {
-    'Authorization': 'Bearer YOUR_TOKEN',
-    'Content-Type': 'application/json'
+    Authorization: "Bearer YOUR_TOKEN",
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
     method: "tools/list",
-    params: {}
-  })
-});
+    params: {},
+  }),
+})
 
-const result = await response.json();
+const result = await response.json()
 ```
 
 **Direct HTTP MCP Client:**
+
 ```javascript
 const client = new MCP.Client({
   transport: new MCP.HTTPTransport({
-    url: 'http://localhost:3000/mcp',
+    url: "http://localhost:3000/mcp",
     headers: {
-      'Authorization': 'Bearer YOUR_TOKEN'
-    }
-  })
-});
+      Authorization: "Bearer YOUR_TOKEN",
+    },
+  }),
+})
 ```
 
 **Custom MCP Client Implementation:**
+
 ```typescript
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { HTTPTransport } from '@modelcontextprotocol/sdk/client/http.js';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { HTTPTransport } from "@modelcontextprotocol/sdk/client/http.js"
 
 const transport = new HTTPTransport({
-  url: 'http://localhost:3000/mcp',
+  url: "http://localhost:3000/mcp",
   headers: {
-    'Authorization': 'Bearer YOUR_TOKEN',
-    'Content-Type': 'application/json'
-  }
-});
+    Authorization: "Bearer YOUR_TOKEN",
+    "Content-Type": "application/json",
+  },
+})
 
-const client = new Client({
-  name: "reddit-client",
-  version: "1.0.0"
-}, {
-  capabilities: {}
-});
+const client = new Client(
+  {
+    name: "reddit-client",
+    version: "1.0.0",
+  },
+  {
+    capabilities: {},
+  },
+)
 
-await client.connect(transport);
+await client.connect(transport)
 ```
 
 **Important Notes:**
+
 - Replace `YOUR_TOKEN` with your generated OAuth token
 - Authorization header MUST be included in every request to `/mcp`
 - Tokens MUST NOT be included in URI query strings per MCP specification
@@ -248,54 +260,59 @@ When connecting to a remote Reddit MCP server (e.g., deployed on your infrastruc
 
 ```javascript
 // Production server with OAuth
-const response = await fetch('https://your-server.com/mcp', {
-  method: 'POST',
+const response = await fetch("https://your-server.com/mcp", {
+  method: "POST",
   headers: {
-    'Authorization': 'Bearer YOUR_TOKEN',
-    'Content-Type': 'application/json'
+    Authorization: "Bearer YOUR_TOKEN",
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
     method: "tools/list",
-    params: {}
-  })
-});
+    params: {},
+  }),
+})
 ```
 
 **MCP Client Configuration for Remote Server:**
+
 ```typescript
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { HTTPTransport } from '@modelcontextprotocol/sdk/client/http.js';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { HTTPTransport } from "@modelcontextprotocol/sdk/client/http.js"
 
 // For your deployed server
 const transport = new HTTPTransport({
-  url: 'https://your-reddit-mcp.company.com/mcp',
+  url: "https://your-reddit-mcp.company.com/mcp",
   headers: {
-    'Authorization': 'Bearer YOUR_GENERATED_TOKEN',
-    'Content-Type': 'application/json'
-  }
-});
+    Authorization: "Bearer YOUR_GENERATED_TOKEN",
+    "Content-Type": "application/json",
+  },
+})
 
-const client = new Client({
-  name: "reddit-client",
-  version: "1.0.0"
-}, {
-  capabilities: {}
-});
+const client = new Client(
+  {
+    name: "reddit-client",
+    version: "1.0.0",
+  },
+  {
+    capabilities: {},
+  },
+)
 
-await client.connect(transport);
+await client.connect(transport)
 ```
 
 **Claude Desktop/Cursor with Remote Server (HTTP):**
 For remote servers, you can use a proxy approach:
+
 ```json
 {
   "mcpServers": {
     "reddit-remote": {
       "command": "node",
       "args": [
-        "-e", 
+        "-e",
         "const http = require('https'); const req = http.request('https://your-server.com/mcp', {method:'POST',headers:{'Authorization':'Bearer YOUR_TOKEN','Content-Type':'application/json'}}, res => res.pipe(process.stdout)); process.stdin.pipe(req);"
       ],
       "env": {}
@@ -306,6 +323,7 @@ For remote servers, you can use a proxy approach:
 
 **For Claude Desktop/Cursor (stdio transport):**
 OAuth is not applicable when using the traditional npx execution method. Use the stdio configuration instead:
+
 ```json
 {
   "mcpServers": {
@@ -326,12 +344,14 @@ OAuth is not applicable when using the traditional npx execution method. Use the
 **Deploy to your infrastructure and share the URL:**
 
 1. **Generate secure token:**
+
    ```bash
    npx reddit-mcp-server --generate-token
    # Output: Generated OAuth token: xyz123abc456def789
    ```
 
 2. **Deploy with Docker on your server:**
+
    ```bash
    docker run -d \
      --name reddit-mcp \
@@ -344,6 +364,7 @@ OAuth is not applicable when using the traditional npx execution method. Use the
    ```
 
 3. **Share with your team:**
+
    ```
    Server URL: https://your-server.com/mcp
    OAuth Token: xyz123abc456def789
@@ -432,7 +453,7 @@ docker run -d \
 ### Docker Compose Example
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   reddit-mcp:

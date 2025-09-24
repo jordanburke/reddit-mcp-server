@@ -63,6 +63,7 @@ pnpm lint:fix
 ## Environment Setup
 
 Required environment variables:
+
 ```bash
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
@@ -87,6 +88,7 @@ The HTTP server (`src/server.ts`) supports optional OAuth protection:
 - **Usage**: Include `Authorization: Bearer <token>` header in requests to `/mcp`
 
 Example request with OAuth:
+
 ```bash
 curl -H "Authorization: Bearer your-token" http://localhost:3000/mcp
 ```
@@ -101,6 +103,7 @@ curl -H "Authorization: Bearer your-token" http://localhost:3000/mcp
 ## Testing Approach
 
 Currently no test framework is configured. When implementing tests:
+
 - Use the MCP inspector (`pnpm inspect`) for manual testing
 - Test both authenticated and unauthenticated flows
 - Verify error handling for invalid inputs and API failures

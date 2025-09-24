@@ -23,7 +23,7 @@ async function setupRedditClient() {
   }
 
   try {
-    await initializeRedditClient({
+    initializeRedditClient({
       clientId,
       clientSecret,
       userAgent,
@@ -154,7 +154,7 @@ server.addTool({
 - ${formattedUser.activityAnalysis.replace(/\n  - /g, "\n- ")}
 
 ## Recommendations
-- ${formattedUser.recommendations.replace(/\n  - /g, "\n- ")}`
+- ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}`
   },
 })
 
