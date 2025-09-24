@@ -11,6 +11,8 @@ jobs:
     permissions:
       id-token: write # Required for OIDC authentication
       contents: read
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -34,10 +36,8 @@ jobs:
         run: pnpm run validate
 
       - name: Publish to npm
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        if: ${{ env.NODE_AUTH_TOKEN != '' }}
         run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Install MCP Publisher
         run: |
