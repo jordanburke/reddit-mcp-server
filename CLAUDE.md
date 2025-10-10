@@ -4,7 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Reddit MCP (Model Context Protocol) server that provides tools for interacting with the Reddit API. It's built with TypeScript and uses the MCP SDK to expose Reddit functionality as tools that can be used by AI assistants.
+This is a Reddit MCP (Model Context Protocol) server that provides tools for interacting with the Reddit API. It's built with TypeScript and uses FastMCP to expose Reddit functionality as tools that can be used by AI assistants.
+
+### Server Modes
+
+The server supports two transport modes:
+
+1. **HTTP Server (Default)**: Runs on port 3000 with `/mcp` endpoint
+   - Used for Docker deployments and direct execution
+   - Access via: `http://localhost:3000/mcp`
+   - SSE endpoint: `http://localhost:3000/sse`
+
+2. **Stdio Mode**: For CLI and npx usage
+   - Automatically enabled when using `npx reddit-mcp-server` or the bin entry point
+   - Used for integration with Claude Desktop and other MCP clients
 
 ## Development Commands
 
@@ -67,18 +80,31 @@ Required environment variables:
 ```bash
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
-REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/0.1.0"
+REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
 REDDIT_USERNAME=your_username     # Optional, for write operations
 REDDIT_PASSWORD=your_password     # Optional, for write operations
+
+# Transport Configuration
+# TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)
+PORT=3000                          # HTTP server port (default: 3000)
 
 # OAuth Authentication (for HTTP server)
 OAUTH_ENABLED=true                # Set to "true" to enable OAuth protection
 OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not provided
 ```
 
+### Transport Modes
+
+The server defaults to HTTP mode unless using the CLI/npx entry point:
+
+- **Running directly**: `node dist/index.js` → HTTP server on port 3000
+- **Running via npx**: `npx reddit-mcp-server` → stdio mode (for Claude Desktop)
+- **Running via Docker**: HTTP server on port 3000
+- **Force stdio mode**: Set `TRANSPORT_TYPE=stdio` environment variable
+
 ### OAuth Security
 
-The HTTP server (`src/server.ts`) supports optional OAuth protection:
+The HTTP server supports optional OAuth protection:
 
 - **Disabled by default**: The server runs without authentication
 - **Enable with**: `OAUTH_ENABLED=true`
@@ -102,9 +128,12 @@ curl -H "Authorization: Bearer your-token" http://localhost:3000/mcp
 
 ## Testing Approach
 
-Currently no test framework is configured. When implementing tests:
+The project uses Vitest for testing:
 
-- Use the MCP inspector (`pnpm inspect`) for manual testing
+- **Run tests**: `pnpm test`
+- **Watch mode**: `pnpm test:watch`
+- **Coverage**: `pnpm test:coverage`
+- **Manual testing**: Use the MCP inspector (`pnpm inspect`)
 - Test both authenticated and unauthenticated flows
 - Verify error handling for invalid inputs and API failures
 

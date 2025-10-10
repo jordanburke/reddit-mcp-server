@@ -11,6 +11,11 @@ interface PackageJson {
 const packageJsonPath = path.join(__dirname, "..", "package.json")
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as PackageJson
 
+// Force stdio mode for CLI/npx usage (unless explicitly overridden)
+if (!process.env.TRANSPORT_TYPE) {
+  process.env.TRANSPORT_TYPE = "stdio"
+}
+
 // Handle command line arguments BEFORE any other imports
 const args = process.argv.slice(2)
 

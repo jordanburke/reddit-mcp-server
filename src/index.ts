@@ -542,10 +542,27 @@ async function main() {
   try {
     await setupRedditClient()
 
-    // Start with stdio transport (for Claude Desktop)
-    await server.start({
-      transportType: "stdio",
-    })
+    // Default to HTTP on port 3000, unless explicitly using stdio (for npx/CLI)
+    const useStdio = process.env.TRANSPORT_TYPE === "stdio"
+    const port = parseInt(process.env.PORT || "3000")
+
+    if (useStdio) {
+      console.error("[Setup] Starting in stdio mode (CLI/npx)")
+      await server.start({
+        transportType: "stdio",
+      })
+    } else {
+      console.error(`[Setup] Starting HTTP server on port ${port}`)
+      await server.start({
+        transportType: "httpStream",
+        httpStream: {
+          port,
+          endpoint: "/mcp",
+        },
+      })
+      console.error(`[Setup] HTTP server ready at http://localhost:${port}/mcp`)
+      console.error(`[Setup] SSE endpoint available at http://localhost:${port}/sse`)
+    }
   } catch (error) {
     console.error("[Error] Failed to start server:", error)
     process.exit(1)

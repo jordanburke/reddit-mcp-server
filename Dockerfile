@@ -48,5 +48,5 @@ USER nodejs
 # Expose port for HTTP server
 EXPOSE 3000
 
-# Default to running the MCP server
+# Run the MCP server (defaults to HTTP on port 3000)
 CMD ["node", "dist/index.js"]
