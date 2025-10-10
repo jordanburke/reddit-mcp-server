@@ -48,5 +48,5 @@ USER nodejs
 # Expose port for HTTP server
 EXPOSE 3000
 
-# Default to running the HTTP server
-CMD ["node", "dist/server.js"]
+# Default to running the MCP server
+CMD ["node", "dist/index.js"]
