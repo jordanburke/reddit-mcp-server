@@ -113,9 +113,10 @@ describe("RedditClient", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
+        statusText: "Unauthorized",
       })
 
-      await expect(client.authenticate()).rejects.toThrow("Failed to authenticate with Reddit API")
+      await expect(client.authenticate()).rejects.toThrow("Authentication failed: 401")
     })
   })
 

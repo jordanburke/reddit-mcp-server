@@ -23,7 +23,7 @@ async function setupRedditClient() {
   }
 
   try {
-    initializeRedditClient({
+    const client = initializeRedditClient({
       clientId,
       clientSecret,
       userAgent,
@@ -32,13 +32,29 @@ async function setupRedditClient() {
     })
 
     console.error("[Setup] Reddit client initialized")
+    console.error("[Setup] Testing Reddit API connection...")
+
+    // Test the connection by attempting authentication
+    const isConnected = await client.checkAuthentication()
+
+    if (!isConnected) {
+      console.error("[Error] ✗ Failed to connect to Reddit API")
+      console.error("[Error] Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+      process.exit(1)
+    }
+
+    console.error("[Setup] ✓ Reddit API connection successful")
+
     if (username && password) {
-      console.error(`[Setup] Authenticated as user: ${username}`)
+      console.error(`[Setup] ✓ User authenticated as: ${username}`)
+      console.error("[Setup] Write operations enabled (posting, replying)")
     } else {
-      console.error("[Setup] Running in read-only mode (no user authentication)")
+      console.error("[Setup] Running in read-only mode (client credentials only)")
+      console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
     }
   } catch (error) {
-    console.error("[Error] Failed to initialize Reddit client:", error)
+    console.error("[Error] ✗ Reddit API connection failed:", error instanceof Error ? error.message : error)
+    console.error("[Error] Please verify your Reddit API credentials")
     process.exit(1)
   }
 }

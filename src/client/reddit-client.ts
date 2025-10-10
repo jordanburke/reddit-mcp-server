@@ -73,11 +73,12 @@ export class RedditClient {
       const authUrl = "https://www.reddit.com/api/v1/access_token"
       const authData = new URLSearchParams()
 
-      if (this.username && this.password) {
+      const isUserAuth = !!(this.username && this.password)
+      if (isUserAuth) {
         // Authenticating with user credentials
         authData.append("grant_type", "password")
-        authData.append("username", this.username)
-        authData.append("password", this.password)
+        authData.append("username", this.username!)
+        authData.append("password", this.password!)
       } else {
         // Authenticating with client credentials (read-only)
         authData.append("grant_type", "client_credentials")
@@ -95,17 +96,19 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        throw new Error(`Authentication failed: ${response.status}`)
+        const statusText = response.statusText || "Unknown Error"
+        throw new Error(`Authentication failed: ${response.status} ${statusText}`)
       }
 
       const data = (await response.json()) as { access_token: string; expires_in: number }
       this.accessToken = data.access_token
       this.tokenExpiry = now + data.expires_in * 1000
       this.authenticated = true
-
-      // Successfully authenticated with Reddit API
-    } catch {
-      // Authentication error occurred
+    } catch (error) {
+      // Re-throw with more specific error message
+      if (error instanceof Error) {
+        throw error
+      }
       throw new Error("Failed to authenticate with Reddit API")
     }
   }
