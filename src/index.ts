@@ -545,6 +545,7 @@ async function main() {
     // Default to HTTP on port 3000, unless explicitly using stdio (for npx/CLI)
     const useStdio = process.env.TRANSPORT_TYPE === "stdio"
     const port = parseInt(process.env.PORT || "3000")
+    const host = process.env.HOST || "0.0.0.0"
 
     if (useStdio) {
       console.error("[Setup] Starting in stdio mode (CLI/npx)")
@@ -552,16 +553,17 @@ async function main() {
         transportType: "stdio",
       })
     } else {
-      console.error(`[Setup] Starting HTTP server on port ${port}`)
+      console.error(`[Setup] Starting HTTP server on ${host}:${port}`)
       await server.start({
         transportType: "httpStream",
         httpStream: {
           port,
+          host,
           endpoint: "/mcp",
         },
       })
-      console.error(`[Setup] HTTP server ready at http://localhost:${port}/mcp`)
-      console.error(`[Setup] SSE endpoint available at http://localhost:${port}/sse`)
+      console.error(`[Setup] HTTP server ready at http://${host}:${port}/mcp`)
+      console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
     }
   } catch (error) {
     console.error("[Error] Failed to start server:", error)
