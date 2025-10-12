@@ -414,10 +414,20 @@ describe("RedditClient", () => {
       }
 
       const mockCommentResponse = {
-        id: "comment123",
-        subreddit: "test",
-        link_title: "Original Post Title",
-        permalink: "/r/test/comments/post123/comment123",
+        json: {
+          data: {
+            things: [
+              {
+                data: {
+                  id: "comment123",
+                  subreddit: "test",
+                  link_title: "Original Post Title",
+                  permalink: "/r/test/comments/post123/comment123",
+                },
+              },
+            ],
+          },
+        },
       }
 
       // Mock authentication

@@ -316,20 +316,40 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        const errorText = await response.text()
+        console.error(`[Reddit API] Create post failed: ${response.status} ${response.statusText}`)
+        console.error(`[Reddit API] Error response: ${errorText}`)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      const json = (await response.json()) as { success: boolean; data: { id: string } }
-      if (json.success) {
-        // Get the newly created post
-        const postId = json.data.id
+      const json = (await response.json()) as any
+      console.error(`[Reddit API] Create post response:`, JSON.stringify(json, null, 2))
+
+      if (json.success || (json.json && json.json.data && json.json.data.id)) {
+        // Get the newly created post ID (format varies between Reddit API responses)
+        const postId = json.data?.id || json.json?.data?.id
+        if (!postId) {
+          console.error(`[Reddit API] No post ID in response`)
+          throw new Error("No post ID returned from Reddit")
+        }
         return await this.getPost(postId)
+      } else if (json.json && json.json.errors && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
+        console.error(`[Reddit API] Post creation errors: ${errors}`)
+        throw new Error(`Reddit API errors: ${errors}`)
       } else {
+        console.error(`[Reddit API] Unexpected response format`)
         throw new Error("Failed to create post")
       }
-    } catch {
-      // Failed to create post
-      throw new Error(`Failed to create post in ${subreddit}`)
+    } catch (error) {
+      // Log and re-throw the actual error
+      console.error(`[Reddit API] Create post exception:`, error)
+      if (error instanceof Error && error.message.includes("HTTP")) {
+        throw error
+      }
+      throw new Error(
+        `Failed to create post in ${subreddit}: ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
   }
 
@@ -373,27 +393,46 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        const errorText = await response.text()
+        console.error(`[Reddit API] Reply to post failed: ${response.status} ${response.statusText}`)
+        console.error(`[Reddit API] Error response: ${errorText}`)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
       // Extract comment data from response
-      const commentData = (await response.json()) as any
-      return {
-        id: commentData.id,
-        author: this.username,
-        body: content,
-        score: 1,
-        controversiality: 0,
-        subreddit: commentData.subreddit,
-        submissionTitle: commentData.link_title,
-        createdUtc: Date.now() / 1000,
-        edited: false,
-        isSubmitter: false,
-        permalink: commentData.permalink,
+      const json = (await response.json()) as any
+      console.error(`[Reddit API] Reply response:`, JSON.stringify(json, null, 2))
+
+      if (json.json && json.json.data && json.json.data.things) {
+        const commentData = json.json.data.things[0].data
+        return {
+          id: commentData.id,
+          author: this.username!,
+          body: content,
+          score: 1,
+          controversiality: 0,
+          subreddit: commentData.subreddit,
+          submissionTitle: commentData.link_title || "",
+          createdUtc: Date.now() / 1000,
+          edited: false,
+          isSubmitter: false,
+          permalink: commentData.permalink,
+        }
+      } else if (json.json && json.json.errors && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
+        console.error(`[Reddit API] Reply errors: ${errors}`)
+        throw new Error(`Reddit API errors: ${errors}`)
+      } else {
+        console.error(`[Reddit API] Unexpected reply response format`)
+        throw new Error("Failed to parse reply response")
       }
-    } catch {
-      // Failed to reply to post
-      throw new Error(`Failed to reply to post ${postId}`)
+    } catch (error) {
+      // Log and re-throw the actual error
+      console.error(`[Reddit API] Reply to post exception:`, error)
+      if (error instanceof Error && error.message.includes("HTTP")) {
+        throw error
+      }
+      throw new Error(`Failed to reply to post ${postId}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
