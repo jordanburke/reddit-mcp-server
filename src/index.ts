@@ -491,6 +491,77 @@ ${searchResults}`
   },
 })
 
+// Write tools (require user authentication)
+server.addTool({
+  name: "create_post",
+  description: "Create a new post in a subreddit (requires REDDIT_USERNAME and REDDIT_PASSWORD)",
+  parameters: z.object({
+    subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
+    title: z.string().describe("The post title"),
+    content: z.string().describe("The post content (text for self posts, URL for link posts)"),
+    is_self: z.boolean().default(true).describe("Whether this is a self post (text) or link post"),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    // Check if user credentials are configured
+    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    const post = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
+    const formattedPost = formatPostInfo(post)
+
+    return `# Post Created Successfully
+
+## Post Details
+- Title: ${formattedPost.title}
+- Subreddit: r/${formattedPost.subreddit}
+- Type: ${formattedPost.type}
+- Link: ${formattedPost.links.fullPost}
+
+Your post has been successfully submitted to r/${formattedPost.subreddit}.`
+  },
+})
+
+server.addTool({
+  name: "reply_to_post",
+  description: "Post a reply to an existing Reddit post or comment (requires REDDIT_USERNAME and REDDIT_PASSWORD)",
+  parameters: z.object({
+    post_id: z.string().describe("The Reddit post ID (thing_id, e.g., t3_xxxxx for posts, t1_xxxxx for comments)"),
+    content: z.string().describe("The reply content"),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    // Check if user credentials are configured
+    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    const comment = await client.replyToPost(args.post_id, args.content)
+
+    return `# Reply Posted Successfully
+
+## Comment Details
+- Posted to: ${args.post_id}
+- Author: u/${process.env.REDDIT_USERNAME}
+- Comment ID: ${comment.id}
+
+Your reply has been successfully posted.`
+  },
+})
+
 // Comment tools
 server.addTool({
   name: "get_post_comments",
