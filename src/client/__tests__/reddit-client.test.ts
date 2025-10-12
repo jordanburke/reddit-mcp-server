@@ -324,32 +324,35 @@ describe("RedditClient", () => {
         },
       }
 
-      const mockPostData = {
-        data: {
-          children: [
-            {
-              data: {
-                id: "newpost123",
-                title: "My New Post",
-                author: "testuser",
-                subreddit: "test",
-                selftext: "Post content",
-                url: "https://reddit.com/r/test/newpost123",
-                score: 1,
-                upvote_ratio: 1,
-                num_comments: 0,
-                created_utc: Date.now() / 1000,
-                over_18: false,
-                spoiler: false,
-                edited: false,
-                is_self: true,
-                link_flair_text: null,
-                permalink: "/r/test/comments/newpost123/",
+      // Mock post data in /r/subreddit/comments/{id}.json format
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "newpost123",
+                  title: "My New Post",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "Post content",
+                  url: "https://reddit.com/r/test/newpost123",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: Date.now() / 1000,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/newpost123/",
+                },
               },
-            },
-          ],
+            ],
+          },
         },
-      }
+      ]
 
       // Mock authentication
       mockFetch.mockResolvedValueOnce({

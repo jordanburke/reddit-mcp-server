@@ -325,14 +325,33 @@ export class RedditClient {
       const json = (await response.json()) as any
       console.error(`[Reddit API] Create post response:`, JSON.stringify(json, null, 2))
 
-      if (json.success || (json.json && json.json.data && json.json.data.id)) {
-        // Get the newly created post ID (format varies between Reddit API responses)
-        const postId = json.data?.id || json.json?.data?.id
+      if (json.success) {
+        // Get the post ID - Reddit can return it in different formats
+        let postId = json.data?.id || json.json?.data?.id
+
+        // If no direct ID, try to extract from redirect URL in jquery array
+        if (!postId && json.jquery && Array.isArray(json.jquery)) {
+          // Look for redirect call with URL
+          const redirectCall = json.jquery.find(
+            (item: any) => Array.isArray(item) && item[2] === "redirect" && item[3] && item[3][0],
+          )
+          if (redirectCall) {
+            const url = redirectCall[3][0]
+            // Extract post ID from URL like: https://www.reddit.com/r/subreddit/comments/POST_ID/title/
+            const match = url.match(/\/comments\/([a-z0-9]+)\//)
+            if (match) {
+              postId = match[1]
+              console.error(`[Reddit API] Extracted post ID from redirect URL: ${postId}`)
+            }
+          }
+        }
+
         if (!postId) {
           console.error(`[Reddit API] No post ID in response`)
           throw new Error("No post ID returned from Reddit")
         }
-        return await this.getPost(postId)
+
+        return await this.getPost(postId, subreddit)
       } else if (json.json && json.json.errors && json.json.errors.length > 0) {
         const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
         console.error(`[Reddit API] Post creation errors: ${errors}`)
