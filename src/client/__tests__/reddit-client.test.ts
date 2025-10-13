@@ -494,4 +494,256 @@ describe("RedditClient", () => {
       await expect(client.replyToPost("nonexistent", "Comment")).rejects.toThrow("Failed to reply to post nonexistent")
     })
   })
+
+  describe("deletePost", () => {
+    it("should delete a post", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock delete request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "",
+      })
+
+      const result = await client.deletePost("post123")
+
+      // Check the delete call
+      const deleteCall = mockFetch.mock.calls[1]
+      expect(deleteCall[0]).toBe("https://oauth.reddit.com/api/del")
+      expect(deleteCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(deleteCall[1].body as string)
+      expect(body.get("id")).toBe("t3_post123")
+
+      expect(result).toBe(true)
+    })
+
+    it("should handle post ID with t3_ prefix", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock delete request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "",
+      })
+
+      await client.deletePost("t3_post123")
+
+      const deleteCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(deleteCall[1].body as string)
+      expect(body.get("id")).toBe("t3_post123")
+    })
+
+    it("should throw error when user is not authenticated", async () => {
+      const clientReadOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      await expect(clientReadOnly.deletePost("post123")).rejects.toThrow(
+        "User authentication required for deleting content",
+      )
+    })
+  })
+
+  describe("deleteComment", () => {
+    it("should delete a comment", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock delete request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "",
+      })
+
+      const result = await client.deleteComment("comment123")
+
+      // Check the delete call
+      const deleteCall = mockFetch.mock.calls[1]
+      expect(deleteCall[0]).toBe("https://oauth.reddit.com/api/del")
+      expect(deleteCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(deleteCall[1].body as string)
+      expect(body.get("id")).toBe("t1_comment123")
+
+      expect(result).toBe(true)
+    })
+
+    it("should handle comment ID with t1_ prefix", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock delete request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "",
+      })
+
+      await client.deleteComment("t1_comment123")
+
+      const deleteCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(deleteCall[1].body as string)
+      expect(body.get("id")).toBe("t1_comment123")
+    })
+  })
+
+  describe("editPost", () => {
+    it("should edit a post", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock edit request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ json: { errors: [] } }),
+      })
+
+      const result = await client.editPost("post123", "Updated content")
+
+      // Check the edit call
+      const editCall = mockFetch.mock.calls[1]
+      expect(editCall[0]).toBe("https://oauth.reddit.com/api/editusertext")
+      expect(editCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(editCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t3_post123")
+      expect(body.get("text")).toBe("Updated content")
+      expect(body.get("api_type")).toBe("json")
+
+      expect(result).toBe(true)
+    })
+
+    it("should handle post ID with t3_ prefix", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock edit request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ json: { errors: [] } }),
+      })
+
+      await client.editPost("t3_post123", "Updated content")
+
+      const editCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(editCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t3_post123")
+    })
+
+    it("should throw error when user is not authenticated", async () => {
+      const clientReadOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      await expect(clientReadOnly.editPost("post123", "New content")).rejects.toThrow(
+        "User authentication required for editing content",
+      )
+    })
+
+    it("should handle API errors", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock edit request with errors
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          json: {
+            errors: [["BAD_TEXT", "invalid text", "text"]],
+          },
+        }),
+      })
+
+      await expect(client.editPost("post123", "")).rejects.toThrow("Reddit API errors: BAD_TEXT: invalid text")
+    })
+  })
+
+  describe("editComment", () => {
+    it("should edit a comment", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock edit request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ json: { errors: [] } }),
+      })
+
+      const result = await client.editComment("comment123", "Updated comment")
+
+      // Check the edit call
+      const editCall = mockFetch.mock.calls[1]
+      expect(editCall[0]).toBe("https://oauth.reddit.com/api/editusertext")
+      expect(editCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(editCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t1_comment123")
+      expect(body.get("text")).toBe("Updated comment")
+      expect(body.get("api_type")).toBe("json")
+
+      expect(result).toBe(true)
+    })
+
+    it("should handle comment ID with t1_ prefix", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock edit request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ json: { errors: [] } }),
+      })
+
+      await client.editComment("t1_comment123", "Updated comment")
+
+      const editCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(editCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t1_comment123")
+    })
+  })
 })

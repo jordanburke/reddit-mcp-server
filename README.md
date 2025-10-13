@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content.
 
-> **Note**: This is a fork of the original [reddit-mcp-server](https://github.com/alexandros-lekkas/reddit-mcp-server) by Alexandros Lekkas, updated with pnpm, tsup build system, and npx execution support.
+> **Note**: This is a fork of the [reddit-mcp-server](https://github.com/alexandros-lekkas/reddit-mcp-server) by Alexandros Lekkas, updated with pnpm, tsup build system, and npx execution support.
 
 ## 🔧 Available Tools (Features)
 
@@ -22,6 +22,10 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 - `create_post(subreddit, title, content, is_self)` - Create a new post in a subreddit
 - `reply_to_post(post_id, content, subreddit?)` - Post a reply to an existing Reddit post
+- `edit_post(thing_id, new_text)` - Edit your own Reddit post (self-text posts only)
+- `edit_comment(thing_id, new_text)` - Edit your own Reddit comment
+- `delete_post(thing_id)` - Delete your own Reddit post
+- `delete_comment(thing_id)` - Delete your own Reddit comment
 
 ## 🔌 Installation
 
@@ -85,8 +89,12 @@ If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDI
         "get_user_posts",
         "get_user_comments",
         "create_post",
-        "reply_to_post"
-      ] // You don't need to add this, but it makes it so that you don't have to keep clicking approve
+        "reply_to_post",
+        "edit_post",
+        "edit_comment",
+        "delete_post",
+        "delete_comment"
+      ] // Optional if you do not want to always approve
     }
   }
 ```
@@ -131,19 +139,19 @@ npx reddit-mcp-server --help
 npx reddit-mcp-server --generate-token
 ```
 
-### Streamable MCP Endpoint (Hono Server)
+### HTTP MCP Endpoint (FastMCP)
 
-In addition to the standard npx execution, this server also supports a Streamable MCP endpoint via Hono for direct HTTP integration:
+In addition to the standard npx execution, this server supports HTTP transport via FastMCP for direct HTTP integration:
 
 ```bash
-# Start the Hono server on port 3000 (default)
-pnpm serve
+# Start the HTTP server on port 3000 (default)
+node dist/index.js
 
 # Start with custom port
-PORT=8080 pnpm serve
+PORT=8080 node dist/index.js
 
-# Development mode with auto-reload
-pnpm serve:dev
+# Or use the npm script
+pnpm start
 ```
 
 The server will be available at `http://localhost:3000` with the MCP endpoint at `http://localhost:3000/mcp`.
@@ -380,7 +388,7 @@ OAuth is not applicable when using the traditional npx execution method. Use the
    await client.connect(transport);
    ```
 
-This allows integration with systems that support HTTP-based MCP communication, similar to the cq-api and agent-todo implementations.
+This allows integration with systems that support HTTP-based MCP communication via the FastMCP framework.
 
 ## 🐳 Docker Usage
 

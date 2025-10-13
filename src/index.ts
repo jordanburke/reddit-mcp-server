@@ -47,7 +47,7 @@ async function setupRedditClient() {
 
     if (username && password) {
       console.error(`[Setup] ✓ User authenticated as: ${username}`)
-      console.error("[Setup] Write operations enabled (posting, replying)")
+      console.error("[Setup] Write operations enabled (posting, replying, editing, deleting)")
     } else {
       console.error("[Setup] Running in read-only mode (client credentials only)")
       console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
@@ -64,15 +64,17 @@ const server = new FastMCP({
   name: "reddit-mcp-server",
   version: "1.1.0",
   instructions: `A comprehensive Reddit MCP server that provides tools for interacting with Reddit API.
-  
+
 Available capabilities:
 - Fetch Reddit posts, comments, and user information
-- Get subreddit details and statistics  
+- Get subreddit details and statistics
 - Search Reddit content across posts and subreddits
 - Create posts and reply to posts/comments (with authentication)
+- Edit your own posts and comments (with authentication)
+- Delete your own posts and comments (with authentication)
 - Analyze engagement metrics and community insights
 
-For write operations (posting, replying), ensure REDDIT_USERNAME and REDDIT_PASSWORD are configured.`,
+For write operations (posting, replying, editing, deleting), ensure REDDIT_USERNAME and REDDIT_PASSWORD are configured.`,
 
   // Optional OAuth configuration for HTTP transport
   ...(process.env.OAUTH_ENABLED === "true" && {
@@ -559,6 +561,148 @@ server.addTool({
 - Comment ID: ${comment.id}
 
 Your reply has been successfully posted.`
+  },
+})
+
+server.addTool({
+  name: "delete_post",
+  description:
+    "Delete your own Reddit post (requires REDDIT_USERNAME and REDDIT_PASSWORD). WARNING: This action is permanent and cannot be undone!",
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The full Reddit thing ID (e.g., 't3_abc123' for posts) or just the post ID (e.g., 'abc123'). The 't3_' prefix will be added automatically if missing.",
+      ),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    // Check if user credentials are configured
+    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    await client.deletePost(args.thing_id)
+
+    return `# Post Deleted Successfully
+
+The post ${args.thing_id} has been permanently deleted from Reddit.
+
+**Note**: This action cannot be undone. The post content has been removed and cannot be recovered.`
+  },
+})
+
+server.addTool({
+  name: "delete_comment",
+  description:
+    "Delete your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). WARNING: This action is permanent and cannot be undone!",
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The full Reddit thing ID (e.g., 't1_abc123' for comments) or just the comment ID (e.g., 'abc123'). The 't1_' prefix will be added automatically if missing.",
+      ),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    // Check if user credentials are configured
+    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    await client.deleteComment(args.thing_id)
+
+    return `# Comment Deleted Successfully
+
+The comment ${args.thing_id} has been permanently deleted from Reddit.
+
+**Note**: This action cannot be undone. The comment content has been removed and cannot be recovered.`
+  },
+})
+
+server.addTool({
+  name: "edit_post",
+  description:
+    "Edit your own Reddit post (self-text posts only, requires REDDIT_USERNAME and REDDIT_PASSWORD). You can only edit the text content of self posts, not titles or link posts.",
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The full Reddit thing ID (e.g., 't3_abc123' for posts) or just the post ID (e.g., 'abc123'). The 't3_' prefix will be added automatically if missing.",
+      ),
+    new_text: z.string().describe("The new text content for the post. Supports Reddit markdown formatting."),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    // Check if user credentials are configured
+    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    await client.editPost(args.thing_id, args.new_text)
+
+    return `# Post Edited Successfully
+
+The post ${args.thing_id} has been updated with your new content.
+
+**Note**:
+- Only self (text) posts can be edited
+- Post titles cannot be edited
+- Link posts cannot be edited
+- An "edited" marker will appear on your post`
+  },
+})
+
+server.addTool({
+  name: "edit_comment",
+  description:
+    "Edit your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). Update the text content of a comment you previously posted.",
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The full Reddit thing ID (e.g., 't1_abc123' for comments) or just the comment ID (e.g., 'abc123'). The 't1_' prefix will be added automatically if missing.",
+      ),
+    new_text: z.string().describe("The new text content for the comment. Supports Reddit markdown formatting."),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    // Check if user credentials are configured
+    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    await client.editComment(args.thing_id, args.new_text)
+
+    return `# Comment Edited Successfully
+
+The comment ${args.thing_id} has been updated with your new content.
+
+**Note**: An "edited" marker will appear on your comment to show it has been modified.`
   },
 })
 

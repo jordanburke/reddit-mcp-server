@@ -439,6 +439,112 @@ export class RedditClient {
     }
   }
 
+  async deletePost(thingId: string): Promise<boolean> {
+    await this.authenticate()
+
+    if (!this.username || !this.password) {
+      throw new Error("User authentication required for deleting content")
+    }
+
+    try {
+      // Ensure thing ID has the correct prefix (t3_ for posts, t1_ for comments)
+      const fullThingId = thingId.startsWith("t3_") || thingId.startsWith("t1_") ? thingId : `t3_${thingId}`
+
+      const params = new URLSearchParams()
+      params.append("id", fullThingId)
+
+      const response = await this.makeRequest("/api/del", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[Reddit API] Delete failed: ${response.status} ${response.statusText}`)
+        console.error(`[Reddit API] Error response: ${errorText}`)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      console.error(`[Reddit API] Successfully deleted ${fullThingId}`)
+      return true
+    } catch (error) {
+      console.error(`[Reddit API] Delete exception:`, error)
+      if (error instanceof Error && error.message.includes("HTTP")) {
+        throw error
+      }
+      throw new Error(`Failed to delete content ${thingId}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  async deleteComment(thingId: string): Promise<boolean> {
+    // deleteComment is just an alias for deletePost since /api/del handles both
+    // Ensure the thing ID has the correct prefix for comments (t1_)
+    const fullThingId = thingId.startsWith("t1_") ? thingId : `t1_${thingId}`
+    return this.deletePost(fullThingId)
+  }
+
+  async editPost(thingId: string, newText: string): Promise<boolean> {
+    await this.authenticate()
+
+    if (!this.username || !this.password) {
+      throw new Error("User authentication required for editing content")
+    }
+
+    try {
+      // Ensure thing ID has the correct prefix (t3_ for posts, t1_ for comments)
+      const fullThingId = thingId.startsWith("t3_") || thingId.startsWith("t1_") ? thingId : `t3_${thingId}`
+
+      const params = new URLSearchParams()
+      params.append("thing_id", fullThingId)
+      params.append("text", newText)
+      params.append("api_type", "json")
+
+      const response = await this.makeRequest("/api/editusertext", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[Reddit API] Edit failed: ${response.status} ${response.statusText}`)
+        console.error(`[Reddit API] Error response: ${errorText}`)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const json = (await response.json()) as any
+      console.error(`[Reddit API] Edit response:`, JSON.stringify(json, null, 2))
+
+      // Check for errors in response
+      if (json.json?.errors && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
+        console.error(`[Reddit API] Edit errors: ${errors}`)
+        throw new Error(`Reddit API errors: ${errors}`)
+      }
+
+      console.error(`[Reddit API] Successfully edited ${fullThingId}`)
+      return true
+    } catch (error) {
+      console.error(`[Reddit API] Edit exception:`, error)
+      if (error instanceof Error && error.message.includes("HTTP")) {
+        throw error
+      }
+      throw new Error(`Failed to edit content ${thingId}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  async editComment(thingId: string, newText: string): Promise<boolean> {
+    // editComment is just an alias for editPost since /api/editusertext handles both
+    // Ensure the thing ID has the correct prefix for comments (t1_)
+    const fullThingId = thingId.startsWith("t1_") ? thingId : `t1_${thingId}`
+    return this.editPost(fullThingId, newText)
+  }
+
   async searchReddit(
     query: string,
     options: {
