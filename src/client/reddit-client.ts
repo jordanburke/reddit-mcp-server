@@ -306,6 +306,7 @@ export class RedditClient {
       params.append("kind", kind)
       params.append("title", title)
       params.append(isSelf ? "text" : "url", content)
+      params.append("api_type", "json") // Request standard JSON response format
 
       const response = await this.makeRequest("/api/submit", {
         method: "POST",
@@ -325,41 +326,23 @@ export class RedditClient {
       const json = (await response.json()) as any
       console.error(`[Reddit API] Create post response:`, JSON.stringify(json, null, 2))
 
-      if (json.success) {
-        // Get the post ID - Reddit can return it in different formats
-        let postId = json.data?.id || json.json?.data?.id
-
-        // If no direct ID, try to extract from redirect URL in jquery array
-        if (!postId && json.jquery && Array.isArray(json.jquery)) {
-          // Look for redirect call with URL
-          const redirectCall = json.jquery.find(
-            (item: any) => Array.isArray(item) && item[2] === "redirect" && item[3] && item[3][0],
-          )
-          if (redirectCall) {
-            const url = redirectCall[3][0]
-            // Extract post ID from URL like: https://www.reddit.com/r/subreddit/comments/POST_ID/title/
-            const match = url.match(/\/comments\/([a-z0-9]+)\//)
-            if (match) {
-              postId = match[1]
-              console.error(`[Reddit API] Extracted post ID from redirect URL: ${postId}`)
-            }
-          }
-        }
-
-        if (!postId) {
-          console.error(`[Reddit API] No post ID in response`)
-          throw new Error("No post ID returned from Reddit")
-        }
-
-        return await this.getPost(postId, subreddit)
-      } else if (json.json && json.json.errors && json.json.errors.length > 0) {
+      // With api_type=json, response has json.data.id or json.errors
+      if (json.json?.errors && json.json.errors.length > 0) {
         const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
         console.error(`[Reddit API] Post creation errors: ${errors}`)
         throw new Error(`Reddit API errors: ${errors}`)
-      } else {
-        console.error(`[Reddit API] Unexpected response format`)
-        throw new Error("Failed to create post")
       }
+
+      // Extract post ID from standard JSON response
+      const postId = json.json?.data?.id || json.json?.data?.name?.replace("t3_", "")
+
+      if (!postId) {
+        console.error(`[Reddit API] No post ID in response`)
+        throw new Error("No post ID returned from Reddit")
+      }
+
+      console.error(`[Reddit API] Post created with ID: ${postId}`)
+      return await this.getPost(postId, subreddit)
     } catch (error) {
       // Log and re-throw the actual error
       console.error(`[Reddit API] Create post exception:`, error)
@@ -402,6 +385,7 @@ export class RedditClient {
       const params = new URLSearchParams()
       params.append("thing_id", `t3_${postId}`)
       params.append("text", content)
+      params.append("api_type", "json") // Request standard JSON response format
 
       const response = await this.makeRequest("/api/comment", {
         method: "POST",

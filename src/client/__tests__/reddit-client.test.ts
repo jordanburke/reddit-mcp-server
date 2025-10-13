@@ -317,10 +317,13 @@ describe("RedditClient", () => {
 
   describe("createPost", () => {
     it("should create a new post", async () => {
+      // With api_type=json, response is wrapped in json object
       const mockSubmitResponse = {
-        success: true,
-        data: {
-          id: "newpost123",
+        json: {
+          data: {
+            id: "newpost123",
+          },
+          errors: [],
         },
       }
 
@@ -384,6 +387,7 @@ describe("RedditClient", () => {
       expect(body.get("kind")).toBe("self")
       expect(body.get("title")).toBe("My New Post")
       expect(body.get("text")).toBe("Post content")
+      expect(body.get("api_type")).toBe("json")
 
       expect(post.id).toBe("newpost123")
       expect(post.title).toBe("My New Post")
@@ -461,6 +465,7 @@ describe("RedditClient", () => {
       const body = new URLSearchParams(commentCall[1].body as string)
       expect(body.get("thing_id")).toBe("t3_post123")
       expect(body.get("text")).toBe("Great post!")
+      expect(body.get("api_type")).toBe("json")
 
       expect(comment.id).toBe("comment123")
       expect(comment.body).toBe("Great post!")
