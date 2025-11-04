@@ -4,6 +4,10 @@ A Model Context Protocol (MCP) that provides tools for fetching and creating Red
 
 > **Note**: This is a fork of the [reddit-mcp-server](https://github.com/alexandros-lekkas/reddit-mcp-server) by Alexandros Lekkas, updated with pnpm, tsup build system, and npx execution support.
 
+<a href="https://glama.ai/mcp/servers/@jordanburke/reddit-mcp-server">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@jordanburke/reddit-mcp-server/badge" alt="reddit-mcp-server MCP server" />
+</a>
+
 ## 🔧 Available Tools (Features)
 
 **Read-only Tools (Client Credentials):**
