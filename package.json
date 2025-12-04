@@ -16,7 +16,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "validate": "pnpm format && pnpm lint && pnpm test && pnpm build",
+    "validate": "pnpm format && pnpm lint && pnpm compile && pnpm test && pnpm build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint ./src --fix",
@@ -25,12 +25,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
-    "build": "rimraf dist && cross-env NODE_ENV=production tsup",
-    "build:watch": "tsup --watch",
-    "build:prod": "SKIP_DTS=true tsup",
-    "dev": "tsup --watch",
+    "build": "NODE_ENV=production tsdown",
+    "build:watch": "tsdown --watch",
+    "dev": "tsdown --watch",
     "prepublishOnly": "pnpm validate",
-    "ts-types": "tsc",
+    "compile": "tsc --noEmit",
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "start": "pnpm build && npx reddit-mcp-server",
     "serve": "pnpm build && node dist/index.js",
@@ -59,23 +58,12 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
     "@types/node": "^22.19.1",
-    "@typescript-eslint/eslint-plugin": "^8.48.1",
-    "@typescript-eslint/parser": "^8.48.1",
-    "@vitest/coverage-v8": "^3.2.4",
     "ajv-cli": "^5.0.0",
-    "cross-env": "^10.1.0",
-    "eslint": "^9.39.1",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
     "msw": "^2.12.4",
-    "prettier": "^3.7.4",
-    "rimraf": "^6.1.2",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "ts-builds": "^1.1.0",
+    "tsdown": "^0.16.8",
+    "tsx": "^4.21.0"
   },
   "packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd"
 }
