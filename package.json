@@ -54,16 +54,16 @@
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
     "dotenv": "^16.6.1",
-    "fastmcp": "^3.24.0",
-    "zod": "^4.1.13"
+    "fastmcp": "^3.26.9",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@types/node": "^22.19.1",
+    "@types/node": "^22.19.7",
     "ajv-cli": "^5.0.0",
-    "msw": "^2.12.4",
-    "ts-builds": "^1.1.0",
+    "msw": "^2.12.7",
+    "ts-builds": "^2.2.1",
     "tsdown": "^0.16.8",
     "tsx": "^4.21.0"
   },
-  "packageManager": "pnpm@10.18.2+sha512.9fb969fa749b3ade6035e0f109f0b8a60b5d08a1a87fdf72e337da90dcc93336e2280ca4e44f2358a649b83c17959e9993e777c2080879f3801e6f0d999ad3dd"
+  "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48"
 }
