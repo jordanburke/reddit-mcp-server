@@ -2,6 +2,7 @@ import { FastMCP } from "fastmcp"
 import { z } from "zod"
 import { initializeRedditClient, getRedditClient } from "./client/reddit-client"
 import { formatUserInfo, formatPostInfo, formatSubredditInfo } from "./utils/formatters"
+import { RedditAuthMode } from "./types"
 import dotenv from "dotenv"
 
 // Load environment variables
@@ -14,42 +15,59 @@ async function setupRedditClient() {
   const userAgent = process.env.REDDIT_USER_AGENT || "RedditMCPServer/1.1.0"
   const username = process.env.REDDIT_USERNAME
   const password = process.env.REDDIT_PASSWORD
+  const authMode = (process.env.REDDIT_AUTH_MODE || "auto") as RedditAuthMode
 
-  if (!clientId || !clientSecret) {
-    console.error(
-      "[Error] Missing required Reddit API credentials. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET environment variables.",
-    )
+  // Validate mode
+  if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
+    console.error(`[Error] Invalid REDDIT_AUTH_MODE: ${authMode}`)
+    console.error("[Error] Valid options are: auto, authenticated, anonymous")
     process.exit(1)
   }
 
+  // In authenticated mode, require credentials
+  if (authMode === "authenticated" && (!clientId || !clientSecret)) {
+    console.error("[Error] Authenticated mode requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+    process.exit(1)
+  }
+
+  // For auto/anonymous, credentials are optional
+  const hasCredentials = !!(clientId && clientSecret)
+
   try {
     const client = initializeRedditClient({
-      clientId,
-      clientSecret,
+      clientId: clientId || "",
+      clientSecret: clientSecret || "",
       userAgent,
       username,
       password,
+      authMode,
     })
 
     console.error("[Setup] Reddit client initialized")
-    console.error("[Setup] Testing Reddit API connection...")
+    console.error(`[Setup] Authentication mode: ${authMode}`)
 
-    // Test the connection by attempting authentication
-    const isConnected = await client.checkAuthentication()
+    if (authMode === "anonymous" || !hasCredentials) {
+      console.error("[Setup] Using anonymous Reddit API (~10 req/min)")
+      console.error("[Setup] No authentication required - ready to use!")
+    } else {
+      console.error("[Setup] Testing Reddit API connection...")
+      const isConnected = await client.checkAuthentication()
 
-    if (!isConnected) {
-      console.error("[Error] ✗ Failed to connect to Reddit API")
-      console.error("[Error] Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
-      process.exit(1)
+      if (!isConnected) {
+        console.error("[Error] ✗ Failed to connect to Reddit API")
+        console.error("[Error] Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+        process.exit(1)
+      }
+
+      console.error("[Setup] ✓ Reddit API connection successful")
+      console.error("[Setup] Using OAuth Reddit API (60-100 req/min)")
     }
-
-    console.error("[Setup] ✓ Reddit API connection successful")
 
     if (username && password) {
       console.error(`[Setup] ✓ User authenticated as: ${username}`)
       console.error("[Setup] Write operations enabled (posting, replying, editing, deleting)")
     } else {
-      console.error("[Setup] Running in read-only mode (client credentials only)")
+      console.error("[Setup] Read-only mode (no user credentials)")
       console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
     }
   } catch (error) {
@@ -773,17 +791,13 @@ async function main() {
   try {
     await setupRedditClient()
 
-    // Default to HTTP on port 3000, unless explicitly using stdio (for npx/CLI)
-    const useStdio = process.env.TRANSPORT_TYPE === "stdio"
+    // Default to stdio for local/MCP client usage
+    // Use HTTP only when explicitly requested (e.g., for Docker)
+    const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
     const port = parseInt(process.env.PORT || "3000")
     const host = process.env.HOST || "0.0.0.0"
 
-    if (useStdio) {
-      console.error("[Setup] Starting in stdio mode (CLI/npx)")
-      await server.start({
-        transportType: "stdio",
-      })
-    } else {
+    if (useHttp) {
       console.error(`[Setup] Starting HTTP server on ${host}:${port}`)
       await server.start({
         transportType: "httpStream",
@@ -795,6 +809,11 @@ async function main() {
       })
       console.error(`[Setup] HTTP server ready at http://${host}:${port}/mcp`)
       console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
+    } else {
+      console.error("[Setup] Starting in stdio mode")
+      await server.start({
+        transportType: "stdio",
+      })
     }
   } catch (error) {
     console.error("[Error] Failed to start server:", error)

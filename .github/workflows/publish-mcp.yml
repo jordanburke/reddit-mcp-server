@@ -1,18 +1,16 @@
-name: Publish to MCP Registry
+name: Publish to NPM and MCP Registry
 
 on:
   push:
-    tags: ["v*"] # Triggers on version tags like v1.0.0
-  workflow_dispatch: # Allow manual triggering
+    tags:
+      - "v*" # Triggers on version tags like v1.0.0
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Required for OIDC authentication
-      contents: read
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      contents: write # Required for GitHub release
+      id-token: write # Required for npm provenance and OIDC authentication
 
     steps:
       - name: Checkout code
@@ -35,9 +33,23 @@ jobs:
       - name: Run validation pipeline
         run: pnpm run validate
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Verify package contents
+        run: |
+          echo "Files to be published:"
+          npm pack --dry-run
+
       - name: Publish to npm
-        if: ${{ env.NODE_AUTH_TOKEN != '' }}
-        run: pnpm publish --no-git-checks
+        run: npm publish --provenance --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install MCP Publisher
         run: |

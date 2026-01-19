@@ -93,6 +93,75 @@ If you want to write posts you need to include your `REDDIT_USERNAME` and `REDDI
   }
 ```
 
+## 🎯 Authentication Modes
+
+The Reddit MCP Server supports three authentication modes to balance ease of use with API rate limits:
+
+### Mode Options
+
+- **`auto` (default)**: Tries OAuth if credentials provided, falls back to anonymous
+- **`authenticated`**: Requires credentials, fails on startup if missing
+- **`anonymous`**: Uses public JSON API without authentication
+
+### Quick Start - No Setup Required! 🎉
+
+Want to try the server without any Reddit API setup? Just use anonymous mode:
+
+```bash
+export REDDIT_AUTH_MODE=anonymous
+npx reddit-mcp-server
+```
+
+Or in your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "reddit": {
+      "command": "npx",
+      "args": ["reddit-mcp-server"],
+      "env": {
+        "REDDIT_AUTH_MODE": "anonymous"
+      }
+    }
+  }
+}
+```
+
+### Rate Limits
+
+| Mode              | Rate Limit     | Setup Required   |
+| ----------------- | -------------- | ---------------- |
+| anonymous         | ~10 req/min    | None!            |
+| auto (no creds)   | ~10 req/min    | None!            |
+| auto (with creds) | 60-100 req/min | Client ID/Secret |
+| authenticated     | 60-100 req/min | Client ID/Secret |
+
+**Note**: Write operations (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment) require REDDIT_USERNAME and REDDIT_PASSWORD in any mode.
+
+### Configuration
+
+Set the `REDDIT_AUTH_MODE` environment variable:
+
+```bash
+# .env file
+REDDIT_AUTH_MODE=auto  # or 'authenticated' or 'anonymous'
+```
+
+Or in your MCP config:
+
+```json
+{
+  "env": {
+    "REDDIT_AUTH_MODE": "anonymous",
+    "REDDIT_CLIENT_ID": "<YOUR_CLIENT_ID_OPTIONAL>",
+    "REDDIT_CLIENT_SECRET": "<YOUR_CLIENT_SECRET_OPTIONAL>",
+    "REDDIT_USERNAME": "<YOUR_USERNAME_OPTIONAL>",
+    "REDDIT_PASSWORD": "<YOUR_PASSWORD_OPTIONAL>"
+  }
+}
+```
+
 ## 🛠️ Development
 
 ### Commands
@@ -135,17 +204,14 @@ npx reddit-mcp-server --generate-token
 
 ### HTTP MCP Endpoint (FastMCP)
 
-In addition to the standard npx execution, this server supports HTTP transport via FastMCP for direct HTTP integration:
+In addition to the standard stdio mode, this server supports HTTP transport via FastMCP for direct HTTP integration (useful for Docker or web-based clients):
 
 ```bash
-# Start the HTTP server on port 3000 (default)
-node dist/index.js
+# Start in HTTP mode on port 3000
+TRANSPORT_TYPE=httpStream node dist/index.js
 
 # Start with custom port
-PORT=8080 node dist/index.js
-
-# Or use the npm script
-pnpm start
+TRANSPORT_TYPE=httpStream PORT=8080 node dist/index.js
 ```
 
 The server will be available at `http://localhost:3000` with the MCP endpoint at `http://localhost:3000/mcp`.

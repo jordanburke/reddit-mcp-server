@@ -96,20 +96,47 @@ pnpm lint:fix
 
 ### Authentication Flow
 
-- **Read-only operations**: Only require client credentials (REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET)
-- **Write operations**: Additionally require user credentials (REDDIT_USERNAME, REDDIT_PASSWORD)
+The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
+
+1. **auto (default)**: Automatically chooses the best authentication method
+   - If REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are provided: Uses OAuth (60-100 req/min)
+   - Otherwise: Falls back to anonymous mode (~10 req/min)
+   - Gracefully degrades without failing
+
+2. **authenticated**: Requires OAuth credentials
+   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
+   - Server fails to start if credentials are missing
+   - Provides higher rate limits (60-100 req/min)
+   - Use for production environments with guaranteed credentials
+
+3. **anonymous**: Uses public JSON API without authentication
+   - No credentials required - zero-setup experience
+   - Lower rate limit (~10 req/min)
+   - Perfect for testing and development
+   - Read-only operations work without any Reddit app setup
+
+**Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
+
+- Require REDDIT_USERNAME and REDDIT_PASSWORD in **any** mode
+- Will fail gracefully with a clear error message if credentials are missing
 - Token management is handled automatically by the Reddit client
 
 ## Environment Setup
 
-Required environment variables:
+Environment variables:
 
 ```bash
+# Reddit API Credentials (optional unless using authenticated mode)
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
-REDDIT_USERNAME=your_username     # Optional, for write operations
-REDDIT_PASSWORD=your_password     # Optional, for write operations
+
+# Reddit User Credentials (optional, for write operations)
+REDDIT_USERNAME=your_username
+REDDIT_PASSWORD=your_password
+
+# Authentication Mode (optional, defaults to 'auto')
+REDDIT_AUTH_MODE=auto            # Options: auto, authenticated, anonymous
 
 # Transport Configuration
 # TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)
@@ -120,14 +147,32 @@ OAUTH_ENABLED=true                # Set to "true" to enable OAuth protection
 OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not provided
 ```
 
+### Quick Start Examples
+
+**Try without any setup:**
+
+```bash
+export REDDIT_AUTH_MODE=anonymous
+npx reddit-mcp-server
+```
+
+**With OAuth for higher rate limits:**
+
+```bash
+export REDDIT_AUTH_MODE=auto
+export REDDIT_CLIENT_ID=your_client_id
+export REDDIT_CLIENT_SECRET=your_client_secret
+npx reddit-mcp-server
+```
+
 ### Transport Modes
 
-The server defaults to HTTP mode unless using the CLI/npx entry point:
+The server defaults to stdio mode for MCP client compatibility:
 
-- **Running directly**: `node dist/index.js` → HTTP server on port 3000
-- **Running via npx**: `npx reddit-mcp-server` → stdio mode (for Claude Desktop)
-- **Running via Docker**: HTTP server on port 3000
-- **Force stdio mode**: Set `TRANSPORT_TYPE=stdio` environment variable
+- **Running directly**: `node dist/index.js` → stdio mode (default)
+- **Running via npx**: `npx reddit-mcp-server` → stdio mode
+- **Running via Docker**: Set `TRANSPORT_TYPE=httpStream` for HTTP server on port 3000
+- **Force HTTP mode**: Set `TRANSPORT_TYPE=httpStream` or `TRANSPORT_TYPE=http`
 
 ### OAuth Security
 

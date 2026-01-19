@@ -1,9 +1,12 @@
+export type RedditAuthMode = "auto" | "authenticated" | "anonymous"
+
 export interface RedditClientConfig {
   clientId: string
   clientSecret: string
   userAgent: string
   username?: string
   password?: string
+  authMode?: RedditAuthMode
 }
 
 export interface RedditUser {

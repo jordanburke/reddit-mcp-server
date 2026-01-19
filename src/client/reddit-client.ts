@@ -1,5 +1,6 @@
 import {
   RedditClientConfig,
+  RedditAuthMode,
   RedditUser,
   RedditPost,
   RedditComment,
@@ -18,8 +19,10 @@ export class RedditClient {
   private password?: string
   private accessToken?: string
   private tokenExpiry: number = 0
-  private baseUrl: string = "https://oauth.reddit.com"
+  private baseUrl: string
   private authenticated: boolean = false
+  private authMode: RedditAuthMode
+  private hasCredentials: boolean
 
   constructor(config: RedditClientConfig) {
     this.clientId = config.clientId
@@ -27,19 +30,39 @@ export class RedditClient {
     this.userAgent = config.userAgent
     this.username = config.username
     this.password = config.password
+    this.authMode = config.authMode || "auto"
+    this.hasCredentials = !!(this.clientId && this.clientSecret)
+    this.baseUrl = this.determineBaseUrl()
+  }
+
+  private determineBaseUrl(): string {
+    switch (this.authMode) {
+      case "authenticated":
+        return "https://oauth.reddit.com"
+      case "anonymous":
+        return "https://www.reddit.com"
+      case "auto":
+        return this.hasCredentials ? "https://oauth.reddit.com" : "https://www.reddit.com"
+    }
   }
 
   private async makeRequest(path: string, options: RequestInit = {}): Promise<Response> {
-    // Check if we need to refresh token
-    if (Date.now() >= this.tokenExpiry || !this.authenticated) {
+    const requiresAuth = this.authMode === "authenticated" || (this.authMode === "auto" && this.hasCredentials)
+
+    // Authenticate only if required
+    if (requiresAuth && (Date.now() >= this.tokenExpiry || !this.authenticated)) {
       await this.authenticate()
     }
 
     const url = `${this.baseUrl}${path}`
-    const headers = {
+    const headers: Record<string, string> = {
       "User-Agent": this.userAgent,
-      Authorization: `Bearer ${this.accessToken}`,
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
+    }
+
+    // Add Bearer token only if authenticated
+    if (requiresAuth && this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`
     }
 
     const response = await fetch(url, {
@@ -64,6 +87,23 @@ export class RedditClient {
   }
 
   async authenticate(): Promise<void> {
+    // Skip in anonymous mode
+    if (this.authMode === "anonymous") {
+      this.authenticated = false
+      return
+    }
+
+    // Require credentials in authenticated mode
+    if (this.authMode === "authenticated" && !this.hasCredentials) {
+      throw new Error("Authenticated mode requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+    }
+
+    // Skip if auto mode without credentials
+    if (this.authMode === "auto" && !this.hasCredentials) {
+      this.authenticated = false
+      return
+    }
+
     try {
       const now = Date.now()
       if (this.accessToken && now < this.tokenExpiry) {
@@ -125,8 +165,19 @@ export class RedditClient {
     return true
   }
 
+  private validateWriteAccess(): void {
+    if (!this.username || !this.password) {
+      if (this.authMode === "anonymous") {
+        throw new Error(
+          "Write operations not available in anonymous mode. " +
+            "Set REDDIT_USERNAME, REDDIT_PASSWORD and use 'auto' or 'authenticated' mode.",
+        )
+      }
+      throw new Error("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+    }
+  }
+
   async getUser(username: string): Promise<RedditUser> {
-    await this.authenticate()
     try {
       const response = await this.makeRequest(`/user/${username}/about.json`)
       if (!response.ok) {
@@ -155,7 +206,6 @@ export class RedditClient {
   }
 
   async getSubredditInfo(subredditName: string): Promise<RedditSubreddit> {
-    await this.authenticate()
     try {
       const response = await this.makeRequest(`/r/${subredditName}/about.json`)
       if (!response.ok) {
@@ -184,7 +234,6 @@ export class RedditClient {
   }
 
   async getTopPosts(subreddit: string, timeFilter: string = "week", limit: number = 10): Promise<RedditPost[]> {
-    await this.authenticate()
     try {
       const endpoint = subreddit ? `/r/${subreddit}/top.json` : "/top.json"
       const params = new URLSearchParams({
@@ -227,7 +276,6 @@ export class RedditClient {
   }
 
   async getPost(postId: string, subreddit?: string): Promise<RedditPost> {
-    await this.authenticate()
     try {
       const endpoint = subreddit ? `/r/${subreddit}/comments/${postId}.json` : `/api/info.json?id=t3_${postId}`
       const response = await this.makeRequest(endpoint)
@@ -275,7 +323,6 @@ export class RedditClient {
   }
 
   async getTrendingSubreddits(limit: number = 5): Promise<string[]> {
-    await this.authenticate()
     try {
       const params = new URLSearchParams({ limit: limit.toString() })
       const response = await this.makeRequest(`/subreddits/popular.json?${params}`)
@@ -293,11 +340,7 @@ export class RedditClient {
   }
 
   async createPost(subreddit: string, title: string, content: string, isSelf: boolean = true): Promise<RedditPost> {
-    await this.authenticate()
-
-    if (!this.username || !this.password) {
-      throw new Error("User authentication required for posting")
-    }
+    this.validateWriteAccess()
 
     try {
       const kind = isSelf ? "self" : "link"
@@ -356,7 +399,6 @@ export class RedditClient {
   }
 
   async checkPostExists(postId: string): Promise<boolean> {
-    await this.authenticate()
     try {
       const response = await this.makeRequest(`/api/info.json?id=t3_${postId}`)
       if (!response.ok) {
@@ -371,11 +413,7 @@ export class RedditClient {
   }
 
   async replyToPost(postId: string, content: string): Promise<RedditComment> {
-    await this.authenticate()
-
-    if (!this.username || !this.password) {
-      throw new Error("User authentication required for posting replies")
-    }
+    this.validateWriteAccess()
 
     try {
       if (!(await this.checkPostExists(postId))) {
@@ -440,11 +478,7 @@ export class RedditClient {
   }
 
   async deletePost(thingId: string): Promise<boolean> {
-    await this.authenticate()
-
-    if (!this.username || !this.password) {
-      throw new Error("User authentication required for deleting content")
-    }
+    this.validateWriteAccess()
 
     try {
       // Ensure thing ID has the correct prefix (t3_ for posts, t1_ for comments)
@@ -487,11 +521,7 @@ export class RedditClient {
   }
 
   async editPost(thingId: string, newText: string): Promise<boolean> {
-    await this.authenticate()
-
-    if (!this.username || !this.password) {
-      throw new Error("User authentication required for editing content")
-    }
+    this.validateWriteAccess()
 
     try {
       // Ensure thing ID has the correct prefix (t3_ for posts, t1_ for comments)
@@ -555,7 +585,6 @@ export class RedditClient {
       type?: string
     } = {},
   ): Promise<RedditPost[]> {
-    await this.authenticate()
     try {
       const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
       const endpoint = subreddit ? `/r/${subreddit}/search.json` : "/search.json"
@@ -612,7 +641,6 @@ export class RedditClient {
       limit?: number
     } = {},
   ): Promise<{ post: RedditPost; comments: RedditComment[] }> {
-    await this.authenticate()
     try {
       const { sort = "best", limit = 100 } = options
       const params = new URLSearchParams({
@@ -694,7 +722,6 @@ export class RedditClient {
       limit?: number
     } = {},
   ): Promise<RedditPost[]> {
-    await this.authenticate()
     try {
       const { sort = "new", timeFilter = "all", limit = 25 } = options
       const params = new URLSearchParams({
@@ -746,7 +773,6 @@ export class RedditClient {
       limit?: number
     } = {},
   ): Promise<RedditComment[]> {
-    await this.authenticate()
     try {
       const { sort = "new", timeFilter = "all", limit = 25 } = options
       const params = new URLSearchParams({
