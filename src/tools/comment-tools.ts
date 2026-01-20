@@ -1,6 +1,7 @@
 import { getRedditClient } from "../client/reddit-client"
 import { formatPost } from "../utils/formatters"
 import { UserError } from "fastmcp"
+import { RedditComment } from "../types"
 
 export async function getPostComments(params: { post_id: string; subreddit: string; sort?: string; limit?: number }) {
   const { post_id, subreddit, sort = "best", limit = 100 } = params
@@ -23,7 +24,7 @@ export async function getPostComments(params: { post_id: string; subreddit: stri
     const formattedPost = formatPost(post)
 
     // Function to format comments with proper indentation
-    const formatComment = (comment: any): string => {
+    const formatComment = (comment: RedditComment): string => {
       const edited = comment.edited ? " *(edited)*" : ""
       const submitter = comment.isSubmitter ? " **[OP]**" : ""
       const depth = comment.depth || 0

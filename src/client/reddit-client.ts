@@ -9,6 +9,13 @@ import {
   RedditApiSubredditResponse,
   RedditApiListingResponse,
   RedditApiPostData,
+  RedditApiSubmitResponse,
+  RedditApiCommentResponse,
+  RedditApiEditResponse,
+  RedditApiPopularSubredditsResponse,
+  RedditApiPostCommentsResponse,
+  RedditApiCommentTreeData,
+  RedditApiInfoResponse,
 } from "../types"
 
 export class RedditClient {
@@ -113,12 +120,14 @@ export class RedditClient {
       const authUrl = "https://www.reddit.com/api/v1/access_token"
       const authData = new URLSearchParams()
 
-      const isUserAuth = !!(this.username && this.password)
+      const username = this.username
+      const password = this.password
+      const isUserAuth = !!(username && password)
       if (isUserAuth) {
         // Authenticating with user credentials
         authData.append("grant_type", "password")
-        authData.append("username", this.username!)
-        authData.append("password", this.password!)
+        authData.append("username", username)
+        authData.append("password", password)
       } else {
         // Authenticating with client credentials (read-only)
         authData.append("grant_type", "client_credentials")
@@ -284,14 +293,14 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as any
-
-      let post
+      let post: RedditApiPostData
       if (subreddit) {
-        // When using the comments endpoint
+        // When using the comments endpoint - returns array [postListing, commentsListing]
+        const json = (await response.json()) as [RedditApiListingResponse<RedditApiPostData>, unknown]
         post = json[0].data.children[0].data
       } else {
         // When using the info endpoint
+        const json = (await response.json()) as RedditApiInfoResponse
         if (!json.data.children.length) {
           throw new Error(`Post with ID ${postId} not found`)
         }
@@ -313,7 +322,7 @@ export class RedditClient {
         spoiler: post.spoiler,
         edited: !!post.edited,
         isSelf: post.is_self,
-        linkFlairText: post.link_flair_text,
+        linkFlairText: post.link_flair_text ?? undefined,
         permalink: post.permalink,
       }
     } catch {
@@ -331,8 +340,8 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: { children: any[] } }
-      return json.data.children.map((child: any) => child.data.display_name)
+      const json = (await response.json()) as RedditApiPopularSubredditsResponse
+      return json.data.children.map((child) => child.data.display_name)
     } catch {
       // Failed to get trending subreddits
       throw new Error("Failed to get trending subreddits")
@@ -366,12 +375,12 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      const json = (await response.json()) as any
+      const json = (await response.json()) as RedditApiSubmitResponse
       console.error(`[Reddit API] Create post response:`, JSON.stringify(json, null, 2))
 
       // With api_type=json, response has json.data.id or json.errors
       if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
+        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
         console.error(`[Reddit API] Post creation errors: ${errors}`)
         throw new Error(`Reddit API errors: ${errors}`)
       }
@@ -405,7 +414,7 @@ export class RedditClient {
         return false
       }
 
-      const json = (await response.json()) as { data: { children: any[] } }
+      const json = (await response.json()) as RedditApiInfoResponse
       return json.data.children.length > 0
     } catch {
       return false
@@ -441,26 +450,28 @@ export class RedditClient {
       }
 
       // Extract comment data from response
-      const json = (await response.json()) as any
+      const json = (await response.json()) as RedditApiCommentResponse
       console.error(`[Reddit API] Reply response:`, JSON.stringify(json, null, 2))
 
-      if (json.json && json.json.data && json.json.data.things) {
+      if (json.json?.data?.things && json.json.data.things.length > 0) {
         const commentData = json.json.data.things[0].data
+        // username is guaranteed to be defined because validateWriteAccess() was called above
+        const author = this.username ?? "[unknown]"
         return {
           id: commentData.id,
-          author: this.username!,
+          author,
           body: content,
           score: 1,
           controversiality: 0,
           subreddit: commentData.subreddit,
-          submissionTitle: commentData.link_title || "",
+          submissionTitle: commentData.link_title ?? "",
           createdUtc: Date.now() / 1000,
           edited: false,
           isSubmitter: false,
           permalink: commentData.permalink,
         }
-      } else if (json.json && json.json.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
+      } else if (json.json?.errors && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
         console.error(`[Reddit API] Reply errors: ${errors}`)
         throw new Error(`Reddit API errors: ${errors}`)
       } else {
@@ -547,12 +558,12 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      const json = (await response.json()) as any
+      const json = (await response.json()) as RedditApiEditResponse
       console.error(`[Reddit API] Edit response:`, JSON.stringify(json, null, 2))
 
       // Check for errors in response
       if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e: any) => e.join(": ")).join(", ")
+        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
         console.error(`[Reddit API] Edit errors: ${errors}`)
         throw new Error(`Reddit API errors: ${errors}`)
       }
@@ -603,11 +614,11 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: { children: any[] } }
+      const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
       return json.data.children
-        .filter((child: any) => child.kind === "t3") // Only posts
-        .map((child: any) => {
+        .filter((child) => child.kind === "t3") // Only posts
+        .map((child) => {
           const post = child.data
           return {
             id: post.id,
@@ -653,7 +664,7 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as any[]
+      const json = (await response.json()) as RedditApiPostCommentsResponse
 
       // First element is the post, second is the comments
       const postData = json[0].data.children[0].data
@@ -672,12 +683,15 @@ export class RedditClient {
         spoiler: postData.spoiler,
         edited: !!postData.edited,
         isSelf: postData.is_self,
-        linkFlairText: postData.link_flair_text,
+        linkFlairText: postData.link_flair_text ?? undefined,
         permalink: postData.permalink,
       }
 
       const comments: RedditComment[] = []
-      const parseComments = (commentData: any[], depth: number = 0) => {
+      const parseComments = (
+        commentData: Array<{ kind: string; data: RedditApiCommentTreeData }>,
+        depth: number = 0,
+      ) => {
         for (const item of commentData) {
           if (item.kind === "t1" && item.data.body) {
             comments.push({
@@ -697,14 +711,15 @@ export class RedditClient {
             })
 
             // Parse replies recursively
-            if (item.data.replies && item.data.replies.data && item.data.replies.data.children) {
-              parseComments(item.data.replies.data.children, depth + 1)
+            const replies = item.data.replies
+            if (replies && typeof replies !== "string" && replies.data?.children) {
+              parseComments(replies.data.children, depth + 1)
             }
           }
         }
       }
 
-      if (json[1] && json[1].data && json[1].data.children) {
+      if (json[1]?.data?.children) {
         parseComments(json[1].data.children)
       }
 
@@ -735,11 +750,11 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: { children: any[] } }
+      const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
       return json.data.children
-        .filter((child: any) => child.kind === "t3")
-        .map((child: any) => {
+        .filter((child) => child.kind === "t3")
+        .map((child) => {
           const post = child.data
           return {
             id: post.id,
@@ -786,20 +801,20 @@ export class RedditClient {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as { data: { children: any[] } }
+      const json = (await response.json()) as RedditApiListingResponse<RedditApiCommentTreeData>
 
       return json.data.children
-        .filter((child: any) => child.kind === "t1")
-        .map((child: any) => {
+        .filter((child) => child.kind === "t1")
+        .map((child) => {
           const comment = child.data
           return {
             id: comment.id,
             author: comment.author,
-            body: comment.body,
+            body: comment.body ?? "",
             score: comment.score,
             controversiality: comment.controversiality,
             subreddit: comment.subreddit,
-            submissionTitle: comment.link_title || "",
+            submissionTitle: comment.link_title ?? "",
             createdUtc: comment.created_utc,
             edited: !!comment.edited,
             isSubmitter: comment.is_submitter,

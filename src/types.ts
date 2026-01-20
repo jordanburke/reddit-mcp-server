@@ -232,3 +232,110 @@ export interface RedditApiResponse<T = unknown> {
   data: T
   [key: string]: unknown
 }
+
+// Reddit API Submit Response (for createPost)
+export interface RedditApiSubmitResponse {
+  json: {
+    errors?: Array<[string, string, string?]>
+    data?: {
+      id?: string
+      name?: string
+      url?: string
+    }
+  }
+}
+
+// Reddit API Comment Response (for replyToPost)
+export interface RedditApiCommentResponse {
+  json: {
+    errors?: Array<[string, string, string?]>
+    data?: {
+      things?: Array<{
+        kind: string
+        data: {
+          id: string
+          subreddit: string
+          link_title?: string
+          permalink: string
+          [key: string]: unknown
+        }
+      }>
+    }
+  }
+}
+
+// Reddit API Edit Response (for editPost)
+export interface RedditApiEditResponse {
+  json: {
+    errors?: Array<[string, string, string?]>
+    data?: {
+      things?: Array<{
+        kind: string
+        data: {
+          id: string
+          body?: string
+          selftext?: string
+          [key: string]: unknown
+        }
+      }>
+    }
+  }
+}
+
+// Reddit API Popular Subreddits Response
+export interface RedditApiPopularSubredditsResponse {
+  data: {
+    children: Array<{
+      kind: string
+      data: {
+        display_name: string
+        [key: string]: unknown
+      }
+    }>
+    [key: string]: unknown
+  }
+}
+
+// Reddit API Post with Comments Response (array of two listings)
+export type RedditApiPostCommentsResponse = [
+  RedditApiListingResponse<RedditApiPostData>,
+  RedditApiListingResponse<RedditApiCommentTreeData>,
+]
+
+// Reddit API Comment Tree Data (includes nested replies)
+export interface RedditApiCommentTreeData {
+  id: string
+  author: string
+  body?: string
+  score: number
+  controversiality: number
+  subreddit: string
+  created_utc: number
+  edited: boolean | number
+  is_submitter: boolean
+  permalink: string
+  parent_id: string
+  link_title?: string // Present in user comment listings
+  replies?:
+    | ""
+    | {
+        data: {
+          children: Array<{
+            kind: string
+            data: RedditApiCommentTreeData
+          }>
+        }
+      }
+  [key: string]: unknown
+}
+
+// Reddit API Info/Check Response (for checkPostExists, getPost info endpoint)
+export interface RedditApiInfoResponse {
+  data: {
+    children: Array<{
+      kind: string
+      data: RedditApiPostData
+    }>
+    [key: string]: unknown
+  }
+}
