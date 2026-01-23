@@ -1,6 +1,8 @@
+import crypto from "crypto"
 import {
   RedditClientConfig,
   RedditAuthMode,
+  SafeModeConfig,
   RedditUser,
   RedditPost,
   RedditComment,
@@ -31,6 +33,11 @@ export class RedditClient {
   private authMode: RedditAuthMode
   private hasCredentials: boolean
 
+  // Safe mode properties
+  private safeMode: SafeModeConfig
+  private lastWriteTime: number = 0
+  private recentContentHashes: Set<string> = new Set()
+
   constructor(config: RedditClientConfig) {
     this.clientId = config.clientId
     this.clientSecret = config.clientSecret
@@ -40,6 +47,15 @@ export class RedditClient {
     this.authMode = config.authMode || "auto"
     this.hasCredentials = !!(this.clientId && this.clientSecret)
     this.baseUrl = this.determineBaseUrl()
+
+    // Initialize safe mode config with defaults
+    this.safeMode = config.safeMode || {
+      enabled: false,
+      mode: "off",
+      writeDelayMs: 0,
+      duplicateCheck: false,
+      maxRecentHashes: 10,
+    }
   }
 
   private determineBaseUrl(): string {
@@ -183,6 +199,50 @@ export class RedditClient {
         )
       }
       throw new Error("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+    }
+  }
+
+  private async enforceWriteRateLimit(): Promise<void> {
+    if (!this.safeMode.enabled || this.safeMode.writeDelayMs <= 0) {
+      return
+    }
+
+    const now = Date.now()
+    const elapsed = now - this.lastWriteTime
+    if (elapsed < this.safeMode.writeDelayMs) {
+      const waitTime = this.safeMode.writeDelayMs - elapsed
+      console.error(`[SafeMode] Rate limit: waiting ${waitTime}ms before write operation`)
+      await new Promise((resolve) => setTimeout(resolve, waitTime))
+    }
+    this.lastWriteTime = Date.now()
+  }
+
+  private hashContent(content: string): string {
+    return crypto.createHash("md5").update(content.trim().toLowerCase()).digest("hex")
+  }
+
+  private checkDuplicateContent(content: string): void {
+    if (!this.safeMode.enabled || !this.safeMode.duplicateCheck) {
+      return
+    }
+
+    const hash = this.hashContent(content)
+    if (this.recentContentHashes.has(hash)) {
+      throw new Error(
+        "Duplicate content detected. Reddit's spam filter may ban your account for posting identical content. " +
+          "Please modify your content and try again.",
+      )
+    }
+
+    // Add to recent hashes
+    this.recentContentHashes.add(hash)
+
+    // Remove oldest hash if over limit
+    if (this.recentContentHashes.size > this.safeMode.maxRecentHashes) {
+      const first = this.recentContentHashes.values().next().value
+      if (first) {
+        this.recentContentHashes.delete(first)
+      }
     }
   }
 
@@ -351,6 +411,10 @@ export class RedditClient {
   async createPost(subreddit: string, title: string, content: string, isSelf: boolean = true): Promise<RedditPost> {
     this.validateWriteAccess()
 
+    // Safe mode checks
+    await this.enforceWriteRateLimit()
+    this.checkDuplicateContent(title + content)
+
     try {
       const kind = isSelf ? "self" : "link"
       const params = new URLSearchParams()
@@ -423,6 +487,10 @@ export class RedditClient {
 
   async replyToPost(postId: string, content: string): Promise<RedditComment> {
     this.validateWriteAccess()
+
+    // Safe mode checks
+    await this.enforceWriteRateLimit()
+    this.checkDuplicateContent(content)
 
     try {
       if (!(await this.checkPostExists(postId))) {
@@ -533,6 +601,10 @@ export class RedditClient {
 
   async editPost(thingId: string, newText: string): Promise<boolean> {
     this.validateWriteAccess()
+
+    // Safe mode checks
+    await this.enforceWriteRateLimit()
+    this.checkDuplicateContent(newText)
 
     try {
       // Ensure thing ID has the correct prefix (t3_ for posts, t1_ for comments)

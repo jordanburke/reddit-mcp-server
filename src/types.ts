@@ -1,5 +1,15 @@
 export type RedditAuthMode = "auto" | "authenticated" | "anonymous"
 
+export type RedditSafeMode = "off" | "standard" | "strict"
+
+export interface SafeModeConfig {
+  enabled: boolean
+  mode: RedditSafeMode
+  writeDelayMs: number
+  duplicateCheck: boolean
+  maxRecentHashes: number
+}
+
 export interface RedditClientConfig {
   clientId: string
   clientSecret: string
@@ -7,6 +17,7 @@ export interface RedditClientConfig {
   username?: string
   password?: string
   authMode?: RedditAuthMode
+  safeMode?: SafeModeConfig
 }
 
 export interface RedditUser {

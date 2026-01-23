@@ -121,6 +121,24 @@ The server supports three authentication modes configured via `REDDIT_AUTH_MODE`
 - Will fail gracefully with a clear error message if credentials are missing
 - Token management is handled automatically by the Reddit client
 
+### Safe Mode (Spam Protection)
+
+The server includes optional safeguards to protect against Reddit's spam detection, configured via `REDDIT_SAFE_MODE`:
+
+1. **off (default)**: No safeguards, original behavior
+2. **standard**: Recommended for normal use
+   - 2-second delay between write operations
+   - Duplicate content detection (tracks last 10 items)
+3. **strict**: For cautious automated posting
+   - 5-second delay between write operations
+   - Aggressive duplicate detection (tracks last 20 items)
+
+**Features:**
+
+- **Rate Limiting**: Enforces minimum delays between write operations to avoid spam flags
+- **Duplicate Detection**: Blocks identical content from being posted, with clear error messages
+- **Smart User-Agent**: Auto-generates Reddit-compliant User-Agent format (`typescript:reddit-mcp-server:1.1.0 (by /u/USERNAME)`) when username is provided
+
 ## Environment Setup
 
 Environment variables:
@@ -137,6 +155,9 @@ REDDIT_PASSWORD=your_password
 
 # Authentication Mode (optional, defaults to 'auto')
 REDDIT_AUTH_MODE=auto            # Options: auto, authenticated, anonymous
+
+# Safe Mode (optional, defaults to 'off')
+REDDIT_SAFE_MODE=standard        # Options: off, standard, strict
 
 # Transport Configuration
 # TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)
@@ -162,6 +183,15 @@ npx reddit-mcp-server
 export REDDIT_AUTH_MODE=auto
 export REDDIT_CLIENT_ID=your_client_id
 export REDDIT_CLIENT_SECRET=your_client_secret
+npx reddit-mcp-server
+```
+
+**With Safe Mode for write operations:**
+
+```bash
+export REDDIT_USERNAME=your_username
+export REDDIT_PASSWORD=your_password
+export REDDIT_SAFE_MODE=standard
 npx reddit-mcp-server
 ```
 

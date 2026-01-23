@@ -2,25 +2,96 @@ import { FastMCP } from "fastmcp"
 import { z } from "zod"
 import { initializeRedditClient, getRedditClient } from "./client/reddit-client"
 import { formatUserInfo, formatPostInfo, formatSubredditInfo } from "./utils/formatters"
-import { RedditAuthMode } from "./types"
+import { RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
 import dotenv from "dotenv"
 
 // Load environment variables
 dotenv.config()
 
+// User-Agent validation and building
+function validateUserAgent(userAgent: string, username?: string): void {
+  const recommendedPattern = /^[\w-]+:[\w-]+:[\d.]+ \(by \/u\/\w+\)$/
+  if (!recommendedPattern.test(userAgent)) {
+    console.error("[Warning] User-Agent does not follow Reddit's recommended format")
+    console.error("[Warning] Recommended: 'platform:app_id:version (by /u/username)'")
+    console.error("[Warning] Non-standard User-Agents may increase ban risk")
+    if (username) {
+      console.error(`[Warning] Consider using: 'typescript:reddit-mcp-server:1.1.0 (by /u/${username})'`)
+    }
+  }
+}
+
+function buildUserAgent(customAgent?: string, username?: string): string {
+  // If custom agent provided, use it (but validate)
+  if (customAgent) {
+    validateUserAgent(customAgent, username)
+    return customAgent
+  }
+
+  // Auto-format with username if available
+  if (username) {
+    const autoAgent = `typescript:reddit-mcp-server:1.1.0 (by /u/${username})`
+    console.error(`[Setup] Auto-generated User-Agent: ${autoAgent}`)
+    return autoAgent
+  }
+
+  // Fallback (will trigger warning during validation)
+  const fallbackAgent = "RedditMCPServer/1.1.0"
+  validateUserAgent(fallbackAgent)
+  return fallbackAgent
+}
+
+// Safe mode configuration
+function buildSafeModeConfig(safeMode: RedditSafeMode): SafeModeConfig {
+  switch (safeMode) {
+    case "off":
+      return {
+        enabled: false,
+        mode: "off",
+        writeDelayMs: 0,
+        duplicateCheck: false,
+        maxRecentHashes: 10,
+      }
+    case "standard":
+      return {
+        enabled: true,
+        mode: "standard",
+        writeDelayMs: 2000, // 2 seconds between writes
+        duplicateCheck: true,
+        maxRecentHashes: 10,
+      }
+    case "strict":
+      return {
+        enabled: true,
+        mode: "strict",
+        writeDelayMs: 5000, // 5 seconds between writes
+        duplicateCheck: true,
+        maxRecentHashes: 20,
+      }
+  }
+}
+
 // Initialize Reddit client
 async function setupRedditClient() {
   const clientId = process.env.REDDIT_CLIENT_ID
   const clientSecret = process.env.REDDIT_CLIENT_SECRET
-  const userAgent = process.env.REDDIT_USER_AGENT || "RedditMCPServer/1.1.0"
+  const customUserAgent = process.env.REDDIT_USER_AGENT
   const username = process.env.REDDIT_USERNAME
   const password = process.env.REDDIT_PASSWORD
   const authMode = (process.env.REDDIT_AUTH_MODE || "auto") as RedditAuthMode
+  const safeMode = (process.env.REDDIT_SAFE_MODE || "off") as RedditSafeMode
 
-  // Validate mode
+  // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
     console.error(`[Error] Invalid REDDIT_AUTH_MODE: ${authMode}`)
     console.error("[Error] Valid options are: auto, authenticated, anonymous")
+    process.exit(1)
+  }
+
+  // Validate safe mode
+  if (!["off", "standard", "strict"].includes(safeMode)) {
+    console.error(`[Error] Invalid REDDIT_SAFE_MODE: ${safeMode}`)
+    console.error("[Error] Valid options are: off, standard, strict")
     process.exit(1)
   }
 
@@ -33,6 +104,12 @@ async function setupRedditClient() {
   // For auto/anonymous, credentials are optional
   const hasCredentials = !!(clientId && clientSecret)
 
+  // Build user-agent (auto-format with username if available)
+  const userAgent = buildUserAgent(customUserAgent, username)
+
+  // Build safe mode config
+  const safeModeConfig = buildSafeModeConfig(safeMode)
+
   try {
     const client = initializeRedditClient({
       clientId: clientId || "",
@@ -41,6 +118,7 @@ async function setupRedditClient() {
       username,
       password,
       authMode,
+      safeMode: safeModeConfig,
     })
 
     console.error("[Setup] Reddit client initialized")
@@ -69,6 +147,16 @@ async function setupRedditClient() {
     } else {
       console.error("[Setup] Read-only mode (no user credentials)")
       console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
+    }
+
+    // Log safe mode status
+    if (safeModeConfig.enabled) {
+      console.error(`[Setup] ✓ Safe mode enabled: ${safeModeConfig.mode}`)
+      console.error(`[Setup]   - Write delay: ${safeModeConfig.writeDelayMs}ms between operations`)
+      console.error(`[Setup]   - Duplicate detection: enabled (tracking last ${safeModeConfig.maxRecentHashes} items)`)
+    } else {
+      console.error("[Setup] Safe mode: off (no write operation safeguards)")
+      console.error("[Setup] Consider enabling REDDIT_SAFE_MODE=standard for spam protection")
     }
   } catch (error) {
     console.error("[Error] ✗ Reddit API connection failed:", error instanceof Error ? error.message : error)
@@ -514,7 +602,10 @@ ${searchResults}`
 // Write tools (require user authentication)
 server.addTool({
   name: "create_post",
-  description: "Create a new post in a subreddit (requires REDDIT_USERNAME and REDDIT_PASSWORD)",
+  description:
+    "Create a new post in a subreddit (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "WARNING: Rapid posting or duplicate content may trigger Reddit's spam detection and result in account bans. " +
+    "Consider enabling REDDIT_SAFE_MODE=standard for protection.",
   parameters: z.object({
     subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
     title: z.string().describe("The post title"),
@@ -551,7 +642,10 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.`
 
 server.addTool({
   name: "reply_to_post",
-  description: "Post a reply to an existing Reddit post or comment (requires REDDIT_USERNAME and REDDIT_PASSWORD)",
+  description:
+    "Post a reply to an existing Reddit post or comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "WARNING: Rapid commenting or duplicate content may trigger Reddit's spam detection. " +
+    "Enable REDDIT_SAFE_MODE=standard for rate limiting and duplicate detection.",
   parameters: z.object({
     post_id: z.string().describe("The Reddit post ID (thing_id, e.g., t3_xxxxx for posts, t1_xxxxx for comments)"),
     content: z.string().describe("The reply content"),
@@ -653,7 +747,9 @@ The comment ${args.thing_id} has been permanently deleted from Reddit.
 server.addTool({
   name: "edit_post",
   description:
-    "Edit your own Reddit post (self-text posts only, requires REDDIT_USERNAME and REDDIT_PASSWORD). You can only edit the text content of self posts, not titles or link posts.",
+    "Edit your own Reddit post (self-text posts only, requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "You can only edit the text content of self posts, not titles or link posts. " +
+    "WARNING: Rapid edits may trigger spam detection. Enable REDDIT_SAFE_MODE for protection.",
   parameters: z.object({
     thing_id: z
       .string()
@@ -692,7 +788,9 @@ The post ${args.thing_id} has been updated with your new content.
 server.addTool({
   name: "edit_comment",
   description:
-    "Edit your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). Update the text content of a comment you previously posted.",
+    "Edit your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "Update the text content of a comment you previously posted. " +
+    "WARNING: Rapid edits may trigger spam detection. Enable REDDIT_SAFE_MODE for protection.",
   parameters: z.object({
     thing_id: z
       .string()

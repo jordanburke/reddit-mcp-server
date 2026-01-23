@@ -20,6 +20,8 @@ module.exports = [
         global: "readonly",
         URL: "readonly",
         fetch: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
       },
     },
   },
@@ -45,6 +47,8 @@ module.exports = [
         global: "readonly",
         URL: "readonly",
         fetch: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
       },
     },
     plugins: {
