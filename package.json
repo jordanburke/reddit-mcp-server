@@ -1,7 +1,7 @@
 {
   "name": "reddit-mcp-server",
-  "version": "1.1.2",
-  "description": "A Model Context Protocol (MCP) that provides tools for fetching and creating Reddit content. Fork of the alexandros-lekkas/reddit-mcp-server.",
+  "version": "1.2.0",
+  "description": "A Model Context Protocol (MCP) server for Reddit with full read AND write operations - create posts, reply, edit, and delete content.",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js"
@@ -33,15 +33,23 @@
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "start": "pnpm build && npx reddit-mcp-server",
     "serve": "pnpm build && node dist/index.js",
-    "serve:dev": "tsx watch src/index.ts"
+    "serve:dev": "tsx watch src/index.ts",
+    "build:mcpb": "./scripts/build-mcpb.sh"
   },
   "keywords": [
     "mcp",
     "reddit",
     "api",
-    "model-context-protocol"
+    "model-context-protocol",
+    "claude",
+    "ai-assistant",
+    "social-media",
+    "fastmcp",
+    "write",
+    "post",
+    "comment"
   ],
-  "mcpName": "io.github.jordanburke.reddit-mcp-server",
+  "mcpName": "io.github.jordanburke/reddit-mcp-server",
   "author": "Jordan Burke <jordan.burke@gmail.com>",
   "license": "MIT",
   "repository": {
@@ -54,8 +62,8 @@
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
     "dotenv": "^16.6.1",
-    "fastmcp": "^3.28.0",
-    "zod": "^4.3.5"
+    "fastmcp": "^3.29.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.19.7",

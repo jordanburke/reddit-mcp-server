@@ -8,3 +8,7 @@ node_modules
 # Test coverage reports
 coverage/
 .nyc_output/
+
+# Built extension
+*.mcpb
+bundle-temp/

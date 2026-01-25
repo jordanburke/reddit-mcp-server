@@ -44,10 +44,17 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
 
+      - name: Build Claude Desktop Extension (.mcpb)
+        run: |
+          chmod +x ./scripts/build-mcpb.sh
+          ./scripts/build-mcpb.sh
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
+          files: |
+            reddit-mcp-server.mcpb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

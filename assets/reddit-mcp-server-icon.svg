@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Gradient for the background -->
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF4500;stop-opacity:1" />
+    </linearGradient>
+    <!-- Glow effect for LEDs -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded rectangle -->
+  <rect x="20" y="20" width="472" height="472" rx="80" fill="url(#orangeGrad)"/>
+
+  <!-- Snoo head (horizontal oval - WIDER than tall) -->
+  <ellipse cx="256" cy="280" rx="165" ry="120" fill="#FFFFFF"/>
+
+  <!-- Antenna stick -->
+  <line x1="256" y1="160" x2="256" y2="100" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Antenna ball -->
+  <circle cx="256" cy="88" r="16" fill="#FFFFFF"/>
+
+  <!-- Left ear -->
+  <ellipse cx="105" cy="220" rx="35" ry="35" fill="#FFFFFF"/>
+
+  <!-- Right ear -->
+  <ellipse cx="407" cy="220" rx="35" ry="35" fill="#FFFFFF"/>
+
+  <!-- Robot face inside Snoo head -->
+  <!-- Left LED eye -->
+  <circle cx="185" cy="260" r="32" fill="#10B981" filter="url(#glow)"/>
+  <circle cx="185" cy="260" r="22" fill="#34D399"/>
+  <circle cx="176" cy="252" r="7" fill="#FFFFFF" opacity="0.7"/>
+
+  <!-- Right LED eye -->
+  <circle cx="327" cy="260" r="32" fill="#10B981" filter="url(#glow)"/>
+  <circle cx="327" cy="260" r="22" fill="#34D399"/>
+  <circle cx="318" cy="252" r="7" fill="#FFFFFF" opacity="0.7"/>
+
+  <!-- Simple robot mouth -->
+  <rect x="196" y="330" width="120" height="14" rx="5" fill="#FF4500"/>
+</svg>

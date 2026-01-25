@@ -1,20 +1,47 @@
 # Reddit MCP Server
 
-A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts, comments, user info, and create content.
+A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts, comments, user info, and **create content**.
+
+[![npm version](https://img.shields.io/npm/v/reddit-mcp-server.svg)](https://www.npmjs.com/package/reddit-mcp-server)
+[![npm downloads](https://img.shields.io/npm/dm/reddit-mcp-server.svg)](https://www.npmjs.com/package/reddit-mcp-server)
+[![GitHub stars](https://img.shields.io/github/stars/jordanburke/reddit-mcp-server.svg?style=flat&logo=github)](https://github.com/jordanburke/reddit-mcp-server/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 <a href="https://glama.ai/mcp/servers/@jordanburke/reddit-mcp-server">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@jordanburke/reddit-mcp-server/badge" alt="reddit-mcp-server MCP server" />
 </a>
 
+## Features at a Glance
+
+| Feature                         | reddit-mcp-server  | Other Reddit MCPs  |
+| ------------------------------- | :----------------: | :----------------: |
+| **Create Posts**                | :white_check_mark: |        :x:         |
+| **Reply to Posts/Comments**     | :white_check_mark: |        :x:         |
+| **Edit Posts/Comments**         | :white_check_mark: |        :x:         |
+| **Delete Posts/Comments**       | :white_check_mark: |        :x:         |
+| **Spam Protection (Safe Mode)** | :white_check_mark: |        :x:         |
+| Browse Subreddits               | :white_check_mark: | :white_check_mark: |
+| Search Reddit                   | :white_check_mark: | :white_check_mark: |
+| User Analysis                   | :white_check_mark: | :white_check_mark: |
+| Post Comments                   | :white_check_mark: | :white_check_mark: |
+| Zero-Setup Anonymous Mode       | :white_check_mark: | :white_check_mark: |
+| Three-Tier Auth (10/60/100 rpm) | :white_check_mark: | :white_check_mark: |
+
 ## Quick Start
 
-**No setup required!** Try it immediately with anonymous mode:
+### Option 1: Claude Desktop Extension (Easiest)
+
+Download and open the extension file - Claude Desktop will install it automatically:
+
+**[Download reddit-mcp-server.mcpb](https://github.com/jordanburke/reddit-mcp-server/releases/latest/download/reddit-mcp-server.mcpb)**
+
+### Option 2: NPX (No install required)
 
 ```bash
 npx reddit-mcp-server
 ```
 
-Or in your MCP config (Claude Desktop, Cursor, etc.):
+Or add to your MCP config (Claude Desktop, Cursor, etc.):
 
 ```json
 {
@@ -25,6 +52,12 @@ Or in your MCP config (Claude Desktop, Cursor, etc.):
     }
   }
 }
+```
+
+### Option 3: Claude Code
+
+```bash
+claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 ```
 
 ## Features

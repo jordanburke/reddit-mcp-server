@@ -16,7 +16,7 @@ function validateUserAgent(userAgent: string, username?: string): void {
     console.error("[Warning] Recommended: 'platform:app_id:version (by /u/username)'")
     console.error("[Warning] Non-standard User-Agents may increase ban risk")
     if (username) {
-      console.error(`[Warning] Consider using: 'typescript:reddit-mcp-server:1.1.0 (by /u/${username})'`)
+      console.error(`[Warning] Consider using: 'typescript:reddit-mcp-server:1.2.0 (by /u/${username})'`)
     }
   }
 }
@@ -30,13 +30,13 @@ function buildUserAgent(customAgent?: string, username?: string): string {
 
   // Auto-format with username if available
   if (username) {
-    const autoAgent = `typescript:reddit-mcp-server:1.1.0 (by /u/${username})`
+    const autoAgent = `typescript:reddit-mcp-server:1.2.0 (by /u/${username})`
     console.error(`[Setup] Auto-generated User-Agent: ${autoAgent}`)
     return autoAgent
   }
 
   // Fallback (will trigger warning during validation)
-  const fallbackAgent = "RedditMCPServer/1.1.0"
+  const fallbackAgent = "RedditMCPServer/1.2.0"
   validateUserAgent(fallbackAgent)
   return fallbackAgent
 }
@@ -168,7 +168,7 @@ async function setupRedditClient() {
 // Create FastMCP server
 const server = new FastMCP({
   name: "reddit-mcp-server",
-  version: "1.1.0",
+  version: "1.2.0",
   instructions: `A comprehensive Reddit MCP server that provides tools for interacting with Reddit API.
 
 Available capabilities:
@@ -240,7 +240,7 @@ server.addTool({
 - Server: ✓ Running
 - Reddit Client: ${hasAuth} ${client ? "Initialized" : "Not initialized"}  
 - Write Access: ${hasWriteAccess} ${hasWriteAccess === "✓" ? "Available" : "Read-only mode"}
-- Version: 1.1.0
+- Version: 1.2.0
 
 Ready to handle Reddit API requests!`
   },
