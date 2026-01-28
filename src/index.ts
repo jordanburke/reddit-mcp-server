@@ -8,6 +8,10 @@ import dotenv from "dotenv"
 // Load environment variables
 dotenv.config()
 
+// Version injected at build time by tsdown
+declare const __VERSION__: string
+const VERSION = (typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0-dev") as `${number}.${number}.${number}`
+
 // User-Agent validation and building
 function validateUserAgent(userAgent: string, username?: string): void {
   const recommendedPattern = /^[\w-]+:[\w-]+:[\d.]+ \(by \/u\/\w+\)$/
@@ -16,7 +20,7 @@ function validateUserAgent(userAgent: string, username?: string): void {
     console.error("[Warning] Recommended: 'platform:app_id:version (by /u/username)'")
     console.error("[Warning] Non-standard User-Agents may increase ban risk")
     if (username) {
-      console.error(`[Warning] Consider using: 'typescript:reddit-mcp-server:1.2.0 (by /u/${username})'`)
+      console.error(`[Warning] Consider using: 'typescript:reddit-mcp-server:${VERSION} (by /u/${username})'`)
     }
   }
 }
@@ -30,13 +34,13 @@ function buildUserAgent(customAgent?: string, username?: string): string {
 
   // Auto-format with username if available
   if (username) {
-    const autoAgent = `typescript:reddit-mcp-server:1.2.0 (by /u/${username})`
+    const autoAgent = `typescript:reddit-mcp-server:${VERSION} (by /u/${username})`
     console.error(`[Setup] Auto-generated User-Agent: ${autoAgent}`)
     return autoAgent
   }
 
   // Fallback (will trigger warning during validation)
-  const fallbackAgent = "RedditMCPServer/1.2.0"
+  const fallbackAgent = `RedditMCPServer/${VERSION}`
   validateUserAgent(fallbackAgent)
   return fallbackAgent
 }
@@ -168,7 +172,7 @@ async function setupRedditClient() {
 // Create FastMCP server
 const server = new FastMCP({
   name: "reddit-mcp-server",
-  version: "1.2.0",
+  version: VERSION,
   instructions: `A comprehensive Reddit MCP server that provides tools for interacting with Reddit API.
 
 Available capabilities:
@@ -238,9 +242,9 @@ server.addTool({
 
     return `Reddit MCP Server Status:
 - Server: ✓ Running
-- Reddit Client: ${hasAuth} ${client ? "Initialized" : "Not initialized"}  
+- Reddit Client: ${hasAuth} ${client ? "Initialized" : "Not initialized"}
 - Write Access: ${hasWriteAccess} ${hasWriteAccess === "✓" ? "Available" : "Read-only mode"}
-- Version: 1.2.0
+- Version: ${VERSION}
 
 Ready to handle Reddit API requests!`
   },

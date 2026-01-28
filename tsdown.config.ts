@@ -1,4 +1,5 @@
 import { defineConfig } from "tsdown"
+import pkg from "./package.json"
 
 const isProduction = process.env.NODE_ENV === "production"
 
@@ -15,6 +16,9 @@ export default defineConfig({
   outDir: "dist",
   platform: "node",
   treeshake: true,
+  define: {
+    __VERSION__: JSON.stringify(pkg.version),
+  },
   outExtensions: () => ({
     js: ".js",
     dts: ".d.ts",
