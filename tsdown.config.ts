@@ -1,5 +1,8 @@
 import { defineConfig } from "tsdown"
-import pkg from "./package.json"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
+const pkg = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf-8")) as { version: string }
 
 const isProduction = process.env.NODE_ENV === "production"
 
