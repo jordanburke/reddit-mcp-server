@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "reddit-mcp-server",
   "display_name": "Reddit MCP Server",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Browse Reddit and create content directly from Claude Desktop. The only Reddit MCP with full write operations.",
   "long_description": "Reddit MCP Server brings the full Reddit experience to Claude Desktop - not just reading, but writing too.\n\n**Key Features:**\n\n**Read Operations:**\n- Browse any subreddit with sorting options\n- Search Reddit content across all communities\n- Get user profiles with karma and activity\n- Fetch full post details including threaded comments\n- Discover trending subreddits\n\n**Write Operations (Unique!):**\n- Create new posts (text or link)\n- Reply to posts and comments\n- Edit your own posts and comments\n- Delete your own content\n\n**Why Choose Reddit MCP Server:**\n- **Full Write Support** - The only Reddit MCP that lets you post and interact\n- **Safe Mode** - Built-in spam protection to keep your account safe\n- **No API Keys Required** - Works instantly in anonymous mode\n- **Three Auth Tiers** - 10/60/100 requests per minute\n- **FastMCP Powered** - Modern, fast MCP implementation\n\n**Perfect for:**\n- Content creators and community managers\n- Market research and trend analysis\n- Automated posting with safeguards\n- Community engagement",
   "author": "Jordan Burke <jordan.burke@gmail.com> (https://github.com/jordanburke)",
