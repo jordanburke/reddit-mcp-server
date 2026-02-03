@@ -1,4 +1,4 @@
-import {
+import type {
   FormattedCommentInfo,
   FormattedPostInfo,
   FormattedSubredditInfo,
@@ -219,7 +219,7 @@ export function formatPostInfo(post: RedditPost): FormattedPostInfo {
   return {
     title: post.title,
     type: contentType,
-    content: content.length > 300 ? content.substring(0, 297) + "..." : content,
+    content: content.length > 300 ? `${content.substring(0, 297)}...` : content,
     author: post.author,
     subreddit: post.subreddit,
     stats: {
@@ -229,7 +229,7 @@ export function formatPostInfo(post: RedditPost): FormattedPostInfo {
     },
     metadata: {
       posted: formatTimestamp(post.createdUtc),
-      flags: flags,
+      flags,
       flair: post.linkFlairText || "None",
     },
     links: {
@@ -258,7 +258,7 @@ export function formatSubredditInfo(subreddit: RedditSubreddit): FormattedSubred
     description: {
       short: subreddit.publicDescription,
       full:
-        subreddit.description.length > 300 ? subreddit.description.substring(0, 297) + "..." : subreddit.description,
+        subreddit.description.length > 300 ? `${subreddit.description.substring(0, 297)}...` : subreddit.description,
     },
     metadata: {
       created: formatTimestamp(subreddit.createdUtc),
@@ -280,7 +280,7 @@ export function formatCommentInfo(comment: RedditComment): FormattedCommentInfo 
 
   return {
     author: comment.author,
-    content: comment.body.length > 300 ? comment.body.substring(0, 297) + "..." : comment.body,
+    content: comment.body.length > 300 ? `${comment.body.substring(0, 297)}...` : comment.body,
     stats: {
       score: comment.score,
       controversiality: comment.controversiality,

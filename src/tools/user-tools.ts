@@ -129,7 +129,7 @@ ${comments
   .map((comment, index) => {
     const date = new Date(comment.createdUtc * 1000).toLocaleString()
     const edited = comment.edited ? " *(edited)*" : ""
-    const body = comment.body.length > 300 ? comment.body.substring(0, 300) + "..." : comment.body
+    const body = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
 
     return `### ${index + 1}. In r/${comment.subreddit} on "${comment.submissionTitle}"
 - Score: ${comment.score} points

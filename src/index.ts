@@ -3,7 +3,7 @@ import { FastMCP } from "fastmcp"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
-import { RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
+import type { RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
@@ -364,7 +364,7 @@ server.addTool({
 
     const commentSummaries = comments
       .map((comment, index) => {
-        const truncatedBody = comment.body.length > 300 ? comment.body.substring(0, 300) + "..." : comment.body
+        const truncatedBody = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
 
         const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
 
@@ -852,8 +852,8 @@ server.addTool({
       limit: args.limit,
     })
 
-    const post = data.post
-    const comments = data.comments
+    const { post } = data
+    const { comments } = data
 
     let response = `# Comments for: ${post.title}
 

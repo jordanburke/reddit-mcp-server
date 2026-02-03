@@ -1,7 +1,7 @@
 import { UserError } from "fastmcp"
 
 import { getRedditClient } from "../client/reddit-client"
-import { RedditComment } from "../types"
+import type { RedditComment } from "../types"
 import { formatPost } from "../utils/formatters"
 
 export async function getPostComments(params: { post_id: string; subreddit: string; sort?: string; limit?: number }) {

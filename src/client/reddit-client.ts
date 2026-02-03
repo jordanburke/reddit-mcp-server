@@ -1,6 +1,6 @@
 import crypto from "crypto"
 
-import {
+import type {
   RedditApiCommentResponse,
   RedditApiCommentTreeData,
   RedditApiEditResponse,
@@ -137,8 +137,8 @@ export class RedditClient {
       const authUrl = "https://www.reddit.com/api/v1/access_token"
       const authData = new URLSearchParams()
 
-      const username = this.username
-      const password = this.password
+      const { username } = this
+      const { password } = this
       const isUserAuth = !!(username && password)
       if (isUserAuth) {
         // Authenticating with user credentials
@@ -255,7 +255,7 @@ export class RedditClient {
       }
 
       const json = (await response.json()) as RedditApiUserResponse
-      const data = json.data
+      const { data } = json
 
       return {
         name: data.name,
@@ -283,7 +283,7 @@ export class RedditClient {
       }
 
       const json = (await response.json()) as RedditApiSubredditResponse
-      const data = json.data
+      const { data } = json
 
       return {
         displayName: data.display_name,
@@ -784,7 +784,7 @@ export class RedditClient {
             })
 
             // Parse replies recursively
-            const replies = item.data.replies
+            const { replies } = item.data
             if (replies && typeof replies !== "string" && replies.data?.children) {
               parseComments(replies.data.children, depth + 1)
             }

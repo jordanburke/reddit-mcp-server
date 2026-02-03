@@ -232,7 +232,7 @@ describe("user-tools", () => {
 
       const result = await getUserComments({ username: "testuser" })
 
-      expect(result.content[0].text).toContain("x".repeat(300) + "...")
+      expect(result.content[0].text).toContain(`${"x".repeat(300)}...`)
       expect(result.content[0].text).not.toContain("x".repeat(301))
     })
 
