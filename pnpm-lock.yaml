@@ -24,6 +24,9 @@ importers:
       ajv-cli:
         specifier: ^5.0.0
         version: 5.0.0(ts-node@10.9.2(@types/node@22.19.7)(typescript@5.9.3))
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
       msw:
         specifier: ^2.12.7
         version: 2.12.7(@types/node@22.19.7)(typescript@5.9.3)
