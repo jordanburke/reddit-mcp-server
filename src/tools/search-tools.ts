@@ -1,6 +1,7 @@
+import { UserError } from "fastmcp"
+
 import { getRedditClient } from "../client/reddit-client"
 import { formatPost } from "../utils/formatters"
-import { UserError } from "fastmcp"
 
 export async function searchReddit(params: {
   query: string

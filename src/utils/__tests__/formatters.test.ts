@@ -1,11 +1,12 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
+
 import {
-  formatTimestamp,
-  analyzeUserActivity,
   analyzePostEngagement,
   analyzeSubredditHealth,
-  getUserRecommendations,
+  analyzeUserActivity,
+  formatTimestamp,
   getBestEngagementTime,
+  getUserRecommendations,
 } from "../formatters"
 
 describe("formatters", () => {

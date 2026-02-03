@@ -1,7 +1,8 @@
-import { getRedditClient } from "../client/reddit-client"
-import { formatPost } from "../utils/formatters"
 import { UserError } from "fastmcp"
+
+import { getRedditClient } from "../client/reddit-client"
 import { RedditComment } from "../types"
+import { formatPost } from "../utils/formatters"
 
 export async function getPostComments(params: { post_id: string; subreddit: string; sort?: string; limit?: number }) {
   const { post_id, subreddit, sort = "best", limit = 100 } = params

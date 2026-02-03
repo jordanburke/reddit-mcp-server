@@ -1,23 +1,24 @@
 import crypto from "crypto"
+
 import {
-  RedditClientConfig,
-  RedditAuthMode,
-  SafeModeConfig,
-  RedditUser,
-  RedditPost,
-  RedditComment,
-  RedditSubreddit,
-  RedditApiUserResponse,
-  RedditApiSubredditResponse,
-  RedditApiListingResponse,
-  RedditApiPostData,
-  RedditApiSubmitResponse,
   RedditApiCommentResponse,
+  RedditApiCommentTreeData,
   RedditApiEditResponse,
+  RedditApiInfoResponse,
+  RedditApiListingResponse,
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
-  RedditApiCommentTreeData,
-  RedditApiInfoResponse,
+  RedditApiPostData,
+  RedditApiSubmitResponse,
+  RedditApiSubredditResponse,
+  RedditApiUserResponse,
+  RedditAuthMode,
+  RedditClientConfig,
+  RedditComment,
+  RedditPost,
+  RedditSubreddit,
+  RedditUser,
+  SafeModeConfig,
 } from "../types"
 
 export class RedditClient {

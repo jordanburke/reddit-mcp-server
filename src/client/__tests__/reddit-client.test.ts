@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest"
-import { RedditClient } from "../reddit-client"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+
 import type { RedditClientConfig } from "../../types"
+import { RedditClient } from "../reddit-client"
 
 // Store original fetch
 const originalFetch = global.fetch

@@ -1,15 +1,6 @@
 #!/usr/bin/env node
 
-// Read package.json dynamically
-import fs from "fs"
-import path from "path"
-
-interface PackageJson {
-  version: string
-}
-
-const packageJsonPath = path.join(__dirname, "..", "package.json")
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as PackageJson
+declare const __VERSION__: string
 
 // Force stdio mode for CLI/npx usage (unless explicitly overridden)
 if (!process.env.TRANSPORT_TYPE) {
@@ -20,16 +11,13 @@ if (!process.env.TRANSPORT_TYPE) {
 const args = process.argv.slice(2)
 
 if (args.includes("--version") || args.includes("-v")) {
-  console.log(packageJson.version)
+  console.log(__VERSION__)
   process.exit(0)
 }
 
-// Only import and start server if not showing version/help
-main().then()
-
 if (args.includes("--help") || args.includes("-h")) {
   console.log(`
-Reddit MCP Server v${packageJson.version}
+Reddit MCP Server v${__VERSION__}
 
 Usage: reddit-mcp-server [options]
 
@@ -56,3 +44,5 @@ async function main() {
   // The index.js exports main() directly, so we just need to execute the file
   // The main() is already executed when the module is imported
 }
+
+main().then()

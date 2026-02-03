@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { getPostComments } from "../comment-tools"
-import { getRedditClient } from "../../client/reddit-client"
 import { UserError } from "fastmcp"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import { getRedditClient } from "../../client/reddit-client"
+import { getPostComments } from "../comment-tools"
 
 vi.mock("../../client/reddit-client")
 

@@ -1,10 +1,17 @@
 {
   "name": "reddit-mcp-server",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "A Model Context Protocol (MCP) server for Reddit with full read AND write operations - create posts, reply, edit, and delete content.",
+  "type": "module",
   "main": "dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
   "bin": {
     "reddit-mcp-server": "dist/bin.js"
@@ -16,27 +23,27 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "validate": "pnpm format && pnpm lint && pnpm compile && pnpm test && pnpm build",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint ./src --fix",
-    "lint:check": "eslint ./src",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui",
-    "build": "NODE_ENV=production tsdown",
+    "validate": "ts-builds validate",
+    "format": "ts-builds format",
+    "format:check": "ts-builds format:check",
+    "lint": "ts-builds lint",
+    "lint:check": "ts-builds lint:check",
+    "typecheck": "ts-builds typecheck",
+    "test": "ts-builds test",
+    "test:watch": "ts-builds test:watch",
+    "test:coverage": "ts-builds test:coverage",
+    "build": "NODE_ENV=production ts-builds build",
+    "dev": "ts-builds dev",
     "build:watch": "tsdown --watch",
-    "dev": "tsdown --watch",
     "check:versions": "tsx scripts/check-versions.ts",
     "prepublishOnly": "pnpm check:versions && pnpm validate",
-    "compile": "tsc --noEmit",
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "start": "pnpm build && npx reddit-mcp-server",
     "serve": "pnpm build && node dist/index.js",
     "serve:dev": "tsx watch src/index.ts",
     "build:mcpb": "./scripts/build-mcpb.sh"
   },
+  "prettier": "ts-builds/prettier",
   "keywords": [
     "mcp",
     "reddit",

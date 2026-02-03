@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { getSubredditInfo, getTrendingSubreddits } from "../subreddit-tools"
-import { getRedditClient } from "../../client/reddit-client"
 import { UserError } from "fastmcp"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+import { getRedditClient } from "../../client/reddit-client"
+import { getSubredditInfo, getTrendingSubreddits } from "../subreddit-tools"
 
 vi.mock("../../client/reddit-client")
 vi.mock("../../utils/formatters")

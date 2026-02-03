@@ -1,9 +1,10 @@
+import dotenv from "dotenv"
 import { FastMCP } from "fastmcp"
 import { z } from "zod"
-import { initializeRedditClient, getRedditClient } from "./client/reddit-client"
-import { formatUserInfo, formatPostInfo, formatSubredditInfo } from "./utils/formatters"
+
+import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
 import { RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
-import dotenv from "dotenv"
+import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
 dotenv.config()
@@ -279,7 +280,7 @@ server.addTool({
 - Profile URL: ${formattedUser.profileUrl}
 
 ## Activity Analysis
-- ${formattedUser.activityAnalysis.replace(/\n  - /g, "\n- ")}
+- ${formattedUser.activityAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Recommendations
 - ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}`
@@ -427,7 +428,7 @@ ${formattedPost.content}
 - Short Link: ${formattedPost.links.shortLink}
 
 ## Engagement Analysis
-- ${formattedPost.engagementAnalysis.replace(/\n  - /g, "\n- ")}
+- ${formattedPost.engagementAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Best Time to Engage
 ${formattedPost.bestTimeToEngage}`
@@ -520,10 +521,10 @@ ${formattedSubreddit.description.full}
 - Wiki: ${formattedSubreddit.links.wiki}
 
 ## Community Analysis
-- ${formattedSubreddit.communityAnalysis.replace(/\n  - /g, "\n- ")}
+- ${formattedSubreddit.communityAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Engagement Tips
-- ${formattedSubreddit.engagementTips.replace(/\n  - /g, "\n- ")}`
+- ${formattedSubreddit.engagementTips.replace(/\n {2}- /g, "\n- ")}`
   },
 })
 

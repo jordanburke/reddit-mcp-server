@@ -1,0 +1,4 @@
+{
+  "srcDir": "./src",
+  "validateChain": ["format", "lint", "typecheck", "test", "build"]
+}

@@ -2,7 +2,11 @@ node_modules
 /build
 /dist
 .env
+.env.*
 .pnpm-store/
+
+# MCP Registry tokens
+.mcpregistry_*
 .idea
 
 # Test coverage reports

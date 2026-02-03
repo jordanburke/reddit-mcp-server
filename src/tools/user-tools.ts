@@ -1,6 +1,7 @@
+import { UserError } from "fastmcp"
+
 import { getRedditClient } from "../client/reddit-client"
 import { formatUserInfo } from "../utils/formatters"
-import { UserError } from "fastmcp"
 
 export async function getUserInfo(params: { username: string }) {
   const { username } = params
@@ -33,10 +34,10 @@ export async function getUserInfo(params: { username: string }) {
 - Profile URL: ${formattedUser.profileUrl}
 
 ## Activity Analysis
-- ${formattedUser.activityAnalysis.replace(/\n  - /g, "\n- ")}
+- ${formattedUser.activityAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Recommendations
-- ${formattedUser.recommendations.replace(/\n  - /g, "\n- ")}
+- ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}
           `,
         },
       ],

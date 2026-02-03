@@ -1,12 +1,12 @@
 import {
-  RedditUser,
-  RedditPost,
-  RedditSubreddit,
-  RedditComment,
-  FormattedUserInfo,
+  FormattedCommentInfo,
   FormattedPostInfo,
   FormattedSubredditInfo,
-  FormattedCommentInfo,
+  FormattedUserInfo,
+  RedditComment,
+  RedditPost,
+  RedditSubreddit,
+  RedditUser,
 } from "../types"
 
 export function formatTimestamp(timestamp: number): string {

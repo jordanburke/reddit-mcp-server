@@ -1,6 +1,7 @@
-import { getRedditClient } from "../client/reddit-client"
-import { formatPostInfo, formatCommentInfo } from "../utils/formatters"
 import { UserError } from "fastmcp"
+
+import { getRedditClient } from "../client/reddit-client"
+import { formatCommentInfo, formatPostInfo } from "../utils/formatters"
 
 export async function getRedditPost(params: { subreddit: string; post_id: string }) {
   const { subreddit, post_id } = params
@@ -45,7 +46,7 @@ ${formattedPost.content}
 - Short Link: ${formattedPost.links.shortLink}
 
 ## Engagement Analysis
-- ${formattedPost.engagementAnalysis.replace(/\n  - /g, "\n- ")}
+- ${formattedPost.engagementAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Best Time to Engage
 ${formattedPost.bestTimeToEngage}

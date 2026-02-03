@@ -1,6 +1,7 @@
+import { UserError } from "fastmcp"
+
 import { getRedditClient } from "../client/reddit-client"
 import { formatSubredditInfo } from "../utils/formatters"
-import { UserError } from "fastmcp"
 
 export async function getSubredditInfo(params: { subreddit_name: string }) {
   const { subreddit_name } = params
@@ -47,10 +48,10 @@ ${formattedSubreddit.description.full}
 - Wiki: ${formattedSubreddit.links.wiki}
 
 ## Community Analysis
-- ${formattedSubreddit.communityAnalysis.replace(/\n  - /g, "\n- ")}
+- ${formattedSubreddit.communityAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Engagement Tips
-- ${formattedSubreddit.engagementTips.replace(/\n  - /g, "\n- ")}
+- ${formattedSubreddit.engagementTips.replace(/\n {2}- /g, "\n- ")}
           `,
         },
       ],
