@@ -21,6 +21,16 @@ import type {
   SafeModeConfig,
 } from "../types"
 
+// Validate and encode a path segment to prevent path traversal
+const SAFE_PATH_SEGMENT = /^[\w][\w.-]{0,99}$/
+
+function sanitizePathSegment(value: string, label: string): string {
+  if (!SAFE_PATH_SEGMENT.test(value)) {
+    throw new Error(`Invalid ${label}: contains disallowed characters`)
+  }
+  return encodeURIComponent(value)
+}
+
 export class RedditClient {
   private clientId: string
   private clientSecret: string
@@ -219,7 +229,7 @@ export class RedditClient {
   }
 
   private hashContent(content: string): string {
-    return crypto.createHash("md5").update(content.trim().toLowerCase()).digest("hex")
+    return crypto.createHash("sha256").update(content.trim().toLowerCase()).digest("hex")
   }
 
   private checkDuplicateContent(content: string): void {
@@ -248,8 +258,9 @@ export class RedditClient {
   }
 
   async getUser(username: string): Promise<RedditUser> {
+    const safeUsername = sanitizePathSegment(username, "username")
     try {
-      const response = await this.makeRequest(`/user/${username}/about.json`)
+      const response = await this.makeRequest(`/user/${safeUsername}/about.json`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
@@ -276,8 +287,9 @@ export class RedditClient {
   }
 
   async getSubredditInfo(subredditName: string): Promise<RedditSubreddit> {
+    const safeName = sanitizePathSegment(subredditName, "subreddit")
     try {
-      const response = await this.makeRequest(`/r/${subredditName}/about.json`)
+      const response = await this.makeRequest(`/r/${safeName}/about.json`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
@@ -304,8 +316,9 @@ export class RedditClient {
   }
 
   async getTopPosts(subreddit: string, timeFilter: string = "week", limit: number = 10): Promise<RedditPost[]> {
+    const safeSubreddit = subreddit ? sanitizePathSegment(subreddit, "subreddit") : ""
     try {
-      const endpoint = subreddit ? `/r/${subreddit}/top.json` : "/top.json"
+      const endpoint = safeSubreddit ? `/r/${safeSubreddit}/top.json` : "/top.json"
       const params = new URLSearchParams({
         t: timeFilter,
         limit: limit.toString(),
@@ -346,8 +359,12 @@ export class RedditClient {
   }
 
   async getPost(postId: string, subreddit?: string): Promise<RedditPost> {
+    const safePostId = sanitizePathSegment(postId, "post_id")
+    const safeSubreddit = subreddit ? sanitizePathSegment(subreddit, "subreddit") : undefined
     try {
-      const endpoint = subreddit ? `/r/${subreddit}/comments/${postId}.json` : `/api/info.json?id=t3_${postId}`
+      const endpoint = safeSubreddit
+        ? `/r/${safeSubreddit}/comments/${safePostId}.json`
+        : `/api/info.json?id=t3_${safePostId}`
       const response = await this.makeRequest(endpoint)
 
       if (!response.ok) {
@@ -434,19 +451,15 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Create post failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        console.error(`[Reddit API] Create post failed: ${response.status}`)
+        throw new Error(`Failed to create post: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiSubmitResponse
-      console.error(`[Reddit API] Create post response:`, JSON.stringify(json, null, 2))
 
       // With api_type=json, response has json.data.id or json.errors
       if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
-        console.error(`[Reddit API] Post creation errors: ${errors}`)
+        const errors = json.json.errors.map((e) => e[1] || e[0]).join(", ")
         throw new Error(`Reddit API errors: ${errors}`)
       }
 
@@ -454,27 +467,23 @@ export class RedditClient {
       const postId = json.json?.data?.id || json.json?.data?.name?.replace("t3_", "")
 
       if (!postId) {
-        console.error(`[Reddit API] No post ID in response`)
         throw new Error("No post ID returned from Reddit")
       }
 
       console.error(`[Reddit API] Post created with ID: ${postId}`)
       return await this.getPost(postId, subreddit)
     } catch (error) {
-      // Log and re-throw the actual error
-      console.error(`[Reddit API] Create post exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
-      throw new Error(
-        `Failed to create post in ${subreddit}: ${error instanceof Error ? error.message : String(error)}`,
-      )
+      throw new Error(`Failed to create post in ${subreddit}`)
     }
   }
 
   async checkPostExists(postId: string): Promise<boolean> {
+    const safePostId = sanitizePathSegment(postId, "post_id")
     try {
-      const response = await this.makeRequest(`/api/info.json?id=t3_${postId}`)
+      const response = await this.makeRequest(`/api/info.json?id=t3_${safePostId}`)
       if (!response.ok) {
         return false
       }
@@ -494,12 +503,20 @@ export class RedditClient {
     this.checkDuplicateContent(content)
 
     try {
-      if (!(await this.checkPostExists(postId))) {
-        throw new Error(`Post with ID ${postId} does not exist or is not accessible`)
+      // Determine the full thing_id, preserving existing prefixes (t3_ for posts, t1_ for comments)
+      const fullThingId =
+        postId.startsWith("t3_") || postId.startsWith("t1_") ? postId : `t3_${postId}`
+
+      // Only check existence for posts (t3_), not comments (t1_)
+      if (fullThingId.startsWith("t3_")) {
+        const bareId = fullThingId.slice(3)
+        if (!(await this.checkPostExists(bareId))) {
+          throw new Error(`Post with ID ${bareId} does not exist or is not accessible`)
+        }
       }
 
       const params = new URLSearchParams()
-      params.append("thing_id", `t3_${postId}`)
+      params.append("thing_id", fullThingId)
       params.append("text", content)
       params.append("api_type", "json") // Request standard JSON response format
 
@@ -512,15 +529,12 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Reply to post failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        console.error(`[Reddit API] Reply to post failed: ${response.status}`)
+        throw new Error(`Failed to reply: HTTP ${response.status}`)
       }
 
       // Extract comment data from response
       const json = (await response.json()) as RedditApiCommentResponse
-      console.error(`[Reddit API] Reply response:`, JSON.stringify(json, null, 2))
 
       if (json.json?.data?.things && json.json.data.things.length > 0) {
         const commentData = json.json.data.things[0].data
@@ -540,20 +554,16 @@ export class RedditClient {
           permalink: commentData.permalink,
         }
       } else if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
-        console.error(`[Reddit API] Reply errors: ${errors}`)
+        const errors = json.json.errors.map((e) => e[1] || e[0]).join(", ")
         throw new Error(`Reddit API errors: ${errors}`)
       } else {
-        console.error(`[Reddit API] Unexpected reply response format`)
         throw new Error("Failed to parse reply response")
       }
     } catch (error) {
-      // Log and re-throw the actual error
-      console.error(`[Reddit API] Reply to post exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
-      throw new Error(`Failed to reply to post ${postId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`Failed to reply to post ${postId}`)
     }
   }
 
@@ -576,20 +586,17 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Delete failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        console.error(`[Reddit API] Delete failed: ${response.status}`)
+        throw new Error(`Failed to delete: HTTP ${response.status}`)
       }
 
       console.error(`[Reddit API] Successfully deleted ${fullThingId}`)
       return true
     } catch (error) {
-      console.error(`[Reddit API] Delete exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
-      throw new Error(`Failed to delete content ${thingId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`Failed to delete content ${thingId}`)
     }
   }
 
@@ -625,30 +632,25 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Edit failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        console.error(`[Reddit API] Edit failed: ${response.status}`)
+        throw new Error(`Failed to edit: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiEditResponse
-      console.error(`[Reddit API] Edit response:`, JSON.stringify(json, null, 2))
 
       // Check for errors in response
       if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
-        console.error(`[Reddit API] Edit errors: ${errors}`)
+        const errors = json.json.errors.map((e) => e[1] || e[0]).join(", ")
         throw new Error(`Reddit API errors: ${errors}`)
       }
 
       console.error(`[Reddit API] Successfully edited ${fullThingId}`)
       return true
     } catch (error) {
-      console.error(`[Reddit API] Edit exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
-      throw new Error(`Failed to edit content ${thingId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`Failed to edit content ${thingId}`)
     }
   }
 
@@ -669,9 +671,10 @@ export class RedditClient {
       type?: string
     } = {},
   ): Promise<RedditPost[]> {
+    const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
+    const safeSubreddit = subreddit ? sanitizePathSegment(subreddit, "subreddit") : undefined
     try {
-      const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
-      const endpoint = subreddit ? `/r/${subreddit}/search.json` : "/search.json"
+      const endpoint = safeSubreddit ? `/r/${safeSubreddit}/search.json` : "/search.json"
 
       const params = new URLSearchParams({
         q: query,
@@ -725,14 +728,15 @@ export class RedditClient {
       limit?: number
     } = {},
   ): Promise<{ post: RedditPost; comments: RedditComment[] }> {
+    const safeSub = sanitizePathSegment(subreddit, "subreddit")
+    const safePostId = sanitizePathSegment(postId, "post_id")
     try {
       const { sort = "best", limit = 100 } = options
       const params = new URLSearchParams({
         sort,
         limit: limit.toString(),
       })
-
-      const response = await this.makeRequest(`/r/${subreddit}/comments/${postId}.json?${params}`)
+      const response = await this.makeRequest(`/r/${safeSub}/comments/${safePostId}.json?${params}`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
@@ -810,6 +814,7 @@ export class RedditClient {
       limit?: number
     } = {},
   ): Promise<RedditPost[]> {
+    const safeUsername = sanitizePathSegment(username, "username")
     try {
       const { sort = "new", timeFilter = "all", limit = 25 } = options
       const params = new URLSearchParams({
@@ -818,7 +823,7 @@ export class RedditClient {
         limit: limit.toString(),
       })
 
-      const response = await this.makeRequest(`/user/${username}/submitted.json?${params}`)
+      const response = await this.makeRequest(`/user/${safeUsername}/submitted.json?${params}`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
@@ -861,6 +866,7 @@ export class RedditClient {
       limit?: number
     } = {},
   ): Promise<RedditComment[]> {
+    const safeUsername = sanitizePathSegment(username, "username")
     try {
       const { sort = "new", timeFilter = "all", limit = 25 } = options
       const params = new URLSearchParams({
@@ -868,8 +874,7 @@ export class RedditClient {
         t: timeFilter,
         limit: limit.toString(),
       })
-
-      const response = await this.makeRequest(`/user/${username}/comments.json?${params}`)
+      const response = await this.makeRequest(`/user/${safeUsername}/comments.json?${params}`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
