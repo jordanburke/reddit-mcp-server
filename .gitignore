@@ -16,3 +16,6 @@ coverage/
 # Built extension
 *.mcpb
 bundle-temp/
+
+# Local notes
+.audit/

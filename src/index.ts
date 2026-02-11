@@ -1,3 +1,5 @@
+import crypto from "crypto"
+
 import dotenv from "dotenv"
 import { FastMCP } from "fastmcp"
 import { z } from "zod"
@@ -84,7 +86,7 @@ async function setupRedditClient() {
   const username = process.env.REDDIT_USERNAME
   const password = process.env.REDDIT_PASSWORD
   const authMode = (process.env.REDDIT_AUTH_MODE || "auto") as RedditAuthMode
-  const safeMode = (process.env.REDDIT_SAFE_MODE || "off") as RedditSafeMode
+  const safeMode = (process.env.REDDIT_SAFE_MODE || "standard") as RedditSafeMode
 
   // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
@@ -170,6 +172,17 @@ async function setupRedditClient() {
   }
 }
 
+// Generate or load OAuth token once at startup
+let oauthToken: string | undefined
+if (process.env.OAUTH_ENABLED === "true") {
+  oauthToken = process.env.OAUTH_TOKEN
+  if (!oauthToken) {
+    oauthToken = crypto.randomBytes(32).toString("hex")
+    console.error(`[Auth] No OAUTH_TOKEN set. Generated token: ${oauthToken}`)
+    console.error("[Auth] Set OAUTH_TOKEN in your environment to use a stable token.")
+  }
+}
+
 // Create FastMCP server
 const server = new FastMCP({
   name: "reddit-mcp-server",
@@ -191,24 +204,12 @@ For write operations (posting, replying, editing, deleting), ensure REDDIT_USERN
   ...(process.env.OAUTH_ENABLED === "true" && {
     authenticate: async (request) => {
       const authHeader = request.headers.authorization
-      const expectedToken = process.env.OAUTH_TOKEN
 
-      if (!expectedToken) {
-        // If OAuth is enabled but no token configured, generate one
-        const token = Array.from({ length: 32 }, () =>
-          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 62)),
-        ).join("")
-        console.log(`[Auth] Generated OAuth token: ${token}`)
-        throw new Response(
-          JSON.stringify({
-            error: "No OAuth token configured",
-            generatedToken: token,
-          }),
-          {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          },
-        )
+      if (!oauthToken) {
+        throw new Response(null, {
+          status: 500,
+          statusText: "OAuth is enabled but no token is configured",
+        })
       }
 
       if (!authHeader?.startsWith("Bearer ")) {
@@ -219,7 +220,9 @@ For write operations (posting, replying, editing, deleting), ensure REDDIT_USERN
       }
 
       const token = authHeader.slice(7)
-      if (token !== expectedToken) {
+      const tokenBuffer = Buffer.from(token)
+      const expectedBuffer = Buffer.from(oauthToken)
+      if (tokenBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(tokenBuffer, expectedBuffer)) {
         throw new Response(null, {
           status: 403,
           statusText: "Invalid token",
@@ -898,7 +901,7 @@ async function main() {
     // Use HTTP only when explicitly requested (e.g., for Docker)
     const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
     const port = parseInt(process.env.PORT || "3000")
-    const host = process.env.HOST || "0.0.0.0"
+    const host = process.env.HOST || "127.0.0.1"
 
     if (useHttp) {
       console.error(`[Setup] Starting HTTP server on ${host}:${port}`)
@@ -925,12 +928,12 @@ async function main() {
 }
 
 // Handle graceful shutdown
-process.on("SIGINT", async () => {
+process.on("SIGINT", () => {
   console.error("[Shutdown] Shutting down Reddit MCP Server...")
   process.exit(0)
 })
 
-process.on("SIGTERM", async () => {
+process.on("SIGTERM", () => {
   console.error("[Shutdown] Shutting down Reddit MCP Server...")
   process.exit(0)
 })
