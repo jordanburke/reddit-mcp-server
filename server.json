@@ -6,43 +6,36 @@
     "url": "https://github.com/jordanburke/reddit-mcp-server",
     "source": "github"
   },
-  "version": "1.2.2",
+  "version": "1.3.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "reddit-mcp-server",
-      "version": "1.2.2",
+      "version": "1.3.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "REDDIT_CLIENT_ID",
-          "description": "Reddit app client ID (optional - enables higher rate limits)",
+          "description": "Reddit app client ID",
           "isRequired": false,
           "format": "string",
           "isSecret": false
         },
         {
-          "name": "REDDIT_CLIENT_SECRET",
-          "description": "Reddit app client secret",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": true
-        },
-        {
-          "name": "REDDIT_USERNAME",
-          "description": "Reddit username (required for write operations)",
+          "name": "REDDIT_USER_AGENT",
+          "description": "Custom user agent",
           "isRequired": false,
           "format": "string",
           "isSecret": false
         },
         {
-          "name": "REDDIT_PASSWORD",
-          "description": "Reddit password (required for write operations)",
+          "name": "REDDIT_CREDENTIAL_PROVIDER",
+          "description": "Credential provider: git-credential (default), pass-cli, env",
           "isRequired": false,
           "format": "string",
-          "isSecret": true
+          "isSecret": false
         },
         {
           "name": "REDDIT_AUTH_MODE",
@@ -57,6 +50,72 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+
+        {
+          "name": "REDDIT_CLIENT_SECRET",
+          "description": "[Legacy env provider] Reddit app client secret (less secure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "REDDIT_PASSWORD",
+          "description": "[Legacy env provider] Reddit password (less secure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "REDDIT_USERNAME",
+          "description": "[Legacy env provider] Reddit username",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+
+        {
+          "name": "REDDIT_GIT_CREDENTIAL_HOST",
+          "description": "git-credential lookup host",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "REDDIT_GIT_CREDENTIAL_CLIENT_SECRET_PATH",
+          "description": "git-credential path key for client secret",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "REDDIT_GIT_CREDENTIAL_PASSWORD_PATH",
+          "description": "git-credential path key for reddit password",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+
+        {
+          "name": "REDDIT_PASS_CLI_COMMAND",
+          "description": "pass-cli command name/path",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "REDDIT_PASS_CLI_CLIENT_SECRET_KEY",
+          "description": "pass-cli key for client secret",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "REDDIT_PASS_CLI_PASSWORD_KEY",
+          "description": "pass-cli key for reddit password",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
         }
       ]
     }

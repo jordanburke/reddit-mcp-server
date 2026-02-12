@@ -311,3 +311,59 @@ docker run -d --name reddit-mcp -p 3000:3000 --env-file .env reddit-mcp-server
 
 - Fork of [reddit-mcp-server](https://github.com/alexandros-lekkas/reddit-mcp-server) by Alexandros Lekkas
 - Inspired by [Python Reddit MCP Server](https://github.com/Arindam200/reddit-mcp) by Arindam200
+
+## Credential Provider Security Model (v1.3+)
+
+This server now supports a credential-provider flow:
+
+- `git-credential` (default, recommended)
+- `pass-cli`
+- `env` (legacy/backward-compatible, less secure)
+
+### Security rationale
+
+Environment variables are easy but high-exposure in multi-process environments. Secure providers avoid long-lived secret env injection and resolve secrets at runtime.
+
+### Migration notes
+
+1. Keep existing `REDDIT_CLIENT_SECRET` / `REDDIT_PASSWORD` setup by setting `REDDIT_CREDENTIAL_PROVIDER=env`.
+2. Move to `git-credential` (default) or `pass-cli` for production.
+3. Provide username via `--username` (preferred) or explicit config from plugin (`reddit.username`).
+4. In secure provider modes, username is not taken from env by default.
+
+### Production configuration examples
+
+#### git-credential (default)
+
+```bash
+reddit-mcp-server \
+  --credential-provider git-credential \
+  --username your_reddit_username \
+  --client-id your_client_id
+```
+
+Store credentials in git credential store as:
+
+- path `oauth-client-secret` (password = app client secret)
+- path `password` (password = reddit account/app password)
+
+#### pass-cli
+
+```bash
+REDDIT_PASS_CLI_CLIENT_SECRET_KEY=reddit/client-secret \
+REDDIT_PASS_CLI_PASSWORD_KEY=reddit/password \
+reddit-mcp-server \
+  --credential-provider pass-cli \
+  --username your_reddit_username \
+  --client-id your_client_id
+```
+
+#### Legacy env mode (less secure)
+
+```bash
+REDDIT_CREDENTIAL_PROVIDER=env \
+REDDIT_USERNAME=... \
+REDDIT_CLIENT_SECRET=... \
+REDDIT_PASSWORD=... \
+reddit-mcp-server
+```

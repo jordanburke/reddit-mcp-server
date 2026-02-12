@@ -1,5 +1,7 @@
 export type RedditAuthMode = "auto" | "authenticated" | "anonymous"
 
+export type RedditCredentialProvider = "git-credential" | "pass-cli" | "env"
+
 export type RedditSafeMode = "off" | "standard" | "strict"
 
 export interface SafeModeConfig {

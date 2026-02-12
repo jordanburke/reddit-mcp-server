@@ -409,7 +409,7 @@ describe("RedditClient", () => {
       })
 
       await expect(clientReadOnly.createPost("test", "Title", "Content")).rejects.toThrow(
-        "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD",
+        "Write operations require username plus configured credentials provider",
       )
     })
   })
@@ -558,7 +558,7 @@ describe("RedditClient", () => {
       })
 
       await expect(clientReadOnly.deletePost("post123")).rejects.toThrow(
-        "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD",
+        "Write operations require username plus configured credentials provider",
       )
     })
   })
@@ -674,7 +674,7 @@ describe("RedditClient", () => {
       })
 
       await expect(clientReadOnly.editPost("post123", "New content")).rejects.toThrow(
-        "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD",
+        "Write operations require username plus configured credentials provider",
       )
     })
 

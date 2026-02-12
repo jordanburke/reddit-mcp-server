@@ -1,10 +1,11 @@
 import crypto from "crypto"
-
 import dotenv from "dotenv"
 import { FastMCP } from "fastmcp"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
+import { resolveSecrets } from "./credentials"
+import { loadRuntimeConfig } from "./runtime-config"
 import type { RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
@@ -80,13 +81,26 @@ function buildSafeModeConfig(safeMode: RedditSafeMode): SafeModeConfig {
 
 // Initialize Reddit client
 async function setupRedditClient() {
-  const clientId = process.env.REDDIT_CLIENT_ID
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET
-  const customUserAgent = process.env.REDDIT_USER_AGENT
-  const username = process.env.REDDIT_USERNAME
-  const password = process.env.REDDIT_PASSWORD
-  const authMode = (process.env.REDDIT_AUTH_MODE || "auto") as RedditAuthMode
-  const safeMode = (process.env.REDDIT_SAFE_MODE || "standard") as RedditSafeMode
+  const runtime = loadRuntimeConfig()
+
+  const clientId = runtime.clientId
+  const customUserAgent = runtime.userAgent
+  const username = runtime.username
+  const authMode = runtime.authMode as RedditAuthMode
+  const safeMode = runtime.safeMode as RedditSafeMode
+
+  const { clientSecret, password } = await resolveSecrets({
+    provider: runtime.credentialProvider,
+    username,
+    envClientSecret: runtime.clientSecret,
+    envPassword: runtime.password,
+    gitCredentialHost: runtime.gitCredentialHost,
+    gitCredentialClientSecretPath: runtime.gitCredentialClientSecretPath,
+    gitCredentialPasswordPath: runtime.gitCredentialPasswordPath,
+    passCliCommand: runtime.passCliCommand,
+    passCliClientSecretKey: runtime.passCliClientSecretKey,
+    passCliPasswordKey: runtime.passCliPasswordKey,
+  })
 
   // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
@@ -153,7 +167,7 @@ async function setupRedditClient() {
       console.error("[Setup] Write operations enabled (posting, replying, editing, deleting)")
     } else {
       console.error("[Setup] Read-only mode (no user credentials)")
-      console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
+      console.error("[Setup] For write operations, provide --username and configure the selected credential provider")
     }
 
     // Log safe mode status
@@ -198,7 +212,7 @@ Available capabilities:
 - Delete your own posts and comments (with authentication)
 - Analyze engagement metrics and community insights
 
-For write operations (posting, replying, editing, deleting), ensure REDDIT_USERNAME and REDDIT_PASSWORD are configured.`,
+For write operations (posting, replying, editing, deleting), provide --username and configure credential secrets via the selected provider.`,
 
   // Optional OAuth configuration for HTTP transport
   ...(process.env.OAUTH_ENABLED === "true" && {
@@ -242,7 +256,7 @@ server.addTool({
   execute: async () => {
     const client = getRedditClient()
     const hasAuth = client ? "✓" : "✗"
-    const hasWriteAccess = process.env.REDDIT_USERNAME && process.env.REDDIT_PASSWORD ? "✓" : "✗"
+    const hasWriteAccess = client?.hasWriteCredentials() ? "✓" : "✗"
 
     return `Reddit MCP Server Status:
 - Server: ✓ Running
@@ -611,7 +625,7 @@ ${searchResults}`
 server.addTool({
   name: "create_post",
   description:
-    "Create a new post in a subreddit (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "Create a new post in a subreddit (requires configured username and credential-provider secrets). " +
     "WARNING: Rapid posting or duplicate content may trigger Reddit's spam detection and result in account bans. " +
     "Consider enabling REDDIT_SAFE_MODE=standard for protection.",
   parameters: z.object({
@@ -627,10 +641,8 @@ server.addTool({
     }
 
     // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
-      throw new Error(
-        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
-      )
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
     }
 
     const post = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
@@ -651,7 +663,7 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.`
 server.addTool({
   name: "reply_to_post",
   description:
-    "Post a reply to an existing Reddit post or comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "Post a reply to an existing Reddit post or comment (requires configured username and credential-provider secrets). " +
     "WARNING: Rapid commenting or duplicate content may trigger Reddit's spam detection. " +
     "Enable REDDIT_SAFE_MODE=standard for rate limiting and duplicate detection.",
   parameters: z.object({
@@ -665,10 +677,8 @@ server.addTool({
     }
 
     // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
-      throw new Error(
-        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
-      )
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
     }
 
     const comment = await client.replyToPost(args.post_id, args.content)
@@ -677,7 +687,7 @@ server.addTool({
 
 ## Comment Details
 - Posted to: ${args.post_id}
-- Author: u/${process.env.REDDIT_USERNAME}
+- Author: u/${client.getAuthenticatedUsername() || "[unknown]"}
 - Comment ID: ${comment.id}
 
 Your reply has been successfully posted.`
@@ -687,7 +697,7 @@ Your reply has been successfully posted.`
 server.addTool({
   name: "delete_post",
   description:
-    "Delete your own Reddit post (requires REDDIT_USERNAME and REDDIT_PASSWORD). WARNING: This action is permanent and cannot be undone!",
+    "Delete your own Reddit post (requires configured username and credential-provider secrets). WARNING: This action is permanent and cannot be undone!",
   parameters: z.object({
     thing_id: z
       .string()
@@ -702,10 +712,8 @@ server.addTool({
     }
 
     // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
-      throw new Error(
-        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
-      )
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
     }
 
     await client.deletePost(args.thing_id)
@@ -721,7 +729,7 @@ The post ${args.thing_id} has been permanently deleted from Reddit.
 server.addTool({
   name: "delete_comment",
   description:
-    "Delete your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). WARNING: This action is permanent and cannot be undone!",
+    "Delete your own Reddit comment (requires configured username and credential-provider secrets). WARNING: This action is permanent and cannot be undone!",
   parameters: z.object({
     thing_id: z
       .string()
@@ -736,10 +744,8 @@ server.addTool({
     }
 
     // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
-      throw new Error(
-        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
-      )
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
     }
 
     await client.deleteComment(args.thing_id)
@@ -755,7 +761,7 @@ The comment ${args.thing_id} has been permanently deleted from Reddit.
 server.addTool({
   name: "edit_post",
   description:
-    "Edit your own Reddit post (self-text posts only, requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "Edit your own Reddit post (self-text posts only, requires configured username and credential-provider secrets). " +
     "You can only edit the text content of self posts, not titles or link posts. " +
     "WARNING: Rapid edits may trigger spam detection. Enable REDDIT_SAFE_MODE for protection.",
   parameters: z.object({
@@ -773,10 +779,8 @@ server.addTool({
     }
 
     // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
-      throw new Error(
-        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
-      )
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
     }
 
     await client.editPost(args.thing_id, args.new_text)
@@ -796,7 +800,7 @@ The post ${args.thing_id} has been updated with your new content.
 server.addTool({
   name: "edit_comment",
   description:
-    "Edit your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
+    "Edit your own Reddit comment (requires configured username and credential-provider secrets). " +
     "Update the text content of a comment you previously posted. " +
     "WARNING: Rapid edits may trigger spam detection. Enable REDDIT_SAFE_MODE for protection.",
   parameters: z.object({
@@ -814,10 +818,8 @@ server.addTool({
     }
 
     // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
-      throw new Error(
-        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
-      )
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
     }
 
     await client.editComment(args.thing_id, args.new_text)

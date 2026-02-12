@@ -201,15 +201,23 @@ export class RedditClient {
     return true
   }
 
+  hasWriteCredentials(): boolean {
+    return !!(this.username && this.password)
+  }
+
+  getAuthenticatedUsername(): string | undefined {
+    return this.username
+  }
+
   private validateWriteAccess(): void {
     if (!this.username || !this.password) {
       if (this.authMode === "anonymous") {
         throw new Error(
           "Write operations not available in anonymous mode. " +
-            "Set REDDIT_USERNAME, REDDIT_PASSWORD and use 'auto' or 'authenticated' mode.",
+            "Set username and configure credentials provider (or REDDIT_PASSWORD in env mode), then use 'auto' or 'authenticated' mode.",
         )
       }
-      throw new Error("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      throw new Error("Write operations require username plus configured credentials provider")
     }
   }
 
@@ -504,8 +512,7 @@ export class RedditClient {
 
     try {
       // Determine the full thing_id, preserving existing prefixes (t3_ for posts, t1_ for comments)
-      const fullThingId =
-        postId.startsWith("t3_") || postId.startsWith("t1_") ? postId : `t3_${postId}`
+      const fullThingId = postId.startsWith("t3_") || postId.startsWith("t1_") ? postId : `t3_${postId}`
 
       // Only check existence for posts (t3_), not comments (t1_)
       if (fullThingId.startsWith("t3_")) {
