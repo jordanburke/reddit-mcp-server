@@ -668,6 +668,37 @@ export class RedditClient {
     return this.editPost(fullThingId, newText)
   }
 
+  async vote(thingId: string, direction: -1 | 0 | 1 = 1): Promise<boolean> {
+    this.validateWriteAccess()
+    await this.enforceWriteRateLimit()
+
+    try {
+      const fullThingId = thingId.startsWith("t3_") || thingId.startsWith("t1_") ? thingId : `t3_${thingId}`
+      const params = new URLSearchParams()
+      params.append("id", fullThingId)
+      params.append("dir", String(direction))
+
+      const response = await this.makeRequest("/api/vote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to vote: HTTP ${response.status}`)
+      }
+
+      return true
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error(`Failed to vote on ${thingId}`)
+    }
+  }
+
   async searchReddit(
     query: string,
     options: {

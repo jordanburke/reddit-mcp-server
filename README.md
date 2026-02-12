@@ -86,6 +86,7 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 | `edit_comment`   | Edit your own Reddit comment                |
 | `delete_post`    | Permanently delete your own post            |
 | `delete_comment` | Permanently delete your own comment         |
+| `vote_post`      | Vote on a post/comment (upvote/downvote)    |
 
 ## Configuration
 

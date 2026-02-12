@@ -414,6 +414,46 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("vote", () => {
+    it("should upvote a post with bare id", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      })
+
+      await client.vote("abc123", 1)
+
+      const voteCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(voteCall[1].body as string)
+      expect(body.get("id")).toBe("t3_abc123")
+      expect(body.get("dir")).toBe("1")
+    })
+
+    it("should preserve thing prefix when voting", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      })
+
+      await client.vote("t1_commentid", -1)
+
+      const voteCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(voteCall[1].body as string)
+      expect(body.get("id")).toBe("t1_commentid")
+      expect(body.get("dir")).toBe("-1")
+    })
+  })
+
   describe("replyToPost", () => {
     it("should reply to an existing post", async () => {
       const mockCheckResponse = {

@@ -832,6 +832,37 @@ The comment ${args.thing_id} has been updated with your new content.
   },
 })
 
+server.addTool({
+  name: "vote_post",
+  description:
+    "Vote on a Reddit post/comment (requires configured username and credential-provider secrets). " +
+    "Use direction 1 to upvote, 0 to clear vote, -1 to downvote.",
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The full Reddit thing ID (e.g., 't3_abc123' for posts, 't1_abc123' for comments) or bare ID. Defaults to post prefix if omitted.",
+      ),
+    direction: z.enum(["1", "0", "-1"]).default("1").describe("Vote direction: 1 upvote, 0 clear, -1 downvote."),
+  }),
+  execute: async (args) => {
+    const client = getRedditClient()
+    if (!client) {
+      throw new Error("Reddit client not initialized")
+    }
+
+    if (!client.hasWriteCredentials()) {
+      throw new Error("User authentication required. Provide --username and configure credential provider secrets.")
+    }
+
+    const direction = Number.parseInt(args.direction, 10) as -1 | 0 | 1
+    await client.vote(args.thing_id, direction)
+
+    const action = direction === 1 ? "upvoted" : direction === -1 ? "downvoted" : "cleared"
+    return `# Vote Submitted Successfully\n\n- Target: ${args.thing_id}\n- Action: ${action}`
+  },
+})
+
 // Comment tools
 server.addTool({
   name: "get_post_comments",
