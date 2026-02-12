@@ -45,6 +45,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 # Switch to non-root user
 USER nodejs
 
+# Default to HTTP mode for Docker
+ENV TRANSPORT_TYPE=httpStream
+
 # Expose port for HTTP server
 EXPOSE 3000
 
