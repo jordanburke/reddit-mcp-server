@@ -350,13 +350,20 @@ Store credentials in git credential store as:
 #### pass-cli
 
 ```bash
-REDDIT_PASS_CLI_CLIENT_SECRET_KEY=reddit/client-secret \
-REDDIT_PASS_CLI_PASSWORD_KEY=reddit/password \
+# Preferred with current Proton Pass CLI: use pass://... URIs (optionally with /field)
+REDDIT_PASS_CLI_CLIENT_SECRET_KEY='pass://<share-id>/<item-id>/client_secret' \
+REDDIT_PASS_CLI_PASSWORD_KEY='pass://<share-id>/<item-id>/password' \
 reddit-mcp-server \
   --credential-provider pass-cli \
   --username your_reddit_username \
   --client-id your_client_id
 ```
+
+Compatibility notes:
+
+- Older `pass-cli` variants that support `pass-cli secret get <key>` are supported.
+- Current Proton Pass CLI variants without `secret` are also supported; the server falls back to `pass-cli item view <key>` and expects `key` to be a pass URI.
+- Keep `REDDIT_PASS_CLI_COMMAND` as a binary path/name (default `pass-cli`), not a full shell command.
 
 #### Legacy env mode (less secure)
 

@@ -47,8 +47,8 @@ Environment Variables:
 
   # pass-cli provider settings
   REDDIT_PASS_CLI_COMMAND             pass-cli binary path/name (default: pass-cli)
-  REDDIT_PASS_CLI_CLIENT_SECRET_KEY   pass-cli key for client secret
-  REDDIT_PASS_CLI_PASSWORD_KEY        pass-cli key for reddit password
+  REDDIT_PASS_CLI_CLIENT_SECRET_KEY   pass-cli key/URI for client secret
+  REDDIT_PASS_CLI_PASSWORD_KEY        pass-cli key/URI for reddit password
 
 For more information, visit: https://github.com/jordanburke/reddit-mcp-server
 `)

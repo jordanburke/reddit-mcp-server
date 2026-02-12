@@ -61,8 +61,24 @@ async function gitCredentialFill(params: {
   return result
 }
 
+async function passCliSupportsSecretSubcommand(command: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync(command, ["help"], { encoding: "utf8" })
+    return /\bsecret\b/.test(stdout)
+  } catch {
+    return false
+  }
+}
+
 async function passCliGet(command: string, key: string): Promise<string> {
-  const { stdout } = await execFileAsync(command, ["secret", "get", key], { encoding: "utf8" })
+  if (await passCliSupportsSecretSubcommand(command)) {
+    const { stdout } = await execFileAsync(command, ["secret", "get", key], { encoding: "utf8" })
+    return stdout.trim()
+  }
+
+  // Proton Pass CLI (current versions) does not expose `secret get`.
+  // In that case we treat key as a pass URI and read it through `item view`.
+  const { stdout } = await execFileAsync(command, ["item", "view", key], { encoding: "utf8" })
   return stdout.trim()
 }
 
