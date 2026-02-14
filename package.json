@@ -69,19 +69,19 @@
   },
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
-    "dotenv": "^17.2.3",
-    "fastmcp": "^3.31.0",
+    "dotenv": "^17.3.1",
+    "fastmcp": "^3.32.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
+    "@types/node": "^22.19.11",
     "ajv-cli": "^5.0.0",
     "cross-env": "^10.1.0",
-    "msw": "^2.12.7",
+    "msw": "^2.12.10",
     "rimraf": "^6.1.2",
-    "ts-builds": "^2.3.2",
-    "tsdown": "^0.20.1",
+    "ts-builds": "^2.4.0",
+    "tsdown": "^0.20.3",
     "tsx": "^4.21.0"
   },
-  "packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264"
+  "packageManager": "pnpm@10.29.3+sha512.498e1fb4cca5aa06c1dcf2611e6fafc50972ffe7189998c409e90de74566444298ffe43e6cd2acdc775ba1aa7cc5e092a8b7054c811ba8c5770f84693d33d2dc"
 }

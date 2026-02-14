@@ -42,7 +42,9 @@ function buildUserAgent(customAgent?: string, username?: string): string {
 
   // Fallback using recommended format without username
   const fallbackAgent = `typescript:reddit-mcp-server:${VERSION} (by /u/anonymous)`
-  console.error("[Setup] No REDDIT_USERNAME set — using anonymous User-Agent. Set REDDIT_USERNAME for a personalized agent.")
+  console.error(
+    "[Setup] No REDDIT_USERNAME set — using anonymous User-Agent. Set REDDIT_USERNAME for a personalized agent.",
+  )
   return fallbackAgent
 }
 

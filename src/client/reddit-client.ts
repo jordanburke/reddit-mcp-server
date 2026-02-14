@@ -175,7 +175,7 @@ export class RedditClient {
       if (error instanceof Error) {
         throw error
       }
-      throw new Error("Failed to authenticate with Reddit API")
+      throw new Error("Failed to authenticate with Reddit API", { cause: error })
     }
   }
 
@@ -468,6 +468,7 @@ export class RedditClient {
       }
       throw new Error(
         `Failed to create post in ${subreddit}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       )
     }
   }
@@ -553,7 +554,9 @@ export class RedditClient {
       if (error instanceof Error && error.message.includes("HTTP")) {
         throw error
       }
-      throw new Error(`Failed to reply to post ${postId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`Failed to reply to post ${postId}: ${error instanceof Error ? error.message : String(error)}`, {
+        cause: error,
+      })
     }
   }
 
@@ -589,7 +592,12 @@ export class RedditClient {
       if (error instanceof Error && error.message.includes("HTTP")) {
         throw error
       }
-      throw new Error(`Failed to delete content ${thingId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(
+        `Failed to delete content ${thingId}: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          cause: error,
+        },
+      )
     }
   }
 
@@ -648,7 +656,9 @@ export class RedditClient {
       if (error instanceof Error && error.message.includes("HTTP")) {
         throw error
       }
-      throw new Error(`Failed to edit content ${thingId}: ${error instanceof Error ? error.message : String(error)}`)
+      throw new Error(`Failed to edit content ${thingId}: ${error instanceof Error ? error.message : String(error)}`, {
+        cause: error,
+      })
     }
   }
 
