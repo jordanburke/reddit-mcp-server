@@ -91,6 +91,7 @@ export class RedditClient {
     const url = `${this.baseUrl}${path}`
     const headers: Record<string, string> = {
       "User-Agent": this.userAgent,
+      Accept: "application/json",
       ...(options.headers as Record<string, string>),
     }
 
@@ -118,6 +119,19 @@ export class RedditClient {
     }
 
     return response
+  }
+
+  private async buildHttpError(response: Response, context: string): Promise<Error> {
+    let body = ""
+    try {
+      body = (await response.text()).slice(0, 500)
+    } catch {
+      // Body extraction is best-effort; ignore failures
+    }
+    const msg = `${context}: HTTP ${response.status} ${response.statusText || ""}`.trim()
+    console.error(`[Reddit API] ${msg}`)
+    if (body) console.error(`[Reddit API] Body: ${body}`)
+    return new Error(msg)
   }
 
   async authenticate(): Promise<void> {
@@ -270,7 +284,7 @@ export class RedditClient {
     try {
       const response = await this.makeRequest(`/user/${safeUsername}/about.json`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get user info for ${username}`)
       }
 
       const json = (await response.json()) as RedditApiUserResponse
@@ -288,8 +302,8 @@ export class RedditClient {
         createdUtc: data.created_utc,
         profileUrl: `https://reddit.com/user/${data.name}`,
       }
-    } catch {
-      // Failed to get user info
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get user info for ${username}`)
     }
   }
@@ -299,7 +313,7 @@ export class RedditClient {
     try {
       const response = await this.makeRequest(`/r/${safeName}/about.json`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get subreddit info for ${subredditName}`)
       }
 
       const json = (await response.json()) as RedditApiSubredditResponse
@@ -317,8 +331,8 @@ export class RedditClient {
         subredditType: data.subreddit_type,
         url: data.url,
       }
-    } catch {
-      // Failed to get subreddit info
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get subreddit info for ${subredditName}`)
     }
   }
@@ -334,7 +348,7 @@ export class RedditClient {
 
       const response = await this.makeRequest(`${endpoint}?${params}`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get top posts for ${subreddit || "home"}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
@@ -360,8 +374,8 @@ export class RedditClient {
           permalink: post.permalink,
         }
       })
-    } catch {
-      // Failed to get top posts
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get top posts for ${subreddit || "home"}`)
     }
   }
@@ -376,7 +390,7 @@ export class RedditClient {
       const response = await this.makeRequest(endpoint)
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get post with ID ${postId}`)
       }
 
       let post: RedditApiPostData
@@ -411,8 +425,8 @@ export class RedditClient {
         linkFlairText: post.link_flair_text ?? undefined,
         permalink: post.permalink,
       }
-    } catch {
-      // Failed to get post
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get post with ID ${postId}`)
     }
   }
@@ -423,13 +437,13 @@ export class RedditClient {
       const response = await this.makeRequest(`/subreddits/popular.json?${params}`)
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, "Failed to get trending subreddits")
       }
 
       const json = (await response.json()) as RedditApiPopularSubredditsResponse
       return json.data.children.map((child) => child.data.display_name)
-    } catch {
-      // Failed to get trending subreddits
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error("Failed to get trending subreddits")
     }
   }
@@ -725,7 +739,7 @@ export class RedditClient {
 
       const response = await this.makeRequest(`${endpoint}?${params}`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to search Reddit for: ${query}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
@@ -753,7 +767,8 @@ export class RedditClient {
             permalink: post.permalink,
           }
         })
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to search Reddit for: ${query}`)
     }
   }
@@ -776,7 +791,7 @@ export class RedditClient {
       })
       const response = await this.makeRequest(`/r/${safeSub}/comments/${safePostId}.json?${params}`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get comments for post ${postId}`)
       }
 
       const json = (await response.json()) as RedditApiPostCommentsResponse
@@ -839,7 +854,8 @@ export class RedditClient {
       }
 
       return { post, comments }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get comments for post ${postId}`)
     }
   }
@@ -863,7 +879,7 @@ export class RedditClient {
 
       const response = await this.makeRequest(`/user/${safeUsername}/submitted.json?${params}`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get posts for user ${username}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
@@ -891,7 +907,8 @@ export class RedditClient {
             permalink: post.permalink,
           }
         })
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get posts for user ${username}`)
     }
   }
@@ -914,7 +931,7 @@ export class RedditClient {
       })
       const response = await this.makeRequest(`/user/${safeUsername}/comments.json?${params}`)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw await this.buildHttpError(response, `Failed to get comments for user ${username}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiCommentTreeData>
@@ -937,7 +954,8 @@ export class RedditClient {
             permalink: comment.permalink,
           }
         })
-    } catch {
+    } catch (error) {
+      if (error instanceof Error) throw error
       throw new Error(`Failed to get comments for user ${username}`)
     }
   }

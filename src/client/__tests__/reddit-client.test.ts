@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { sanitizeUsername } from "../../index"
 import type { RedditClientConfig } from "../../types"
 import { RedditClient } from "../reddit-client"
 
@@ -1040,5 +1041,101 @@ describe("RedditClient", () => {
       // Should only have 2 fetch calls: auth + comment (no existence check)
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
+  })
+
+  describe("Accept header", () => {
+    it("should include Accept: application/json on all requests", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock subreddit request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            display_name: "test",
+            title: "Test",
+            description: "",
+            public_description: "",
+            subscribers: 100,
+            active_user_count: 10,
+            created_utc: 0,
+            over18: false,
+            subreddit_type: "public",
+            url: "/r/test/",
+          },
+        }),
+      })
+
+      await client.getSubredditInfo("test")
+
+      const apiCall = mockFetch.mock.calls[1]
+      expect(apiCall[1].headers).toHaveProperty("Accept", "application/json")
+    })
+  })
+
+  describe("error handling with HTTP status", () => {
+    it("should preserve HTTP status in error messages", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock 403 response
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        text: async () => "blocked",
+      })
+
+      await expect(client.getSubredditInfo("test")).rejects.toThrow("HTTP 403")
+    })
+
+    it("should include context in HTTP error messages", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock 429 response
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        text: async () => "rate limited",
+      })
+
+      await expect(client.searchReddit("test query")).rejects.toThrow(
+        "Failed to search Reddit for: test query: HTTP 429",
+      )
+    })
+  })
+})
+
+describe("sanitizeUsername", () => {
+  it("should strip domain from email addresses", () => {
+    expect(sanitizeUsername("reddit.user@passmail.com")).toBe("reddit_user")
+  })
+
+  it("should replace dots with underscores", () => {
+    expect(sanitizeUsername("first.last")).toBe("first_last")
+  })
+
+  it("should leave valid usernames unchanged", () => {
+    expect(sanitizeUsername("valid_user-123")).toBe("valid_user-123")
+  })
+
+  it("should strip special characters", () => {
+    expect(sanitizeUsername("user!@#name")).toBe("user_")
+  })
+
+  it("should handle plain username without @ symbol", () => {
+    expect(sanitizeUsername("plainuser")).toBe("plainuser")
   })
 })

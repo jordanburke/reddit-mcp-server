@@ -29,6 +29,12 @@ function validateUserAgent(userAgent: string, username?: string): void {
   }
 }
 
+export function sanitizeUsername(username: string): string {
+  const atIndex = username.indexOf("@")
+  const name = atIndex > 0 ? username.slice(0, atIndex) : username
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_")
+}
+
 function buildUserAgent(customAgent?: string, username?: string): string {
   // If custom agent provided, use it (but validate)
   if (customAgent) {
@@ -38,7 +44,8 @@ function buildUserAgent(customAgent?: string, username?: string): string {
 
   // Auto-format with username if available
   if (username) {
-    const autoAgent = `typescript:reddit-mcp-server:${VERSION} (by /u/${username})`
+    const sanitized = sanitizeUsername(username)
+    const autoAgent = `typescript:reddit-mcp-server:${VERSION} (by /u/${sanitized})`
     console.error(`[Setup] Auto-generated User-Agent: ${autoAgent}`)
     return autoAgent
   }
