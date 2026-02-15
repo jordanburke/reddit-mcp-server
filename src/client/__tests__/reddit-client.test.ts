@@ -1138,4 +1138,12 @@ describe("sanitizeUsername", () => {
   it("should handle plain username without @ symbol", () => {
     expect(sanitizeUsername("plainuser")).toBe("plainuser")
   })
+
+  it("should strip u/ prefix", () => {
+    expect(sanitizeUsername("u/SevenOfNine-ai")).toBe("SevenOfNine-ai")
+  })
+
+  it("should strip /u/ prefix", () => {
+    expect(sanitizeUsername("/u/SevenOfNine-ai")).toBe("SevenOfNine-ai")
+  })
 })

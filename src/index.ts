@@ -30,8 +30,11 @@ function validateUserAgent(userAgent: string, username?: string): void {
 }
 
 export function sanitizeUsername(username: string): string {
-  const atIndex = username.indexOf("@")
-  const name = atIndex > 0 ? username.slice(0, atIndex) : username
+  // Strip common prefixes (u/, /u/) that users might copy from Reddit
+  let name = username.replace(/^\/?u\//, "")
+  // Strip email domain if present
+  const atIndex = name.indexOf("@")
+  if (atIndex > 0) name = name.slice(0, atIndex)
   return name.replace(/[^a-zA-Z0-9_-]/g, "_")
 }
 
