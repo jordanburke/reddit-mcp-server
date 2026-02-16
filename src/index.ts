@@ -1,3 +1,4 @@
+import crypto from "crypto"
 import dotenv from "dotenv"
 import { FastMCP } from "fastmcp"
 import { z } from "zod"
@@ -172,6 +173,12 @@ async function setupRedditClient() {
   }
 }
 
+// OAuth token: generate once at startup, never expose in responses
+const oauthToken = process.env.OAUTH_TOKEN || crypto.randomBytes(32).toString("hex")
+if (process.env.OAUTH_ENABLED === "true" && !process.env.OAUTH_TOKEN) {
+  console.error(`[Auth] Generated OAuth token: ${oauthToken}`)
+}
+
 // Create FastMCP server
 const server = new FastMCP({
   name: "reddit-mcp-server",
@@ -193,26 +200,6 @@ For write operations (posting, replying, editing, deleting), ensure REDDIT_USERN
   ...(process.env.OAUTH_ENABLED === "true" && {
     authenticate: async (request) => {
       const authHeader = request.headers.authorization
-      const expectedToken = process.env.OAUTH_TOKEN
-
-      if (!expectedToken) {
-        // If OAuth is enabled but no token configured, generate one
-        const token = Array.from({ length: 32 }, () =>
-          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 62)),
-        ).join("")
-        console.log(`[Auth] Generated OAuth token: ${token}`)
-        throw new Response(
-          JSON.stringify({
-            error: "No OAuth token configured",
-            generatedToken: token,
-          }),
-          {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          },
-        )
-      }
-
       if (!authHeader?.startsWith("Bearer ")) {
         throw new Response(null, {
           status: 401,
@@ -221,7 +208,12 @@ For write operations (posting, replying, editing, deleting), ensure REDDIT_USERN
       }
 
       const token = authHeader.slice(7)
-      if (token !== expectedToken) {
+      const tokenBuffer = Buffer.from(token)
+      const expectedBuffer = Buffer.from(oauthToken)
+      // Constant-time comparison: hash both so timingSafeEqual always compares equal-length buffers
+      const tokenHash = crypto.createHash("sha256").update(tokenBuffer).digest()
+      const expectedHash = crypto.createHash("sha256").update(expectedBuffer).digest()
+      if (!crypto.timingSafeEqual(tokenHash, expectedHash)) {
         throw new Response(null, {
           status: 403,
           statusText: "Invalid token",
@@ -900,7 +892,7 @@ async function main() {
     // Use HTTP only when explicitly requested (e.g., for Docker)
     const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
     const port = parseInt(process.env.PORT || "3000")
-    const host = process.env.HOST || "0.0.0.0"
+    const host = process.env.HOST || "127.0.0.1"
 
     if (useHttp) {
       console.error(`[Setup] Starting HTTP server on ${host}:${port}`)

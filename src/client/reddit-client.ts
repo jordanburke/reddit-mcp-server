@@ -219,7 +219,7 @@ export class RedditClient {
   }
 
   private hashContent(content: string): string {
-    return crypto.createHash("md5").update(content.trim().toLowerCase()).digest("hex")
+    return crypto.createHash("sha256").update(content.trim().toLowerCase()).digest("hex")
   }
 
   private checkDuplicateContent(content: string): void {
@@ -434,19 +434,14 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Create post failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        throw new Error(`HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiSubmitResponse
-      console.error(`[Reddit API] Create post response:`, JSON.stringify(json, null, 2))
 
       // With api_type=json, response has json.data.id or json.errors
       if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
-        console.error(`[Reddit API] Post creation errors: ${errors}`)
+        const errors = json.json.errors.map((e) => e[1] || e[0]).join(", ")
         throw new Error(`Reddit API errors: ${errors}`)
       }
 
@@ -454,16 +449,12 @@ export class RedditClient {
       const postId = json.json?.data?.id || json.json?.data?.name?.replace("t3_", "")
 
       if (!postId) {
-        console.error(`[Reddit API] No post ID in response`)
         throw new Error("No post ID returned from Reddit")
       }
 
-      console.error(`[Reddit API] Post created with ID: ${postId}`)
       return await this.getPost(postId, subreddit)
     } catch (error) {
-      // Log and re-throw the actual error
-      console.error(`[Reddit API] Create post exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
       throw new Error(
@@ -495,12 +486,15 @@ export class RedditClient {
     this.checkDuplicateContent(content)
 
     try {
-      if (!(await this.checkPostExists(postId))) {
+      const fullThingId = postId.startsWith("t3_") || postId.startsWith("t1_") ? postId : `t3_${postId}`
+
+      // Only check existence for posts (t3_), not comments (t1_)
+      if (!postId.startsWith("t1_") && !(await this.checkPostExists(postId.replace(/^t3_/, "")))) {
         throw new Error(`Post with ID ${postId} does not exist or is not accessible`)
       }
 
       const params = new URLSearchParams()
-      params.append("thing_id", `t3_${postId}`)
+      params.append("thing_id", fullThingId)
       params.append("text", content)
       params.append("api_type", "json") // Request standard JSON response format
 
@@ -513,15 +507,11 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Reply to post failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        throw new Error(`HTTP ${response.status}`)
       }
 
       // Extract comment data from response
       const json = (await response.json()) as RedditApiCommentResponse
-      console.error(`[Reddit API] Reply response:`, JSON.stringify(json, null, 2))
 
       if (json.json?.data?.things && json.json.data.things.length > 0) {
         const commentData = json.json.data.things[0].data
@@ -541,17 +531,13 @@ export class RedditClient {
           permalink: commentData.permalink,
         }
       } else if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
-        console.error(`[Reddit API] Reply errors: ${errors}`)
+        const errors = json.json.errors.map((e) => e[1] || e[0]).join(", ")
         throw new Error(`Reddit API errors: ${errors}`)
       } else {
-        console.error(`[Reddit API] Unexpected reply response format`)
         throw new Error("Failed to parse reply response")
       }
     } catch (error) {
-      // Log and re-throw the actual error
-      console.error(`[Reddit API] Reply to post exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
       throw new Error(`Failed to reply to post ${postId}: ${error instanceof Error ? error.message : String(error)}`, {
@@ -633,27 +619,20 @@ export class RedditClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`[Reddit API] Edit failed: ${response.status} ${response.statusText}`)
-        console.error(`[Reddit API] Error response: ${errorText}`)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        throw new Error(`HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiEditResponse
-      console.error(`[Reddit API] Edit response:`, JSON.stringify(json, null, 2))
 
       // Check for errors in response
       if (json.json?.errors && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e.join(": ")).join(", ")
-        console.error(`[Reddit API] Edit errors: ${errors}`)
+        const errors = json.json.errors.map((e) => e[1] || e[0]).join(", ")
         throw new Error(`Reddit API errors: ${errors}`)
       }
 
-      console.error(`[Reddit API] Successfully edited ${fullThingId}`)
       return true
     } catch (error) {
-      console.error(`[Reddit API] Edit exception:`, error)
-      if (error instanceof Error && error.message.includes("HTTP")) {
+      if (error instanceof Error) {
         throw error
       }
       throw new Error(`Failed to edit content ${thingId}: ${error instanceof Error ? error.message : String(error)}`, {

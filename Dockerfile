@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
 # Set working directory
 WORKDIR /app
@@ -24,7 +24,7 @@ RUN pnpm build
 FROM node:22-alpine
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -45,8 +45,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 # Switch to non-root user
 USER nodejs
 
-# Default to HTTP mode for Docker
+# Default to HTTP mode for Docker, bind to all interfaces so container is reachable
 ENV TRANSPORT_TYPE=httpStream
+ENV HOST=0.0.0.0
 
 # Expose port for HTTP server
 EXPOSE 3000

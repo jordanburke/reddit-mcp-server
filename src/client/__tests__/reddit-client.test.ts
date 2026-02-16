@@ -415,7 +415,7 @@ describe("RedditClient", () => {
   })
 
   describe("replyToPost", () => {
-    it.skip("should reply to an existing post", async () => {
+    it("should reply to an existing post", async () => {
       const mockCheckResponse = {
         data: {
           children: [{ data: { id: "post123" } }],
@@ -493,7 +493,184 @@ describe("RedditClient", () => {
         json: async () => mockCheckResponse,
       })
 
-      await expect(client.replyToPost("nonexistent", "Comment")).rejects.toThrow("Failed to reply to post nonexistent")
+      await expect(client.replyToPost("nonexistent", "Comment")).rejects.toThrow(
+        "Post with ID nonexistent does not exist or is not accessible",
+      )
+    })
+
+    it("should not double-prefix t3_ post IDs", async () => {
+      const mockCheckResponse = {
+        data: {
+          children: [{ data: { id: "post123" } }],
+        },
+      }
+
+      const mockCommentResponse = {
+        json: {
+          data: {
+            things: [
+              {
+                data: {
+                  id: "comment456",
+                  subreddit: "test",
+                  link_title: "Test Post",
+                  permalink: "/r/test/comments/post123/comment456",
+                },
+              },
+            ],
+          },
+        },
+      }
+
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock check post exists
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCheckResponse,
+      })
+
+      // Mock comment submission
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCommentResponse,
+      })
+
+      await client.replyToPost("t3_post123", "Reply text")
+
+      const commentCall = mockFetch.mock.calls[2]
+      const body = new URLSearchParams(commentCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t3_post123")
+    })
+
+    it("should pass through t1_ comment IDs for comment replies", async () => {
+      const mockCommentResponse = {
+        json: {
+          data: {
+            things: [
+              {
+                data: {
+                  id: "reply789",
+                  subreddit: "test",
+                  link_title: "Test Post",
+                  permalink: "/r/test/comments/post123/reply789",
+                },
+              },
+            ],
+          },
+        },
+      }
+
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock comment submission (no checkPostExists for t1_)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCommentResponse,
+      })
+
+      await client.replyToPost("t1_comment123", "Reply to comment")
+
+      // Should only have 2 fetch calls: auth + comment (no checkPostExists)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+
+      const commentCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(commentCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t1_comment123")
+    })
+
+    it("should add t3_ prefix to bare post IDs", async () => {
+      const mockCheckResponse = {
+        data: {
+          children: [{ data: { id: "post123" } }],
+        },
+      }
+
+      const mockCommentResponse = {
+        json: {
+          data: {
+            things: [
+              {
+                data: {
+                  id: "comment456",
+                  subreddit: "test",
+                  link_title: "Test Post",
+                  permalink: "/r/test/comments/post123/comment456",
+                },
+              },
+            ],
+          },
+        },
+      }
+
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock check post exists
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCheckResponse,
+      })
+
+      // Mock comment submission
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCommentResponse,
+      })
+
+      await client.replyToPost("post123", "Reply text")
+
+      const commentCall = mockFetch.mock.calls[2]
+      const body = new URLSearchParams(commentCall[1].body as string)
+      expect(body.get("thing_id")).toBe("t3_post123")
+    })
+
+    it("should skip existence check for t1_ comment IDs", async () => {
+      const mockCommentResponse = {
+        json: {
+          data: {
+            things: [
+              {
+                data: {
+                  id: "reply789",
+                  subreddit: "test",
+                  link_title: "Test Post",
+                  permalink: "/r/test/comments/post123/reply789",
+                },
+              },
+            ],
+          },
+        },
+      }
+
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock comment submission only (no existence check)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCommentResponse,
+      })
+
+      const comment = await client.replyToPost("t1_abc123", "Nested reply")
+
+      // Verify only 2 fetch calls: auth + comment API (no /api/info.json call)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      expect(comment.id).toBe("reply789")
     })
   })
 
@@ -612,7 +789,7 @@ describe("RedditClient", () => {
   })
 
   describe("editPost", () => {
-    it.skip("should edit a post", async () => {
+    it("should edit a post", async () => {
       // Mock authentication
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -640,7 +817,7 @@ describe("RedditClient", () => {
       expect(result).toBe(true)
     })
 
-    it.skip("should handle post ID with t3_ prefix", async () => {
+    it("should handle post ID with t3_ prefix", async () => {
       // Mock authentication
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -678,7 +855,7 @@ describe("RedditClient", () => {
       )
     })
 
-    it.skip("should handle API errors", async () => {
+    it("should handle API errors", async () => {
       // Mock authentication
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -695,7 +872,7 @@ describe("RedditClient", () => {
         }),
       })
 
-      await expect(client.editPost("post123", "")).rejects.toThrow("Reddit API errors: BAD_TEXT: invalid text")
+      await expect(client.editPost("post123", "")).rejects.toThrow("Reddit API errors: invalid text")
     })
   })
 
