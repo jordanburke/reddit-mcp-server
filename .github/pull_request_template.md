@@ -16,7 +16,7 @@ Closes #
 
 - [ ] This PR contains a single logical change
 - [ ] No unrelated features, refactors, or cleanups are included
-- [ ] No breaking changes to defaults or existing behavior (or discussed and approved in issue #___)
+- [ ] No breaking changes to defaults or existing behavior (or discussed and approved in issue #\_\_\_)
 - [ ] No version bumps included
 - [ ] Tests added or updated for the changes
 - [ ] `pnpm build` passes

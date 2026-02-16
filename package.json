@@ -70,7 +70,7 @@
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
     "dotenv": "^17.3.1",
-    "fastmcp": "^3.32.0",
+    "fastmcp": "^3.33.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -78,7 +78,7 @@
     "ajv-cli": "^5.0.0",
     "cross-env": "^10.1.0",
     "msw": "^2.12.10",
-    "rimraf": "^6.1.2",
+    "rimraf": "^6.1.3",
     "ts-builds": "^2.4.0",
     "tsdown": "^0.20.3",
     "tsx": "^4.21.0"

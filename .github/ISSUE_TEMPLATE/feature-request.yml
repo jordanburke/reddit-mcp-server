@@ -1,0 +1,39 @@
+name: Feature Request
+description: Suggest a new tool, enhancement, or improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do that isn't supported today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work? Include example tool calls or API shapes if relevant.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      options:
+        - New MCP tool
+        - Existing tool improvement
+        - Authentication / credentials
+        - Transport / deployment
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, if any.
+    validations:
+      required: false

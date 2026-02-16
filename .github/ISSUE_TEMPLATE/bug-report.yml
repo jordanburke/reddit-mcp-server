@@ -1,0 +1,62 @@
+name: Bug Report
+description: Something isn't working as expected
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include what you expected vs what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      placeholder: |
+        1. Set env vars: REDDIT_AUTH_MODE=auto
+        2. Run: npx reddit-mcp-server
+        3. Call tool: get_reddit_post with id "abc123"
+        4. See error: ...
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport mode
+      options:
+        - stdio (npx / CLI)
+        - HTTP (Docker / direct)
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: auth-mode
+    attributes:
+      label: Auth mode
+      options:
+        - auto
+        - authenticated
+        - anonymous
+        - Not sure
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Package version or commit hash.
+      placeholder: "1.3.0 or abc1234"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or error output
+      description: Paste any error messages. These will be formatted as code automatically.
+      render: shell
+    validations:
+      required: false
