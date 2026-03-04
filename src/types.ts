@@ -5,284 +5,284 @@ export type RedditSafeMode = "off" | "standard" | "strict"
 export type BotDisclosureMode = "auto" | "off"
 
 export type BotDisclosureConfig = {
-  enabled: boolean
-  footer: string
+  readonly enabled: boolean
+  readonly footer: string
 }
 
 export type ContentRecord = {
-  hash: string
-  subreddit: string
-  timestamp: number
+  readonly hash: string
+  readonly subreddit: string
+  readonly timestamp: number
 }
 
-export interface SafeModeConfig {
-  enabled: boolean
-  mode: RedditSafeMode
-  writeDelayMs: number
-  duplicateCheck: boolean
-  maxRecentHashes: number
+export type SafeModeConfig = {
+  readonly enabled: boolean
+  readonly mode: RedditSafeMode
+  readonly writeDelayMs: number
+  readonly duplicateCheck: boolean
+  readonly maxRecentHashes: number
 }
 
-export interface RedditClientConfig {
-  clientId: string
-  clientSecret: string
-  userAgent: string
-  username?: string
-  password?: string
-  authMode?: RedditAuthMode
-  safeMode?: SafeModeConfig
-  botDisclosure?: BotDisclosureConfig
+export type RedditClientConfig = {
+  readonly clientId: string
+  readonly clientSecret: string
+  readonly userAgent: string
+  readonly username?: string
+  readonly password?: string
+  readonly authMode?: RedditAuthMode
+  readonly safeMode?: SafeModeConfig
+  readonly botDisclosure?: BotDisclosureConfig
 }
 
-export interface RedditUser {
-  name: string
-  id: string
-  commentKarma: number
-  linkKarma: number
-  totalKarma: number
-  isMod: boolean
-  isGold: boolean
-  isEmployee: boolean
-  createdUtc: number
-  profileUrl: string
+export type RedditUser = {
+  readonly name: string
+  readonly id: string
+  readonly commentKarma: number
+  readonly linkKarma: number
+  readonly totalKarma: number
+  readonly isMod: boolean
+  readonly isGold: boolean
+  readonly isEmployee: boolean
+  readonly createdUtc: number
+  readonly profileUrl: string
 }
 
-export interface RedditPost {
-  id: string
-  title: string
-  author: string
-  subreddit: string
-  selftext?: string
-  url?: string
-  score: number
-  upvoteRatio: number
-  numComments: number
-  createdUtc: number
-  over18: boolean
-  spoiler?: boolean
-  edited: boolean
-  isSelf: boolean
-  linkFlairText?: string
-  permalink: string
+export type RedditPost = {
+  readonly id: string
+  readonly title: string
+  readonly author: string
+  readonly subreddit: string
+  readonly selftext?: string
+  readonly url?: string
+  readonly score: number
+  readonly upvoteRatio: number
+  readonly numComments: number
+  readonly createdUtc: number
+  readonly over18: boolean
+  readonly spoiler?: boolean
+  readonly edited: boolean
+  readonly isSelf: boolean
+  readonly linkFlairText?: string
+  readonly permalink: string
 }
 
-export interface RedditComment {
-  id: string
-  author: string
-  body: string
-  score: number
-  controversiality: number
-  subreddit: string
-  submissionTitle: string
-  createdUtc: number
-  edited: boolean
-  isSubmitter: boolean
-  permalink: string
-  depth?: number
-  parentId?: string
+export type RedditComment = {
+  readonly id: string
+  readonly author: string
+  readonly body: string
+  readonly score: number
+  readonly controversiality: number
+  readonly subreddit: string
+  readonly submissionTitle: string
+  readonly createdUtc: number
+  readonly edited: boolean
+  readonly isSubmitter: boolean
+  readonly permalink: string
+  readonly depth?: number
+  readonly parentId?: string
 }
 
-export interface RedditSubreddit {
-  displayName: string
-  title: string
-  description: string
-  publicDescription: string
-  subscribers: number
-  activeUserCount?: number
-  createdUtc: number
-  over18: boolean
-  subredditType?: string
-  url: string
+export type RedditSubreddit = {
+  readonly displayName: string
+  readonly title: string
+  readonly description: string
+  readonly publicDescription: string
+  readonly subscribers: number
+  readonly activeUserCount?: number
+  readonly createdUtc: number
+  readonly over18: boolean
+  readonly subredditType?: string
+  readonly url: string
 }
 
-export interface FormattedUserInfo {
-  username: string
-  karma: {
-    commentKarma: number
-    postKarma: number
-    totalKarma: number
+export type FormattedUserInfo = {
+  readonly username: string
+  readonly karma: {
+    readonly commentKarma: number
+    readonly postKarma: number
+    readonly totalKarma: number
   }
-  accountStatus: string[]
-  accountCreated: string
-  profileUrl: string
-  activityAnalysis: string
-  recommendations: string
+  readonly accountStatus: readonly string[]
+  readonly accountCreated: string
+  readonly profileUrl: string
+  readonly activityAnalysis: string
+  readonly recommendations: string
 }
 
-export interface FormattedPostInfo {
-  title: string
-  type: string
-  content: string
-  author: string
-  subreddit: string
-  stats: {
-    score: number
-    upvoteRatio: number
-    comments: number
+export type FormattedPostInfo = {
+  readonly title: string
+  readonly type: string
+  readonly content: string
+  readonly author: string
+  readonly subreddit: string
+  readonly stats: {
+    readonly score: number
+    readonly upvoteRatio: number
+    readonly comments: number
   }
-  metadata: {
-    posted: string
-    flags: string[]
-    flair: string
+  readonly metadata: {
+    readonly posted: string
+    readonly flags: readonly string[]
+    readonly flair: string
   }
-  links: {
-    fullPost: string
-    shortLink: string
+  readonly links: {
+    readonly fullPost: string
+    readonly shortLink: string
   }
-  engagementAnalysis: string
-  bestTimeToEngage: string
+  readonly engagementAnalysis: string
+  readonly bestTimeToEngage: string
 }
 
-export interface FormattedSubredditInfo {
-  name: string
-  title: string
-  stats: {
-    subscribers: number
-    activeUsers: number | string
+export type FormattedSubredditInfo = {
+  readonly name: string
+  readonly title: string
+  readonly stats: {
+    readonly subscribers: number
+    readonly activeUsers: number | string
   }
-  description: {
-    short: string
-    full: string
+  readonly description: {
+    readonly short: string
+    readonly full: string
   }
-  metadata: {
-    created: string
-    flags: string[]
+  readonly metadata: {
+    readonly created: string
+    readonly flags: readonly string[]
   }
-  links: {
-    subreddit: string
-    wiki: string
+  readonly links: {
+    readonly subreddit: string
+    readonly wiki: string
   }
-  communityAnalysis: string
-  engagementTips: string
+  readonly communityAnalysis: string
+  readonly engagementTips: string
 }
 
-export interface FormattedCommentInfo {
-  author: string
-  content: string
-  stats: {
-    score: number
-    controversiality: number | string
+export type FormattedCommentInfo = {
+  readonly author: string
+  readonly content: string
+  readonly stats: {
+    readonly score: number
+    readonly controversiality: number | string
   }
-  context: {
-    subreddit: string
-    thread: string
+  readonly context: {
+    readonly subreddit: string
+    readonly thread: string
   }
-  metadata: {
-    posted: string
-    flags: string[]
+  readonly metadata: {
+    readonly posted: string
+    readonly flags: readonly string[]
   }
-  link: string
-  commentAnalysis: string
+  readonly link: string
+  readonly commentAnalysis: string
 }
 
 // Reddit API Response Types (Raw API structures)
-export interface RedditApiUserResponse {
-  data: {
-    name: string
-    id: string
-    comment_karma: number
-    link_karma: number
-    total_karma?: number // Optional since it may not exist
-    is_mod: boolean
-    is_gold: boolean
-    is_employee: boolean
-    created_utc: number
-    [key: string]: unknown // Allow additional properties
+export type RedditApiUserResponse = {
+  readonly data: {
+    readonly name: string
+    readonly id: string
+    readonly comment_karma: number
+    readonly link_karma: number
+    readonly total_karma?: number
+    readonly is_mod: boolean
+    readonly is_gold: boolean
+    readonly is_employee: boolean
+    readonly created_utc: number
+    readonly [key: string]: unknown
   }
 }
 
-export interface RedditApiSubredditResponse {
-  data: {
-    display_name: string
-    title: string
-    description: string
-    public_description: string
-    subscribers: number
-    active_user_count: number | null
-    created_utc: number
-    over18: boolean
-    subreddit_type: string
-    url: string
-    [key: string]: unknown
+export type RedditApiSubredditResponse = {
+  readonly data: {
+    readonly display_name: string
+    readonly title: string
+    readonly description: string
+    readonly public_description: string
+    readonly subscribers: number
+    readonly active_user_count: number | null
+    readonly created_utc: number
+    readonly over18: boolean
+    readonly subreddit_type: string
+    readonly url: string
+    readonly [key: string]: unknown
   }
 }
 
-export interface RedditApiPostData {
-  id: string
-  title: string
-  author: string
-  subreddit: string
-  selftext: string
-  url: string
-  score: number
-  upvote_ratio: number
-  num_comments: number
-  created_utc: number
-  over_18: boolean
-  spoiler: boolean
-  edited: boolean | number
-  is_self: boolean
-  link_flair_text: string | null
-  permalink: string
-  [key: string]: unknown
+export type RedditApiPostData = {
+  readonly id: string
+  readonly title: string
+  readonly author: string
+  readonly subreddit: string
+  readonly selftext: string
+  readonly url: string
+  readonly score: number
+  readonly upvote_ratio: number
+  readonly num_comments: number
+  readonly created_utc: number
+  readonly over_18: boolean
+  readonly spoiler: boolean
+  readonly edited: boolean | number
+  readonly is_self: boolean
+  readonly link_flair_text: string | null
+  readonly permalink: string
+  readonly [key: string]: unknown
 }
 
-export interface RedditApiListingResponse<T> {
-  data: {
-    children: Array<{
-      kind: string
-      data: T
+export type RedditApiListingResponse<T> = {
+  readonly data: {
+    readonly children: ReadonlyArray<{
+      readonly kind: string
+      readonly data: T
     }>
-    [key: string]: unknown
+    readonly [key: string]: unknown
   }
 }
 
-export interface RedditApiCommentData {
-  id: string
-  author: string
-  body: string
-  score: number
-  controversiality: number
-  subreddit: string
-  link_title: string
-  created_utc: number
-  edited: boolean | number
-  is_submitter: boolean
-  permalink: string
-  [key: string]: unknown
+export type RedditApiCommentData = {
+  readonly id: string
+  readonly author: string
+  readonly body: string
+  readonly score: number
+  readonly controversiality: number
+  readonly subreddit: string
+  readonly link_title: string
+  readonly created_utc: number
+  readonly edited: boolean | number
+  readonly is_submitter: boolean
+  readonly permalink: string
+  readonly [key: string]: unknown
 }
 
 // Generic Reddit API wrapper
-export interface RedditApiResponse<T = unknown> {
-  data: T
-  [key: string]: unknown
+export type RedditApiResponse<T = unknown> = {
+  readonly data: T
+  readonly [key: string]: unknown
 }
 
 // Reddit API Submit Response (for createPost)
-export interface RedditApiSubmitResponse {
-  json: {
-    errors?: Array<[string, string, string?]>
-    data?: {
-      id?: string
-      name?: string
-      url?: string
+export type RedditApiSubmitResponse = {
+  readonly json: {
+    readonly errors?: ReadonlyArray<readonly [string, string, string?]>
+    readonly data?: {
+      readonly id?: string
+      readonly name?: string
+      readonly url?: string
     }
   }
 }
 
 // Reddit API Comment Response (for replyToPost)
-export interface RedditApiCommentResponse {
-  json: {
-    errors?: Array<[string, string, string?]>
-    data?: {
-      things?: Array<{
-        kind: string
-        data: {
-          id: string
-          subreddit: string
-          link_title?: string
-          permalink: string
-          [key: string]: unknown
+export type RedditApiCommentResponse = {
+  readonly json: {
+    readonly errors?: ReadonlyArray<readonly [string, string, string?]>
+    readonly data?: {
+      readonly things?: ReadonlyArray<{
+        readonly kind: string
+        readonly data: {
+          readonly id: string
+          readonly subreddit: string
+          readonly link_title?: string
+          readonly permalink: string
+          readonly [key: string]: unknown
         }
       }>
     }
@@ -290,17 +290,17 @@ export interface RedditApiCommentResponse {
 }
 
 // Reddit API Edit Response (for editPost)
-export interface RedditApiEditResponse {
-  json: {
-    errors?: Array<[string, string, string?]>
-    data?: {
-      things?: Array<{
-        kind: string
-        data: {
-          id: string
-          body?: string
-          selftext?: string
-          [key: string]: unknown
+export type RedditApiEditResponse = {
+  readonly json: {
+    readonly errors?: ReadonlyArray<readonly [string, string, string?]>
+    readonly data?: {
+      readonly things?: ReadonlyArray<{
+        readonly kind: string
+        readonly data: {
+          readonly id: string
+          readonly body?: string
+          readonly selftext?: string
+          readonly [key: string]: unknown
         }
       }>
     }
@@ -308,59 +308,59 @@ export interface RedditApiEditResponse {
 }
 
 // Reddit API Popular Subreddits Response
-export interface RedditApiPopularSubredditsResponse {
-  data: {
-    children: Array<{
-      kind: string
-      data: {
-        display_name: string
-        [key: string]: unknown
+export type RedditApiPopularSubredditsResponse = {
+  readonly data: {
+    readonly children: ReadonlyArray<{
+      readonly kind: string
+      readonly data: {
+        readonly display_name: string
+        readonly [key: string]: unknown
       }
     }>
-    [key: string]: unknown
+    readonly [key: string]: unknown
   }
 }
 
 // Reddit API Post with Comments Response (array of two listings)
-export type RedditApiPostCommentsResponse = [
+export type RedditApiPostCommentsResponse = readonly [
   RedditApiListingResponse<RedditApiPostData>,
   RedditApiListingResponse<RedditApiCommentTreeData>,
 ]
 
 // Reddit API Comment Tree Data (includes nested replies)
-export interface RedditApiCommentTreeData {
-  id: string
-  author: string
-  body?: string
-  score: number
-  controversiality: number
-  subreddit: string
-  created_utc: number
-  edited: boolean | number
-  is_submitter: boolean
-  permalink: string
-  parent_id: string
-  link_title?: string // Present in user comment listings
-  replies?:
+export type RedditApiCommentTreeData = {
+  readonly id: string
+  readonly author: string
+  readonly body?: string
+  readonly score: number
+  readonly controversiality: number
+  readonly subreddit: string
+  readonly created_utc: number
+  readonly edited: boolean | number
+  readonly is_submitter: boolean
+  readonly permalink: string
+  readonly parent_id: string
+  readonly link_title?: string
+  readonly replies?:
     | ""
     | {
-        data: {
-          children: Array<{
-            kind: string
-            data: RedditApiCommentTreeData
+        readonly data: {
+          readonly children: ReadonlyArray<{
+            readonly kind: string
+            readonly data: RedditApiCommentTreeData
           }>
         }
       }
-  [key: string]: unknown
+  readonly [key: string]: unknown
 }
 
 // Reddit API Info/Check Response (for checkPostExists, getPost info endpoint)
-export interface RedditApiInfoResponse {
-  data: {
-    children: Array<{
-      kind: string
-      data: RedditApiPostData
+export type RedditApiInfoResponse = {
+  readonly data: {
+    readonly children: ReadonlyArray<{
+      readonly kind: string
+      readonly data: RedditApiPostData
     }>
-    [key: string]: unknown
+    readonly [key: string]: unknown
   }
 }

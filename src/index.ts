@@ -21,27 +21,24 @@ function validateUserAgent(userAgent: string, username?: string): void {
     console.error("[Warning] User-Agent does not follow Reddit's recommended format")
     console.error("[Warning] Recommended: 'platform:app_id:version (by /u/username)'")
     console.error("[Warning] Non-standard User-Agents may increase ban risk")
-    if (username) {
+    if (username !== undefined) {
       console.error(`[Warning] Consider using: 'typescript:reddit-mcp-server:${VERSION} (by /u/${username})'`)
     }
   }
 }
 
 function buildUserAgent(customAgent?: string, username?: string): string {
-  // If custom agent provided, use it (but validate)
-  if (customAgent) {
+  if (customAgent !== undefined) {
     validateUserAgent(customAgent, username)
     return customAgent
   }
 
-  // Auto-format with username if available
-  if (username) {
+  if (username !== undefined) {
     const autoAgent = `typescript:reddit-mcp-server:${VERSION} (by /u/${username})`
     console.error(`[Setup] Auto-generated User-Agent: ${autoAgent}`)
     return autoAgent
   }
 
-  // Fallback using recommended format without username
   const fallbackAgent = `typescript:reddit-mcp-server:${VERSION} (by /u/anonymous)`
   console.error(
     "[Setup] No REDDIT_USERNAME set — using anonymous User-Agent. Set REDDIT_USERNAME for a personalized agent.",
@@ -64,7 +61,7 @@ function buildSafeModeConfig(safeMode: RedditSafeMode): SafeModeConfig {
       return {
         enabled: true,
         mode: "standard",
-        writeDelayMs: 2000, // 2 seconds between writes
+        writeDelayMs: 2000,
         duplicateCheck: true,
         maxRecentHashes: 10,
       }
@@ -72,11 +69,15 @@ function buildSafeModeConfig(safeMode: RedditSafeMode): SafeModeConfig {
       return {
         enabled: true,
         mode: "strict",
-        writeDelayMs: 5000, // 5 seconds between writes
+        writeDelayMs: 5000,
         duplicateCheck: true,
         maxRecentHashes: 20,
       }
   }
+}
+
+function unwrapClient() {
+  return getRedditClient().orThrow(new Error("Reddit client not initialized"))
 }
 
 // Initialize Reddit client
@@ -86,8 +87,8 @@ async function setupRedditClient() {
   const customUserAgent = process.env.REDDIT_USER_AGENT
   const username = process.env.REDDIT_USERNAME
   const password = process.env.REDDIT_PASSWORD
-  const authMode = (process.env.REDDIT_AUTH_MODE || "auto") as RedditAuthMode
-  const safeMode = (process.env.REDDIT_SAFE_MODE || "standard") as RedditSafeMode
+  const authMode = (process.env.REDDIT_AUTH_MODE ?? "auto") as RedditAuthMode
+  const safeMode = (process.env.REDDIT_SAFE_MODE ?? "standard") as RedditSafeMode
 
   // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
@@ -104,13 +105,13 @@ async function setupRedditClient() {
   }
 
   // In authenticated mode, require credentials
-  if (authMode === "authenticated" && (!clientId || !clientSecret)) {
+  if (authMode === "authenticated" && (clientId === undefined || clientSecret === undefined)) {
     console.error("[Error] Authenticated mode requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
     process.exit(1)
   }
 
   // For auto/anonymous, credentials are optional
-  const hasCredentials = !!(clientId && clientSecret)
+  const hasCredentials = Boolean(clientId && clientSecret)
 
   // Build user-agent (auto-format with username if available)
   const userAgent = buildUserAgent(customUserAgent, username)
@@ -119,82 +120,76 @@ async function setupRedditClient() {
   const safeModeConfig = buildSafeModeConfig(safeMode)
 
   // Build bot disclosure config
-  const botDisclosureMode = process.env.REDDIT_BOT_DISCLOSURE || "off"
+  const botDisclosureMode = process.env.REDDIT_BOT_DISCLOSURE ?? "off"
   const defaultFooter =
     "\n\n---\n^(🤖 I am a bot | Built with) [^reddit-mcp-server](https://github.com/jordanburke/reddit-mcp-server)"
   const botDisclosureConfig: BotDisclosureConfig = {
     enabled: botDisclosureMode === "auto",
-    footer: botDisclosureMode === "auto" ? process.env.REDDIT_BOT_FOOTER || defaultFooter : "",
+    footer: botDisclosureMode === "auto" ? (process.env.REDDIT_BOT_FOOTER ?? defaultFooter) : "",
   }
 
-  try {
-    const client = initializeRedditClient({
-      clientId: clientId || "",
-      clientSecret: clientSecret || "",
-      userAgent,
-      username,
-      password,
-      authMode,
-      safeMode: safeModeConfig,
-      botDisclosure: botDisclosureConfig,
-    })
+  const client = initializeRedditClient({
+    clientId: clientId ?? "",
+    clientSecret: clientSecret ?? "",
+    userAgent,
+    username,
+    password,
+    authMode,
+    safeMode: safeModeConfig,
+    botDisclosure: botDisclosureConfig,
+  })
 
-    console.error("[Setup] Reddit client initialized")
-    console.error(`[Setup] Authentication mode: ${authMode}`)
+  console.error("[Setup] Reddit client initialized")
+  console.error(`[Setup] Authentication mode: ${authMode}`)
 
-    if (authMode === "anonymous" || !hasCredentials) {
-      console.error("[Setup] Using anonymous Reddit API (~10 req/min)")
-      console.error("[Setup] No authentication required - ready to use!")
-    } else {
-      console.error("[Setup] Testing Reddit API connection...")
-      const isConnected = await client.checkAuthentication()
+  if (authMode === "anonymous" || !hasCredentials) {
+    console.error("[Setup] Using anonymous Reddit API (~10 req/min)")
+    console.error("[Setup] No authentication required - ready to use!")
+  } else {
+    console.error("[Setup] Testing Reddit API connection...")
+    const isConnected = await client.checkAuthentication()
 
-      if (!isConnected) {
-        console.error("[Error] ✗ Failed to connect to Reddit API")
-        console.error("[Error] Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
-        process.exit(1)
-      }
-
-      console.error("[Setup] ✓ Reddit API connection successful")
-      console.error("[Setup] Using OAuth Reddit API (60-100 req/min)")
+    if (!isConnected) {
+      console.error("[Error] ✗ Failed to connect to Reddit API")
+      console.error("[Error] Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+      process.exit(1)
     }
 
-    if (username && password) {
-      console.error(`[Setup] ✓ User authenticated as: ${username}`)
-      console.error("[Setup] Write operations enabled (posting, replying, editing, deleting)")
-    } else {
-      console.error("[Setup] Read-only mode (no user credentials)")
-      console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
-    }
+    console.error("[Setup] ✓ Reddit API connection successful")
+    console.error("[Setup] Using OAuth Reddit API (60-100 req/min)")
+  }
 
-    // Log safe mode status
-    if (safeModeConfig.enabled) {
-      console.error(`[Setup] ✓ Safe mode enabled: ${safeModeConfig.mode}`)
-      console.error(`[Setup]   - Write delay: ${safeModeConfig.writeDelayMs}ms between operations`)
-      console.error(`[Setup]   - Duplicate detection: enabled (tracking last ${safeModeConfig.maxRecentHashes} items)`)
-    } else {
-      console.error(
-        "[Setup] Safe mode: off (explicitly disabled — ensure compliance with Reddit's Responsible Builder Policy)",
-      )
-    }
+  if (username !== undefined && password !== undefined) {
+    console.error(`[Setup] ✓ User authenticated as: ${username}`)
+    console.error("[Setup] Write operations enabled (posting, replying, editing, deleting)")
+  } else {
+    console.error("[Setup] Read-only mode (no user credentials)")
+    console.error("[Setup] For write operations, set REDDIT_USERNAME and REDDIT_PASSWORD")
+  }
 
-    // Log bot disclosure status
-    if (botDisclosureConfig.enabled) {
-      console.error("[Setup] ✓ Bot disclosure: enabled (automated content will include bot footer)")
-    } else {
-      console.error("[Setup] Bot disclosure: off")
-      console.error("[Setup] For Reddit policy compliance, consider REDDIT_BOT_DISCLOSURE=auto")
-    }
-  } catch (error) {
-    console.error("[Error] ✗ Reddit API connection failed:", error instanceof Error ? error.message : error)
-    console.error("[Error] Please verify your Reddit API credentials")
-    process.exit(1)
+  // Log safe mode status
+  if (safeModeConfig.enabled) {
+    console.error(`[Setup] ✓ Safe mode enabled: ${safeModeConfig.mode}`)
+    console.error(`[Setup]   - Write delay: ${safeModeConfig.writeDelayMs}ms between operations`)
+    console.error(`[Setup]   - Duplicate detection: enabled (tracking last ${safeModeConfig.maxRecentHashes} items)`)
+  } else {
+    console.error(
+      "[Setup] Safe mode: off (explicitly disabled — ensure compliance with Reddit's Responsible Builder Policy)",
+    )
+  }
+
+  // Log bot disclosure status
+  if (botDisclosureConfig.enabled) {
+    console.error("[Setup] ✓ Bot disclosure: enabled (automated content will include bot footer)")
+  } else {
+    console.error("[Setup] Bot disclosure: off")
+    console.error("[Setup] For Reddit policy compliance, consider REDDIT_BOT_DISCLOSURE=auto")
   }
 }
 
 // OAuth token: generate once at startup, never expose in responses
-const oauthToken = process.env.OAUTH_TOKEN || crypto.randomBytes(32).toString("hex")
-if (process.env.OAUTH_ENABLED === "true" && !process.env.OAUTH_TOKEN) {
+const oauthToken = process.env.OAUTH_TOKEN ?? crypto.randomBytes(32).toString("hex")
+if (process.env.OAUTH_ENABLED === "true" && process.env.OAUTH_TOKEN === undefined) {
   console.error(`[Auth] Generated OAuth token: ${oauthToken}`)
 }
 
@@ -227,9 +222,10 @@ For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Res
 
   // Optional OAuth configuration for HTTP transport
   ...(process.env.OAUTH_ENABLED === "true" && {
-    authenticate: async (request) => {
+    authenticate: (request: { readonly headers: { readonly authorization?: string } }) => {
       const authHeader = request.headers.authorization
       if (!authHeader?.startsWith("Bearer ")) {
+        // eslint-disable-next-line functional/no-throw-statements
         throw new Response(null, {
           status: 401,
           statusText: "Missing or invalid Authorization header",
@@ -239,17 +235,17 @@ For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Res
       const token = authHeader.slice(7)
       const tokenBuffer = Buffer.from(token)
       const expectedBuffer = Buffer.from(oauthToken)
-      // Constant-time comparison: hash both so timingSafeEqual always compares equal-length buffers
       const tokenHash = crypto.createHash("sha256").update(tokenBuffer).digest()
       const expectedHash = crypto.createHash("sha256").update(expectedBuffer).digest()
       if (!crypto.timingSafeEqual(tokenHash, expectedHash)) {
+        // eslint-disable-next-line functional/no-throw-statements
         throw new Response(null, {
           status: 403,
           statusText: "Invalid token",
         })
       }
 
-      return { authenticated: true }
+      return Promise.resolve({ authenticated: true })
     },
   }),
 })
@@ -259,18 +255,25 @@ server.addTool({
   name: "test_reddit_mcp_server",
   description: "Test the Reddit MCP Server connection and configuration",
   parameters: z.object({}),
-  execute: async () => {
+  execute: () => {
     const client = getRedditClient()
-    const hasAuth = client ? "✓" : "✗"
-    const hasWriteAccess = process.env.REDDIT_USERNAME && process.env.REDDIT_PASSWORD ? "✓" : "✗"
+    const hasAuth = client.fold(
+      () => "✗",
+      () => "✓",
+    )
+    const hasWriteAccess =
+      process.env.REDDIT_USERNAME !== undefined && process.env.REDDIT_PASSWORD !== undefined ? "✓" : "✗"
 
-    return `Reddit MCP Server Status:
+    return Promise.resolve(`Reddit MCP Server Status:
 - Server: ✓ Running
-- Reddit Client: ${hasAuth} ${client ? "Initialized" : "Not initialized"}
+- Reddit Client: ${hasAuth} ${client.fold(
+      () => "Not initialized",
+      () => "Initialized",
+    )}
 - Write Access: ${hasWriteAccess} ${hasWriteAccess === "✓" ? "Available" : "Read-only mode"}
 - Version: ${VERSION}
 
-Ready to handle Reddit API requests!`
+Ready to handle Reddit API requests!`)
   },
 })
 
@@ -282,15 +285,18 @@ server.addTool({
     username: z.string().describe("The Reddit username (without u/ prefix)"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const user = await client.getUser(args.username)
-    const formattedUser = formatUserInfo(user)
+    const result = await client.getUser(args.username)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get user info: ${err.message}`)
+      },
+      (user) => {
+        const formattedUser = formatUserInfo(user)
 
-    return `# User Information: u/${formattedUser.username}
+        return `# User Information: u/${formattedUser.username}
 
 ## Profile Overview
 - Username: u/${formattedUser.username}
@@ -307,6 +313,8 @@ server.addTool({
 
 ## Recommendations
 - ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}`
+      },
+    )
   },
 })
 
@@ -323,37 +331,42 @@ server.addTool({
     limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const posts = await client.getUserPosts(args.username, {
+    const result = await client.getUserPosts(args.username, {
       sort: args.sort,
       timeFilter: args.time_filter,
       limit: args.limit,
     })
 
-    if (posts.length === 0) {
-      return `No posts found for u/${args.username} with the specified filters.`
-    }
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get user posts: ${err.message}`)
+      },
+      (posts) => {
+        if (posts.length === 0) {
+          return `No posts found for u/${args.username} with the specified filters.`
+        }
 
-    const postSummaries = posts
-      .map((post, index) => {
-        const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler ? ["**Spoiler**"] : [])]
+        const postSummaries = posts
+          .map((post, index) => {
+            const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
 
-        return `### ${index + 1}. ${post.title} ${flags.join(" ")}
+            return `### ${index + 1}. ${post.title} ${flags.join(" ")}
 - Subreddit: r/${post.subreddit}
 - Score: ${post.score.toLocaleString()} (${(post.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.numComments.toLocaleString()}
 - Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
 - Link: https://reddit.com${post.permalink}`
-      })
-      .join("\n\n")
+          })
+          .join("\n\n")
 
-    return `# Posts by u/${args.username} (${args.sort} - ${args.time_filter})
+        return `# Posts by u/${args.username} (${args.sort} - ${args.time_filter})
 
 ${postSummaries}`
+      },
+    )
   },
 })
 
@@ -370,28 +383,31 @@ server.addTool({
     limit: z.number().min(1).max(100).default(10).describe("Number of comments to retrieve"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const comments = await client.getUserComments(args.username, {
+    const result = await client.getUserComments(args.username, {
       sort: args.sort,
       timeFilter: args.time_filter,
       limit: args.limit,
     })
 
-    if (comments.length === 0) {
-      return `No comments found for u/${args.username} with the specified filters.`
-    }
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get user comments: ${err.message}`)
+      },
+      (comments) => {
+        if (comments.length === 0) {
+          return `No comments found for u/${args.username} with the specified filters.`
+        }
 
-    const commentSummaries = comments
-      .map((comment, index) => {
-        const truncatedBody = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
+        const commentSummaries = comments
+          .map((comment, index) => {
+            const truncatedBody = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
 
-        const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
+            const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
 
-        return `### ${index + 1}. Comment ${flags.join(" ")}
+            return `### ${index + 1}. Comment ${flags.join(" ")}
 In r/${comment.subreddit} on "${comment.submissionTitle}"
 
 > ${truncatedBody}
@@ -399,12 +415,14 @@ In r/${comment.subreddit} on "${comment.submissionTitle}"
 - Score: ${comment.score.toLocaleString()}
 - Posted: ${new Date(comment.createdUtc * 1000).toLocaleString()}
 - Link: https://reddit.com${comment.permalink}`
-      })
-      .join("\n\n")
+          })
+          .join("\n\n")
 
-    return `# Comments by u/${args.username} (${args.sort} - ${args.time_filter})
+        return `# Comments by u/${args.username} (${args.sort} - ${args.time_filter})
 
 ${commentSummaries}`
+      },
+    )
   },
 })
 
@@ -418,15 +436,18 @@ server.addTool({
     post_id: z.string().describe("The Reddit post ID"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const post = await client.getPost(args.post_id, args.subreddit)
-    const formattedPost = formatPostInfo(post)
+    const result = await client.getPost(args.post_id, args.subreddit)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get post: ${err.message}`)
+      },
+      (post) => {
+        const formattedPost = formatPostInfo(post)
 
-    return `# Post from r/${formattedPost.subreddit}
+        return `# Post from r/${formattedPost.subreddit}
 
 ## Post Details
 - Title: ${formattedPost.title}
@@ -443,7 +464,7 @@ ${formattedPost.content}
 
 ## Metadata
 - Posted: ${formattedPost.metadata.posted}
-- Flags: ${formattedPost.metadata.flags.length ? formattedPost.metadata.flags.join(", ") : "None"}
+- Flags: ${formattedPost.metadata.flags.length > 0 ? formattedPost.metadata.flags.join(", ") : "None"}
 - Flair: ${formattedPost.metadata.flair}
 
 ## Links
@@ -455,6 +476,8 @@ ${formattedPost.content}
 
 ## Best Time to Engage
 ${formattedPost.bestTimeToEngage}`
+      },
+    )
   },
 })
 
@@ -470,34 +493,38 @@ server.addTool({
     limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const posts = await client.getTopPosts(args.subreddit || "", args.time_filter, args.limit)
+    const result = await client.getTopPosts(args.subreddit ?? "", args.time_filter, args.limit)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get top posts: ${err.message}`)
+      },
+      (posts) => {
+        if (posts.length === 0) {
+          const location = args.subreddit !== undefined ? `r/${args.subreddit}` : "home feed"
+          return `No posts found in ${location} for the specified time period.`
+        }
 
-    if (posts.length === 0) {
-      const location = args.subreddit ? `r/${args.subreddit}` : "home feed"
-      return `No posts found in ${location} for the specified time period.`
-    }
-
-    const formattedPosts = posts.map(formatPostInfo)
-    const postSummaries = formattedPosts
-      .map(
-        (post, index) => `### ${index + 1}. ${post.title}
+        const formattedPosts = posts.map(formatPostInfo)
+        const postSummaries = formattedPosts
+          .map(
+            (post, index) => `### ${index + 1}. ${post.title}
 - Author: u/${post.author}
 - Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.stats.comments.toLocaleString()}
 - Posted: ${post.metadata.posted}
 - Link: ${post.links.shortLink}`,
-      )
-      .join("\n\n")
+          )
+          .join("\n\n")
 
-    const location = args.subreddit ? `r/${args.subreddit}` : "Home Feed"
-    return `# Top Posts from ${location} (${args.time_filter})
+        const location = args.subreddit !== undefined ? `r/${args.subreddit}` : "Home Feed"
+        return `# Top Posts from ${location} (${args.time_filter})
 
 ${postSummaries}`
+      },
+    )
   },
 })
 
@@ -509,25 +536,28 @@ server.addTool({
     subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const subreddit = await client.getSubredditInfo(args.subreddit_name)
-    const formattedSubreddit = formatSubredditInfo(subreddit)
+    const result = await client.getSubredditInfo(args.subreddit_name)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get subreddit info: ${err.message}`)
+      },
+      (subreddit) => {
+        const formattedSubreddit = formatSubredditInfo(subreddit)
 
-    return `# Subreddit Information: r/${formattedSubreddit.name}
+        return `# Subreddit Information: r/${formattedSubreddit.name}
 
 ## Overview
 - Name: r/${formattedSubreddit.name}
 - Title: ${formattedSubreddit.title}
 - Subscribers: ${formattedSubreddit.stats.subscribers.toLocaleString()}
 - Active Users: ${
-      typeof formattedSubreddit.stats.activeUsers === "number"
-        ? formattedSubreddit.stats.activeUsers.toLocaleString()
-        : formattedSubreddit.stats.activeUsers
-    }
+          typeof formattedSubreddit.stats.activeUsers === "number"
+            ? formattedSubreddit.stats.activeUsers.toLocaleString()
+            : formattedSubreddit.stats.activeUsers
+        }
 
 ## Description
 ${formattedSubreddit.description.short}
@@ -548,6 +578,8 @@ ${formattedSubreddit.description.full}
 
 ## Engagement Tips
 - ${formattedSubreddit.engagementTips.replace(/\n {2}- /g, "\n- ")}`
+      },
+    )
   },
 })
 
@@ -556,16 +588,18 @@ server.addTool({
   description: "Get a list of currently trending subreddits",
   parameters: z.object({}),
   execute: async () => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    const trendingSubreddits = await client.getTrendingSubreddits()
+    const result = await client.getTrendingSubreddits()
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get trending subreddits: ${err.message}`)
+      },
+      (trendingSubreddits) => `# Trending Subreddits
 
-    return `# Trending Subreddits
-
-${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).join("\n")}`
+${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).join("\n")}`,
+    )
   },
 })
 
@@ -582,16 +616,14 @@ server.addTool({
     type: z.enum(["link", "sr", "user"]).default("link").describe("Type of content to search"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    if (!args.query || args.query.trim() === "") {
+    if (args.query.trim() === "") {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error("Search query cannot be empty")
     }
 
-    const posts = await client.searchReddit(args.query, {
+    const result = await client.searchReddit(args.query, {
       subreddit: args.subreddit,
       sort: args.sort,
       timeFilter: args.time_filter,
@@ -599,31 +631,39 @@ server.addTool({
       type: args.type,
     })
 
-    if (posts.length === 0) {
-      const searchLocation = args.subreddit ? ` in r/${args.subreddit}` : ""
-      return `No results found for "${args.query}"${searchLocation}.`
-    }
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to search: ${err.message}`)
+      },
+      (posts) => {
+        if (posts.length === 0) {
+          const searchLocation = args.subreddit !== undefined ? ` in r/${args.subreddit}` : ""
+          return `No results found for "${args.query}"${searchLocation}.`
+        }
 
-    const searchResults = posts
-      .map((post, index) => {
-        const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler ? ["**Spoiler**"] : [])]
+        const searchResults = posts
+          .map((post, index) => {
+            const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
 
-        return `### ${index + 1}. ${post.title} ${flags.join(" ")}
+            return `### ${index + 1}. ${post.title} ${flags.join(" ")}
 - Subreddit: r/${post.subreddit}
 - Author: u/${post.author}
 - Score: ${post.score.toLocaleString()} (${(post.upvoteRatio * 100).toFixed(1)}% upvoted)
 - Comments: ${post.numComments.toLocaleString()}
 - Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
 - Link: https://reddit.com${post.permalink}`
-      })
-      .join("\n\n")
+          })
+          .join("\n\n")
 
-    const searchLocation = args.subreddit ? ` in r/${args.subreddit}` : ""
-    return `# Reddit Search Results for: "${args.query}"${searchLocation}
+        const searchLocation = args.subreddit !== undefined ? ` in r/${args.subreddit}` : ""
+        return `# Reddit Search Results for: "${args.query}"${searchLocation}
 
 Sorted by: ${args.sort} | Time: ${args.time_filter} | Type: ${args.type}
 
 ${searchResults}`
+      },
+    )
   },
 })
 
@@ -641,22 +681,25 @@ server.addTool({
     is_self: z.boolean().default(true).describe("Whether this is a self post (text) or link post"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
-    const post = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
-    const formattedPost = formatPostInfo(post)
+    const result = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to create post: ${err.message}`)
+      },
+      (post) => {
+        const formattedPost = formatPostInfo(post)
 
-    return `# Post Created Successfully
+        return `# Post Created Successfully
 
 ## Post Details
 - Title: ${formattedPost.title}
@@ -665,6 +708,8 @@ server.addTool({
 - Link: ${formattedPost.links.fullPost}
 
 Your post has been successfully submitted to r/${formattedPost.subreddit}.`
+      },
+    )
   },
 })
 
@@ -679,28 +724,30 @@ server.addTool({
     content: z.string().describe("The reply content"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
-    const comment = await client.replyToPost(args.post_id, args.content)
-
-    return `# Reply Posted Successfully
+    const result = await client.replyToPost(args.post_id, args.content)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to reply: ${err.message}`)
+      },
+      (comment) => `# Reply Posted Successfully
 
 ## Comment Details
 - Posted to: ${args.post_id}
 - Author: u/${process.env.REDDIT_USERNAME}
 - Comment ID: ${comment.id}
 
-Your reply has been successfully posted.`
+Your reply has been successfully posted.`,
+    )
   },
 })
 
@@ -716,25 +763,27 @@ server.addTool({
       ),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
-    await client.deletePost(args.thing_id)
-
-    return `# Post Deleted Successfully
+    const result = await client.deletePost(args.thing_id)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to delete post: ${err.message}`)
+      },
+      () => `# Post Deleted Successfully
 
 The post ${args.thing_id} has been permanently deleted from Reddit.
 
-**Note**: This action cannot be undone. The post content has been removed and cannot be recovered.`
+**Note**: This action cannot be undone. The post content has been removed and cannot be recovered.`,
+    )
   },
 })
 
@@ -750,25 +799,27 @@ server.addTool({
       ),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
-    await client.deleteComment(args.thing_id)
-
-    return `# Comment Deleted Successfully
+    const result = await client.deleteComment(args.thing_id)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to delete comment: ${err.message}`)
+      },
+      () => `# Comment Deleted Successfully
 
 The comment ${args.thing_id} has been permanently deleted from Reddit.
 
-**Note**: This action cannot be undone. The comment content has been removed and cannot be recovered.`
+**Note**: This action cannot be undone. The comment content has been removed and cannot be recovered.`,
+    )
   },
 })
 
@@ -787,21 +838,22 @@ server.addTool({
     new_text: z.string().describe("The new text content for the post. Supports Reddit markdown formatting."),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
-    await client.editPost(args.thing_id, args.new_text)
-
-    return `# Post Edited Successfully
+    const result = await client.editPost(args.thing_id, args.new_text)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to edit post: ${err.message}`)
+      },
+      () => `# Post Edited Successfully
 
 The post ${args.thing_id} has been updated with your new content.
 
@@ -809,7 +861,8 @@ The post ${args.thing_id} has been updated with your new content.
 - Only self (text) posts can be edited
 - Post titles cannot be edited
 - Link posts cannot be edited
-- An "edited" marker will appear on your post`
+- An "edited" marker will appear on your post`,
+    )
   },
 })
 
@@ -828,25 +881,27 @@ server.addTool({
     new_text: z.string().describe("The new text content for the comment. Supports Reddit markdown formatting."),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    // Check if user credentials are configured
-    if (!process.env.REDDIT_USERNAME || !process.env.REDDIT_PASSWORD) {
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
-    await client.editComment(args.thing_id, args.new_text)
-
-    return `# Comment Edited Successfully
+    const result = await client.editComment(args.thing_id, args.new_text)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to edit comment: ${err.message}`)
+      },
+      () => `# Comment Edited Successfully
 
 The comment ${args.thing_id} has been updated with your new content.
 
-**Note**: An "edited" marker will appear on your comment to show it has been modified.`
+**Note**: An "edited" marker will appear on your comment to show it has been modified.`,
+    )
   },
 })
 
@@ -861,24 +916,25 @@ server.addTool({
     limit: z.number().min(1).max(500).default(100).describe("Maximum number of comments to retrieve"),
   }),
   execute: async (args) => {
-    const client = getRedditClient()
-    if (!client) {
-      throw new Error("Reddit client not initialized")
-    }
+    const client = unwrapClient()
 
-    if (!args.post_id || !args.subreddit) {
+    if (args.post_id === "" || args.subreddit === "") {
+      // eslint-disable-next-line functional/no-throw-statements
       throw new Error("post_id and subreddit are required")
     }
 
-    const data = await client.getPostComments(args.post_id, args.subreddit, {
+    const result = await client.getPostComments(args.post_id, args.subreddit, {
       sort: args.sort,
       limit: args.limit,
     })
 
-    const { post } = data
-    const { comments } = data
-
-    let response = `# Comments for: ${post.title}
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functional/no-throw-statements
+        throw new Error(`Failed to get comments: ${err.message}`)
+      },
+      ({ post, comments }) => {
+        const header = `# Comments for: ${post.title}
 
 **Post by u/${post.author} in r/${post.subreddit}**
 - Score: ${post.score.toLocaleString()} | Comments: ${post.numComments.toLocaleString()}
@@ -888,74 +944,67 @@ server.addTool({
 
 `
 
-    if (comments.length === 0) {
-      response += "No comments found for this post."
-      return response
-    }
+        if (comments.length === 0) {
+          return `${header}No comments found for this post.`
+        }
 
-    const commentSummaries = comments
-      .map((comment) => {
-        const indent = "└─".repeat(Math.min(comment.depth || 0, 3))
-        const authorBadge = comment.isSubmitter ? " **[OP]**" : ""
-        const editedBadge = comment.edited ? " *(edited)*" : ""
+        const commentSummaries = comments
+          .map((comment) => {
+            const indent = "└─".repeat(Math.min(comment.depth ?? 0, 3))
+            const authorBadge = comment.isSubmitter ? " **[OP]**" : ""
+            const editedBadge = comment.edited ? " *(edited)*" : ""
 
-        return `${indent} **u/${comment.author}**${authorBadge}${editedBadge} (${comment.score.toLocaleString()} points)
+            return `${indent} **u/${comment.author}**${authorBadge}${editedBadge} (${comment.score.toLocaleString()} points)
 
 ${comment.body}
 
 ---`
-      })
-      .join("\n\n")
+          })
+          .join("\n\n")
 
-    response += commentSummaries
-    return response
+        return header + commentSummaries
+      },
+    )
   },
 })
 
 // Initialize and start server
 async function main() {
-  try {
-    await setupRedditClient()
+  await setupRedditClient()
 
-    // Default to stdio for local/MCP client usage
-    // Use HTTP only when explicitly requested (e.g., for Docker)
-    const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
-    const port = parseInt(process.env.PORT || "3000")
-    const host = process.env.HOST || "127.0.0.1"
+  const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
+  const port = parseInt(process.env.PORT ?? "3000")
+  const host = process.env.HOST ?? "127.0.0.1"
 
-    if (useHttp) {
-      console.error(`[Setup] Starting HTTP server on ${host}:${port}`)
-      await server.start({
-        transportType: "httpStream",
-        httpStream: {
-          port,
-          host,
-          endpoint: "/mcp",
-        },
-      })
-      console.error(`[Setup] HTTP server ready at http://${host}:${port}/mcp`)
-      console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
-    } else {
-      console.error("[Setup] Starting in stdio mode")
-      await server.start({
-        transportType: "stdio",
-      })
-    }
-  } catch (error) {
-    console.error("[Error] Failed to start server:", error)
-    process.exit(1)
+  if (useHttp) {
+    console.error(`[Setup] Starting HTTP server on ${host}:${port}`)
+    await server.start({
+      transportType: "httpStream",
+      httpStream: {
+        port,
+        host,
+        endpoint: "/mcp",
+      },
+    })
+    console.error(`[Setup] HTTP server ready at http://${host}:${port}/mcp`)
+    console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
+  } else {
+    console.error("[Setup] Starting in stdio mode")
+    await server.start({
+      transportType: "stdio",
+    })
   }
 }
 
 // Handle graceful shutdown
-process.on("SIGINT", async () => {
+process.on("SIGINT", () => {
   console.error("[Shutdown] Shutting down Reddit MCP Server...")
   process.exit(0)
 })
 
-process.on("SIGTERM", async () => {
+process.on("SIGTERM", () => {
   console.error("[Shutdown] Shutting down Reddit MCP Server...")
   process.exit(0)
 })
 
-main().catch(console.error)
+void main().catch(console.error)

@@ -1,4 +1,5 @@
 import { UserError } from "fastmcp"
+import { Left, Option, Right } from "functype"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getRedditClient } from "../../client/reddit-client"
@@ -15,7 +16,7 @@ describe("user-tools", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRedditClient).mockReturnValue(mockRedditClient as any)
+    vi.mocked(getRedditClient).mockReturnValue(Option(mockRedditClient) as any)
   })
 
   describe("getUserInfo", () => {
@@ -33,7 +34,7 @@ describe("user-tools", () => {
         profileUrl: "https://reddit.com/user/testuser",
       }
 
-      mockRedditClient.getUser.mockResolvedValue(mockUser)
+      mockRedditClient.getUser.mockResolvedValue(Right(mockUser))
 
       const result = await getUserInfo({ username: "testuser" })
 
@@ -46,16 +47,16 @@ describe("user-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getUserInfo({ username: "test" })).rejects.toThrow(new UserError("Reddit client not initialized"))
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getUser.mockRejectedValue(new Error("User not found"))
+      mockRedditClient.getUser.mockResolvedValue(Left(new Error("User not found")))
 
       await expect(getUserInfo({ username: "nonexistent" })).rejects.toThrow(
-        new UserError("Failed to fetch user data: Error: User not found"),
+        new UserError("Failed to fetch user data: User not found"),
       )
     })
   })
@@ -79,7 +80,7 @@ describe("user-tools", () => {
         },
       ]
 
-      mockRedditClient.getUserPosts.mockResolvedValue(mockPosts)
+      mockRedditClient.getUserPosts.mockResolvedValue(Right(mockPosts))
 
       const result = await getUserPosts({ username: "testuser" })
 
@@ -97,7 +98,7 @@ describe("user-tools", () => {
     })
 
     it("should fetch posts with custom parameters", async () => {
-      mockRedditClient.getUserPosts.mockResolvedValue([])
+      mockRedditClient.getUserPosts.mockResolvedValue(Right([]))
 
       await getUserPosts({
         username: "testuser",
@@ -131,7 +132,7 @@ describe("user-tools", () => {
         },
       ]
 
-      mockRedditClient.getUserPosts.mockResolvedValue(mockPosts)
+      mockRedditClient.getUserPosts.mockResolvedValue(Right(mockPosts))
 
       const result = await getUserPosts({ username: "testuser" })
 
@@ -140,16 +141,16 @@ describe("user-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getUserPosts({ username: "test" })).rejects.toThrow(new UserError("Reddit client not initialized"))
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getUserPosts.mockRejectedValue(new Error("API Error"))
+      mockRedditClient.getUserPosts.mockResolvedValue(Left(new Error("API Error")))
 
       await expect(getUserPosts({ username: "test" })).rejects.toThrow(
-        new UserError("Failed to fetch user posts: Error: API Error"),
+        new UserError("Failed to fetch user posts: API Error"),
       )
     })
   })
@@ -171,7 +172,7 @@ describe("user-tools", () => {
         },
       ]
 
-      mockRedditClient.getUserComments.mockResolvedValue(mockComments)
+      mockRedditClient.getUserComments.mockResolvedValue(Right(mockComments))
 
       const result = await getUserComments({ username: "testuser" })
 
@@ -204,7 +205,7 @@ describe("user-tools", () => {
         },
       ]
 
-      mockRedditClient.getUserComments.mockResolvedValue(mockComments)
+      mockRedditClient.getUserComments.mockResolvedValue(Right(mockComments))
 
       const result = await getUserComments({ username: "testuser" })
 
@@ -228,7 +229,7 @@ describe("user-tools", () => {
         },
       ]
 
-      mockRedditClient.getUserComments.mockResolvedValue(mockComments)
+      mockRedditClient.getUserComments.mockResolvedValue(Right(mockComments))
 
       const result = await getUserComments({ username: "testuser" })
 
@@ -237,7 +238,7 @@ describe("user-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getUserComments({ username: "test" })).rejects.toThrow(
         new UserError("Reddit client not initialized"),
@@ -245,10 +246,10 @@ describe("user-tools", () => {
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getUserComments.mockRejectedValue(new Error("API Error"))
+      mockRedditClient.getUserComments.mockResolvedValue(Left(new Error("API Error")))
 
       await expect(getUserComments({ username: "test" })).rejects.toThrow(
-        new UserError("Failed to fetch user comments: Error: API Error"),
+        new UserError("Failed to fetch user comments: API Error"),
       )
     })
   })

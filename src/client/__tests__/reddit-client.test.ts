@@ -7,6 +7,7 @@ import { RedditClient } from "../reddit-client"
 const originalFetch = global.fetch
 
 describe("RedditClient", () => {
+  // eslint-disable-next-line functional/no-let
   let client: RedditClient
   const mockConfig: RedditClientConfig = {
     clientId: "test-client-id",
@@ -21,11 +22,13 @@ describe("RedditClient", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFetch.mockReset()
+    // eslint-disable-next-line functional/immutable-data
     global.fetch = mockFetch
     client = new RedditClient(mockConfig)
   })
 
   afterEach(() => {
+    // eslint-disable-next-line functional/immutable-data
     global.fetch = originalFetch
     vi.restoreAllMocks()
   })
@@ -42,7 +45,8 @@ describe("RedditClient", () => {
         json: async () => mockTokenResponse,
       })
 
-      await client.authenticate()
+      const result = await client.authenticate()
+      expect(result.isRight()).toBe(true)
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://www.reddit.com/api/v1/access_token",
@@ -82,7 +86,8 @@ describe("RedditClient", () => {
         json: async () => mockTokenResponse,
       })
 
-      await clientReadOnly.authenticate()
+      const result = await clientReadOnly.authenticate()
+      expect(result.isRight()).toBe(true)
 
       const callArgs = mockFetch.mock.calls[0]
       const body = new URLSearchParams(callArgs[1].body as string)
@@ -103,22 +108,28 @@ describe("RedditClient", () => {
       })
 
       // First authentication
-      await client.authenticate()
+      const result1 = await client.authenticate()
+      expect(result1.isRight()).toBe(true)
       expect(mockFetch).toHaveBeenCalledTimes(1)
 
       // Second authentication should not make another request
-      await client.authenticate()
+      const result2 = await client.authenticate()
+      expect(result2.isRight()).toBe(true)
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
-    it("should throw error on authentication failure", async () => {
+    it("should return Left on authentication failure", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
         statusText: "Unauthorized",
       })
 
-      await expect(client.authenticate()).rejects.toThrow("Authentication failed: 401")
+      const result = await client.authenticate()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Authentication failed: 401")
+      }
     })
   })
 
@@ -149,7 +160,7 @@ describe("RedditClient", () => {
         json: async () => mockUserData,
       })
 
-      const user = await client.getUser("testuser")
+      const result = await client.getUser("testuser")
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
       expect(mockFetch).toHaveBeenLastCalledWith(
@@ -161,6 +172,8 @@ describe("RedditClient", () => {
         }),
       )
 
+      expect(result.isRight()).toBe(true)
+      const user = result.orThrow()
       expect(user).toEqual({
         name: "testuser",
         id: "123",
@@ -175,7 +188,7 @@ describe("RedditClient", () => {
       })
     })
 
-    it("should throw error when user fetch fails", async () => {
+    it("should return Left when user fetch fails", async () => {
       // Mock authentication
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -188,7 +201,11 @@ describe("RedditClient", () => {
         status: 404,
       })
 
-      await expect(client.getUser("testuser")).rejects.toThrow("Failed to get user info for testuser")
+      const result = await client.getUser("testuser")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Failed to get user info for testuser")
+      }
     })
   })
 
@@ -221,12 +238,15 @@ describe("RedditClient", () => {
         json: async () => mockSubredditData,
       })
 
-      const subreddit = await client.getSubredditInfo("programming")
+      const result = await client.getSubredditInfo("programming")
 
       expect(mockFetch).toHaveBeenLastCalledWith(
         "https://oauth.reddit.com/r/programming/about.json",
         expect.any(Object),
       )
+
+      expect(result.isRight()).toBe(true)
+      const subreddit = result.orThrow()
       expect(subreddit.displayName).toBe("programming")
       expect(subreddit.subscribers).toBe(1000000)
     })
@@ -238,6 +258,7 @@ describe("RedditClient", () => {
         data: {
           children: [
             {
+              kind: "t3",
               data: {
                 id: "post1",
                 title: "Test Post 1",
@@ -273,7 +294,7 @@ describe("RedditClient", () => {
         json: async () => mockPostsData,
       })
 
-      const posts = await client.getTopPosts("programming", "week", 10)
+      const result = await client.getTopPosts("programming", "week", 10)
 
       expect(mockFetch).toHaveBeenLastCalledWith(
         expect.stringContaining("/r/programming/top.json?"),
@@ -284,6 +305,8 @@ describe("RedditClient", () => {
       expect(lastCallUrl).toContain("t=week")
       expect(lastCallUrl).toContain("limit=10")
 
+      expect(result.isRight()).toBe(true)
+      const posts = result.orThrow()
       expect(posts).toHaveLength(1)
       expect(posts[0].id).toBe("post1")
       expect(posts[0].title).toBe("Test Post 1")
@@ -377,7 +400,7 @@ describe("RedditClient", () => {
         json: async () => mockPostData,
       })
 
-      const post = await client.createPost("test", "My New Post", "Post content")
+      const result = await client.createPost("test", "My New Post", "Post content")
 
       // Check submit call
       const submitCall = mockFetch.mock.calls[1]
@@ -391,26 +414,24 @@ describe("RedditClient", () => {
       expect(body.get("text")).toBe("Post content")
       expect(body.get("api_type")).toBe("json")
 
+      expect(result.isRight()).toBe(true)
+      const post = result.orThrow()
       expect(post.id).toBe("newpost123")
       expect(post.title).toBe("My New Post")
     })
 
-    it("should throw error when user is not authenticated", async () => {
+    it("should return Left when user is not authenticated for write", async () => {
       const clientReadOnly = new RedditClient({
         clientId: "test-client-id",
         clientSecret: "test-client-secret",
         userAgent: "TestApp/1.0.0",
       })
 
-      // Mock authentication
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
-      })
-
-      await expect(clientReadOnly.createPost("test", "Title", "Content")).rejects.toThrow(
-        "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD",
-      )
+      const result = await clientReadOnly.createPost("test", "Title", "Content")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
     })
   })
 
@@ -457,7 +478,7 @@ describe("RedditClient", () => {
         json: async () => mockCommentResponse,
       })
 
-      const comment = await client.replyToPost("post123", "Great post!")
+      const result = await client.replyToPost("post123", "Great post!")
 
       // Check the comment submission call
       const commentCall = mockFetch.mock.calls[2]
@@ -469,12 +490,14 @@ describe("RedditClient", () => {
       expect(body.get("text")).toBe("Great post!")
       expect(body.get("api_type")).toBe("json")
 
+      expect(result.isRight()).toBe(true)
+      const comment = result.orThrow()
       expect(comment.id).toBe("comment123")
       expect(comment.body).toBe("Great post!")
       expect(comment.author).toBe("testuser")
     })
 
-    it("should throw error when post does not exist", async () => {
+    it("should return Left when post does not exist", async () => {
       const mockCheckResponse = {
         data: {
           children: [],
@@ -493,9 +516,11 @@ describe("RedditClient", () => {
         json: async () => mockCheckResponse,
       })
 
-      await expect(client.replyToPost("nonexistent", "Comment")).rejects.toThrow(
-        "Post with ID nonexistent does not exist or is not accessible",
-      )
+      const result = await client.replyToPost("nonexistent", "Comment")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Post with ID nonexistent does not exist or is not accessible")
+      }
     })
 
     it("should not double-prefix t3_ post IDs", async () => {
@@ -577,7 +602,7 @@ describe("RedditClient", () => {
         json: async () => mockCommentResponse,
       })
 
-      await client.replyToPost("t1_comment123", "Reply to comment")
+      const result = await client.replyToPost("t1_comment123", "Reply to comment")
 
       // Should only have 2 fetch calls: auth + comment (no checkPostExists)
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -585,6 +610,8 @@ describe("RedditClient", () => {
       const commentCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(commentCall[1].body as string)
       expect(body.get("thing_id")).toBe("t1_comment123")
+
+      expect(result.isRight()).toBe(true)
     })
 
     it("should add t3_ prefix to bare post IDs", async () => {
@@ -666,10 +693,12 @@ describe("RedditClient", () => {
         json: async () => mockCommentResponse,
       })
 
-      const comment = await client.replyToPost("t1_abc123", "Nested reply")
+      const result = await client.replyToPost("t1_abc123", "Nested reply")
 
       // Verify only 2 fetch calls: auth + comment API (no /api/info.json call)
       expect(mockFetch).toHaveBeenCalledTimes(2)
+      expect(result.isRight()).toBe(true)
+      const comment = result.orThrow()
       expect(comment.id).toBe("reply789")
     })
   })
@@ -698,7 +727,8 @@ describe("RedditClient", () => {
       const body = new URLSearchParams(deleteCall[1].body as string)
       expect(body.get("id")).toBe("t3_post123")
 
-      expect(result).toBe(true)
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
     })
 
     it("should handle post ID with t3_ prefix", async () => {
@@ -714,29 +744,26 @@ describe("RedditClient", () => {
         text: async () => "",
       })
 
-      await client.deletePost("t3_post123")
+      const result = await client.deletePost("t3_post123")
+      expect(result.isRight()).toBe(true)
 
       const deleteCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(deleteCall[1].body as string)
       expect(body.get("id")).toBe("t3_post123")
     })
 
-    it("should throw error when user is not authenticated", async () => {
+    it("should return Left when user is not authenticated for write", async () => {
       const clientReadOnly = new RedditClient({
         clientId: "test-client-id",
         clientSecret: "test-client-secret",
         userAgent: "TestApp/1.0.0",
       })
 
-      // Mock authentication
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
-      })
-
-      await expect(clientReadOnly.deletePost("post123")).rejects.toThrow(
-        "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD",
-      )
+      const result = await clientReadOnly.deletePost("post123")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
     })
   })
 
@@ -764,7 +791,8 @@ describe("RedditClient", () => {
       const body = new URLSearchParams(deleteCall[1].body as string)
       expect(body.get("id")).toBe("t1_comment123")
 
-      expect(result).toBe(true)
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
     })
 
     it("should handle comment ID with t1_ prefix", async () => {
@@ -780,7 +808,8 @@ describe("RedditClient", () => {
         text: async () => "",
       })
 
-      await client.deleteComment("t1_comment123")
+      const result = await client.deleteComment("t1_comment123")
+      expect(result.isRight()).toBe(true)
 
       const deleteCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(deleteCall[1].body as string)
@@ -814,7 +843,8 @@ describe("RedditClient", () => {
       expect(body.get("text")).toBe("Updated content")
       expect(body.get("api_type")).toBe("json")
 
-      expect(result).toBe(true)
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
     })
 
     it("should handle post ID with t3_ prefix", async () => {
@@ -830,29 +860,26 @@ describe("RedditClient", () => {
         json: async () => ({ json: { errors: [] } }),
       })
 
-      await client.editPost("t3_post123", "Updated content")
+      const result = await client.editPost("t3_post123", "Updated content")
+      expect(result.isRight()).toBe(true)
 
       const editCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(editCall[1].body as string)
       expect(body.get("thing_id")).toBe("t3_post123")
     })
 
-    it("should throw error when user is not authenticated", async () => {
+    it("should return Left when user is not authenticated for write", async () => {
       const clientReadOnly = new RedditClient({
         clientId: "test-client-id",
         clientSecret: "test-client-secret",
         userAgent: "TestApp/1.0.0",
       })
 
-      // Mock authentication
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
-      })
-
-      await expect(clientReadOnly.editPost("post123", "New content")).rejects.toThrow(
-        "Write operations require REDDIT_USERNAME and REDDIT_PASSWORD",
-      )
+      const result = await clientReadOnly.editPost("post123", "New content")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
     })
 
     it("should handle API errors", async () => {
@@ -872,7 +899,11 @@ describe("RedditClient", () => {
         }),
       })
 
-      await expect(client.editPost("post123", "")).rejects.toThrow("Reddit API errors: invalid text")
+      const result = await client.editPost("post123", "")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Reddit API errors: invalid text")
+      }
     })
   })
 
@@ -929,7 +960,8 @@ describe("RedditClient", () => {
         json: async () => mockPostData,
       })
 
-      await clientWithDisclosure.createPost("test", "Test", "Content")
+      const result = await clientWithDisclosure.createPost("test", "Test", "Content")
+      expect(result.isRight()).toBe(true)
 
       const submitCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(submitCall[1].body as string)
@@ -971,7 +1003,8 @@ describe("RedditClient", () => {
         }),
       })
 
-      await clientWithDisclosure.replyToPost("post123", "Great post!")
+      const result = await clientWithDisclosure.replyToPost("post123", "Great post!")
+      expect(result.isRight()).toBe(true)
 
       const commentCall = mockFetch.mock.calls[2]
       const body = new URLSearchParams(commentCall[1].body as string)
@@ -1024,7 +1057,8 @@ describe("RedditClient", () => {
         json: async () => mockPostData,
       })
 
-      await client.createPost("test", "Test", "Content")
+      const result = await client.createPost("test", "Test", "Content")
+      expect(result.isRight()).toBe(true)
 
       const submitCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(submitCall[1].body as string)
@@ -1091,12 +1125,15 @@ describe("RedditClient", () => {
         json: async () => mockPostData,
       })
 
-      await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+      const result1 = await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+      expect(result1.isRight()).toBe(true)
 
       // Second post to different subreddit with same content should fail
-      await expect(clientWithSafeMode.createPost("sub2", "Test", "Same content")).rejects.toThrow(
-        "Cross-subreddit duplicate detected",
-      )
+      const result2 = await clientWithSafeMode.createPost("sub2", "Test", "Same content")
+      expect(result2.isLeft()).toBe(true)
+      if (result2.isLeft()) {
+        expect(result2.value.message).toContain("Cross-subreddit duplicate detected")
+      }
     })
 
     it("should block same content posted to same subreddit", async () => {
@@ -1156,12 +1193,15 @@ describe("RedditClient", () => {
         json: async () => mockPostData,
       })
 
-      await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+      const result1 = await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+      expect(result1.isRight()).toBe(true)
 
       // Same content to same subreddit should still be blocked
-      await expect(clientWithSafeMode.createPost("sub1", "Test", "Same content")).rejects.toThrow(
-        "Duplicate content detected",
-      )
+      const result2 = await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+      expect(result2.isLeft()).toBe(true)
+      if (result2.isLeft()) {
+        expect(result2.value.message).toContain("Duplicate content detected")
+      }
     })
 
     it("should allow different content to same subreddit", async () => {
@@ -1222,7 +1262,8 @@ describe("RedditClient", () => {
         json: async () => createMockPostData("post1", "sub1"),
       })
 
-      await clientWithSafeMode.createPost("sub1", "Test", "First content")
+      const result1 = await clientWithSafeMode.createPost("sub1", "Test", "First content")
+      expect(result1.isRight()).toBe(true)
 
       // Second post with different content to same subreddit should work
       mockFetch.mockResolvedValueOnce({
@@ -1234,7 +1275,9 @@ describe("RedditClient", () => {
         json: async () => createMockPostData("post2", "sub1"),
       })
 
-      const post = await clientWithSafeMode.createPost("sub1", "Test 2", "Different content")
+      const result2 = await clientWithSafeMode.createPost("sub1", "Test 2", "Different content")
+      expect(result2.isRight()).toBe(true)
+      const post = result2.orThrow()
       expect(post.id).toBe("post2")
     })
   })
@@ -1265,7 +1308,8 @@ describe("RedditClient", () => {
       expect(body.get("text")).toBe("Updated comment")
       expect(body.get("api_type")).toBe("json")
 
-      expect(result).toBe(true)
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
     })
 
     it("should handle comment ID with t1_ prefix", async () => {
@@ -1281,7 +1325,8 @@ describe("RedditClient", () => {
         json: async () => ({ json: { errors: [] } }),
       })
 
-      await client.editComment("t1_comment123", "Updated comment")
+      const result = await client.editComment("t1_comment123", "Updated comment")
+      expect(result.isRight()).toBe(true)
 
       const editCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(editCall[1].body as string)

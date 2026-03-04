@@ -3,24 +3,26 @@ import { UserError } from "fastmcp"
 import { getRedditClient } from "../client/reddit-client"
 import { formatUserInfo } from "../utils/formatters"
 
-export async function getUserInfo(params: { username: string }) {
+export async function getUserInfo(params: { readonly username: string }) {
   const { username } = params
-  const client = getRedditClient()
 
-  if (!client) {
-    throw new UserError("Reddit client not initialized")
-  }
+  const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
-  try {
-    // Getting user info
-    const user = await client.getUser(username)
-    const formattedUser = formatUserInfo(user)
+  const result = await client.getUser(username)
 
-    return {
-      content: [
-        {
-          type: "text",
-          text: `
+  return result.fold(
+    (err) => {
+      // eslint-disable-next-line functional/no-throw-statements
+      throw new UserError(`Failed to fetch user data: ${err.message}`)
+    },
+    (user) => {
+      const formattedUser = formatUserInfo(user)
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `
 # User Information: u/${formattedUser.username}
 
 ## Profile Overview
@@ -39,34 +41,38 @@ export async function getUserInfo(params: { username: string }) {
 ## Recommendations
 - ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}
           `,
-        },
-      ],
-    }
-  } catch (error) {
-    // Error will be logged by the server
-    throw new UserError(`Failed to fetch user data: ${String(error)}`)
-  }
+          },
+        ],
+      }
+    },
+  )
 }
 
-export async function getUserPosts(params: { username: string; sort?: string; time_filter?: string; limit?: number }) {
+export async function getUserPosts(params: {
+  readonly username: string
+  readonly sort?: string
+  readonly time_filter?: string
+  readonly limit?: number
+}) {
   const { username, sort = "new", time_filter = "all", limit = 10 } = params
-  const client = getRedditClient()
 
-  if (!client) {
-    throw new UserError("Reddit client not initialized")
-  }
+  const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
-  try {
-    const posts = await client.getUserPosts(username, {
-      sort,
-      timeFilter: time_filter,
-      limit,
-    })
+  const result = await client.getUserPosts(username, {
+    sort,
+    timeFilter: time_filter,
+    limit,
+  })
 
-    return {
+  return result.fold(
+    (err) => {
+      // eslint-disable-next-line functional/no-throw-statements
+      throw new UserError(`Failed to fetch user posts: ${err.message}`)
+    },
+    (posts) => ({
       content: [
         {
-          type: "text",
+          type: "text" as const,
           text: `# Posts by u/${username}
 
 ## Sort: ${sort} | Time: ${time_filter} | Count: ${posts.length}
@@ -74,9 +80,10 @@ export async function getUserPosts(params: { username: string; sort?: string; ti
 ${posts
   .map((post, index) => {
     const date = new Date(post.createdUtc * 1000).toLocaleString()
-    const selftext = post.selftext
-      ? `\n${post.selftext.substring(0, 200)}${post.selftext.length > 200 ? "..." : ""}\n`
-      : ""
+    const selftext =
+      post.selftext !== undefined
+        ? `\n${post.selftext.substring(0, 200)}${post.selftext.length > 200 ? "..." : ""}\n`
+        : ""
 
     return `### ${index + 1}. ${post.title}
 - Subreddit: r/${post.subreddit}
@@ -86,41 +93,40 @@ ${posts
 ${selftext}
 - Link: https://reddit.com${post.permalink}
 ${post.over18 ? "- **NSFW**" : ""}
-${post.spoiler ? "- **Spoiler**" : ""}`
+${post.spoiler === true ? "- **Spoiler**" : ""}`
   })
   .join("\n\n---\n\n")}`,
         },
       ],
-    }
-  } catch (error) {
-    throw new UserError(`Failed to fetch user posts: ${String(error)}`)
-  }
+    }),
+  )
 }
 
 export async function getUserComments(params: {
-  username: string
-  sort?: string
-  time_filter?: string
-  limit?: number
+  readonly username: string
+  readonly sort?: string
+  readonly time_filter?: string
+  readonly limit?: number
 }) {
   const { username, sort = "new", time_filter = "all", limit = 10 } = params
-  const client = getRedditClient()
 
-  if (!client) {
-    throw new UserError("Reddit client not initialized")
-  }
+  const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
-  try {
-    const comments = await client.getUserComments(username, {
-      sort,
-      timeFilter: time_filter,
-      limit,
-    })
+  const result = await client.getUserComments(username, {
+    sort,
+    timeFilter: time_filter,
+    limit,
+  })
 
-    return {
+  return result.fold(
+    (err) => {
+      // eslint-disable-next-line functional/no-throw-statements
+      throw new UserError(`Failed to fetch user comments: ${err.message}`)
+    },
+    (comments) => ({
       content: [
         {
-          type: "text",
+          type: "text" as const,
           text: `# Comments by u/${username}
 
 ## Sort: ${sort} | Time: ${time_filter} | Count: ${comments.length}
@@ -141,8 +147,6 @@ ${body}`
   .join("\n\n---\n\n")}`,
         },
       ],
-    }
-  } catch (error) {
-    throw new UserError(`Failed to fetch user comments: ${String(error)}`)
-  }
+    }),
+  )
 }

@@ -3,9 +3,8 @@
 declare const __VERSION__: string
 
 // Force stdio mode for CLI/npx usage (unless explicitly overridden)
-if (!process.env.TRANSPORT_TYPE) {
-  process.env.TRANSPORT_TYPE = "stdio"
-}
+// eslint-disable-next-line functional/immutable-data
+process.env.TRANSPORT_TYPE ??= "stdio"
 
 // Handle command line arguments BEFORE any other imports
 const args = process.argv.slice(2)
@@ -43,10 +42,7 @@ For more information, visit: https://github.com/jordanburke/reddit-mcp-server
 
 // Import and start server if not showing version/help
 async function main() {
-  // Import and run the main function from the FastMCP server
   await import("./index.js")
-  // The index.js exports main() directly, so we just need to execute the file
-  // The main() is already executed when the module is imported
 }
 
-main().then()
+void main().catch(console.error)

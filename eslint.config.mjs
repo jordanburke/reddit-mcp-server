@@ -1,4 +1,4 @@
-import baseConfig from "ts-builds/eslint"
+import baseConfig from "ts-builds/eslint-functype"
 
 export default [
   ...baseConfig,
@@ -12,6 +12,7 @@ export default [
       "@typescript-eslint/no-unsafe-argument": "off",
       "@typescript-eslint/no-unsafe-return": "off",
       "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/require-await": "off",
     },
   },
 ]

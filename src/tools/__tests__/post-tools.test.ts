@@ -1,4 +1,5 @@
 import { UserError } from "fastmcp"
+import { Left, Option, Right } from "functype"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getRedditClient } from "../../client/reddit-client"
@@ -14,7 +15,7 @@ vi.mock("../../utils/formatters", () => ({
     author: post.author,
     subreddit: post.subreddit,
     type: post.isVideo ? "Video Post" : post.selftext ? "Text Post" : "Link Post",
-    content: post.selftext || post.url,
+    content: post.selftext ?? post.url,
     stats: {
       score: post.score,
       upvoteRatio: post.upvoteRatio,
@@ -27,7 +28,7 @@ vi.mock("../../utils/formatters", () => ({
         ...(post.spoiler ? ["Spoiler"] : []),
         ...(post.edited ? ["Edited"] : []),
       ],
-      flair: post.linkFlairText || "None",
+      flair: post.linkFlairText ?? "None",
     },
     links: {
       fullPost: `https://reddit.com${post.permalink}`,
@@ -46,7 +47,7 @@ describe("post-tools", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRedditClient).mockReturnValue(mockRedditClient as any)
+    vi.mocked(getRedditClient).mockReturnValue(Option(mockRedditClient) as any)
   })
 
   describe("getRedditPost", () => {
@@ -70,7 +71,7 @@ describe("post-tools", () => {
         permalink: "/r/programming/comments/test123/test_post_title/",
       }
 
-      mockRedditClient.getPost.mockResolvedValue(mockPost)
+      mockRedditClient.getPost.mockResolvedValue(Right(mockPost))
 
       const result = await getRedditPost({
         subreddit: "programming",
@@ -86,7 +87,7 @@ describe("post-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getRedditPost({ subreddit: "test", post_id: "123" })).rejects.toThrow(
         new UserError("Reddit client not initialized"),
@@ -94,10 +95,10 @@ describe("post-tools", () => {
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getPost.mockRejectedValue(new Error("Post not found"))
+      mockRedditClient.getPost.mockResolvedValue(Left(new Error("Post not found")))
 
       await expect(getRedditPost({ subreddit: "test", post_id: "123" })).rejects.toThrow(
-        new UserError("Failed to fetch post data: Error: Post not found"),
+        new UserError("Failed to fetch post data: Post not found"),
       )
     })
   })
@@ -125,7 +126,7 @@ describe("post-tools", () => {
         },
       ]
 
-      mockRedditClient.getTopPosts.mockResolvedValue(mockPosts)
+      mockRedditClient.getTopPosts.mockResolvedValue(Right(mockPosts))
 
       const result = await getTopPosts({
         subreddit: "programming",
@@ -139,7 +140,7 @@ describe("post-tools", () => {
     })
 
     it("should fetch posts with custom parameters", async () => {
-      mockRedditClient.getTopPosts.mockResolvedValue([])
+      mockRedditClient.getTopPosts.mockResolvedValue(Right([]))
 
       await getTopPosts({
         subreddit: "test",
@@ -151,16 +152,16 @@ describe("post-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(new UserError("Reddit client not initialized"))
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getTopPosts.mockRejectedValue(new Error("Subreddit not found"))
+      mockRedditClient.getTopPosts.mockResolvedValue(Left(new Error("Subreddit not found")))
 
       await expect(getTopPosts({ subreddit: "test" })).rejects.toThrow(
-        new UserError("Failed to fetch top posts: Error: Subreddit not found"),
+        new UserError("Failed to fetch top posts: Subreddit not found"),
       )
     })
   })

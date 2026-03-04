@@ -1,4 +1,5 @@
 import { UserError } from "fastmcp"
+import { Left, Option, Right } from "functype"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getRedditClient } from "../../client/reddit-client"
@@ -14,7 +15,7 @@ vi.mock("../../utils/formatters", () => ({
     title: subreddit.title,
     stats: {
       subscribers: subreddit.subscribers,
-      activeUsers: subreddit.activeUserCount || "N/A",
+      activeUsers: subreddit.activeUserCount ?? "N/A",
     },
     description: {
       short: subreddit.publicDescription,
@@ -41,7 +42,7 @@ describe("subreddit-tools", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRedditClient).mockReturnValue(mockRedditClient as any)
+    vi.mocked(getRedditClient).mockReturnValue(Option(mockRedditClient) as any)
   })
 
   describe("getSubredditInfo", () => {
@@ -59,7 +60,7 @@ describe("subreddit-tools", () => {
         url: "/r/programming/",
       }
 
-      mockRedditClient.getSubredditInfo.mockResolvedValue(mockSubreddit)
+      mockRedditClient.getSubredditInfo.mockResolvedValue(Right(mockSubreddit))
 
       const result = await getSubredditInfo({
         subreddit_name: "programming",
@@ -73,7 +74,7 @@ describe("subreddit-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getSubredditInfo({ subreddit_name: "test" })).rejects.toThrow(
         new UserError("Reddit client not initialized"),
@@ -81,10 +82,10 @@ describe("subreddit-tools", () => {
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getSubredditInfo.mockRejectedValue(new Error("Subreddit not found"))
+      mockRedditClient.getSubredditInfo.mockResolvedValue(Left(new Error("Subreddit not found")))
 
       await expect(getSubredditInfo({ subreddit_name: "nonexistent" })).rejects.toThrow(
-        new UserError("Failed to fetch subreddit data: Error: Subreddit not found"),
+        new UserError("Failed to fetch subreddit data: Subreddit not found"),
       )
     })
 
@@ -102,7 +103,7 @@ describe("subreddit-tools", () => {
         url: "/r/programming/",
       }
 
-      mockRedditClient.getSubredditInfo.mockResolvedValue(mockSubreddit)
+      mockRedditClient.getSubredditInfo.mockResolvedValue(Right(mockSubreddit))
 
       const result = await getSubredditInfo({
         subreddit_name: "programming",
@@ -125,7 +126,7 @@ describe("subreddit-tools", () => {
         url: "/r/nsfw_subreddit/",
       }
 
-      mockRedditClient.getSubredditInfo.mockResolvedValue(mockSubreddit)
+      mockRedditClient.getSubredditInfo.mockResolvedValue(Right(mockSubreddit))
 
       const result = await getSubredditInfo({
         subreddit_name: "nsfw_subreddit",
@@ -139,7 +140,7 @@ describe("subreddit-tools", () => {
     it("should fetch trending subreddits", async () => {
       const mockTrending = ["programming", "javascript", "python", "webdev", "technology"]
 
-      mockRedditClient.getTrendingSubreddits.mockResolvedValue(mockTrending)
+      mockRedditClient.getTrendingSubreddits.mockResolvedValue(Right(mockTrending))
 
       const result = await getTrendingSubreddits()
 
@@ -152,21 +153,21 @@ describe("subreddit-tools", () => {
     })
 
     it("should throw error if Reddit client is not initialized", async () => {
-      vi.mocked(getRedditClient).mockReturnValue(null)
+      vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
       await expect(getTrendingSubreddits()).rejects.toThrow(new UserError("Reddit client not initialized"))
     })
 
     it("should handle API errors", async () => {
-      mockRedditClient.getTrendingSubreddits.mockRejectedValue(new Error("API Error"))
+      mockRedditClient.getTrendingSubreddits.mockResolvedValue(Left(new Error("API Error")))
 
       await expect(getTrendingSubreddits()).rejects.toThrow(
-        new UserError("Failed to fetch trending subreddits: Error: API Error"),
+        new UserError("Failed to fetch trending subreddits: API Error"),
       )
     })
 
     it("should handle empty trending subreddits list", async () => {
-      mockRedditClient.getTrendingSubreddits.mockResolvedValue([])
+      mockRedditClient.getTrendingSubreddits.mockResolvedValue(Right([]))
 
       const result = await getTrendingSubreddits()
 

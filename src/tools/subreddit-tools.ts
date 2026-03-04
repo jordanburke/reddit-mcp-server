@@ -3,24 +3,26 @@ import { UserError } from "fastmcp"
 import { getRedditClient } from "../client/reddit-client"
 import { formatSubredditInfo } from "../utils/formatters"
 
-export async function getSubredditInfo(params: { subreddit_name: string }) {
+export async function getSubredditInfo(params: { readonly subreddit_name: string }) {
   const { subreddit_name } = params
-  const client = getRedditClient()
 
-  if (!client) {
-    throw new UserError("Reddit client not initialized")
-  }
+  const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
-  try {
-    // Getting subreddit info
-    const subreddit = await client.getSubredditInfo(subreddit_name)
-    const formattedSubreddit = formatSubredditInfo(subreddit)
+  const result = await client.getSubredditInfo(subreddit_name)
 
-    return {
-      content: [
-        {
-          type: "text",
-          text: `
+  return result.fold(
+    (err) => {
+      // eslint-disable-next-line functional/no-throw-statements
+      throw new UserError(`Failed to fetch subreddit data: ${err.message}`)
+    },
+    (subreddit) => {
+      const formattedSubreddit = formatSubredditInfo(subreddit)
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `
 # Subreddit Information: r/${formattedSubreddit.name}
 
 ## Overview
@@ -28,10 +30,10 @@ export async function getSubredditInfo(params: { subreddit_name: string }) {
 - Title: ${formattedSubreddit.title}
 - Subscribers: ${formattedSubreddit.stats.subscribers.toLocaleString()}
 - Active Users: ${
-            typeof formattedSubreddit.stats.activeUsers === "number"
-              ? formattedSubreddit.stats.activeUsers.toLocaleString()
-              : formattedSubreddit.stats.activeUsers
-          }
+              typeof formattedSubreddit.stats.activeUsers === "number"
+                ? formattedSubreddit.stats.activeUsers.toLocaleString()
+                : formattedSubreddit.stats.activeUsers
+            }
 
 ## Description
 ${formattedSubreddit.description.short}
@@ -53,30 +55,27 @@ ${formattedSubreddit.description.full}
 ## Engagement Tips
 - ${formattedSubreddit.engagementTips.replace(/\n {2}- /g, "\n- ")}
           `,
-        },
-      ],
-    }
-  } catch (error) {
-    // Error will be logged by the server
-    throw new UserError(`Failed to fetch subreddit data: ${String(error)}`)
-  }
+          },
+        ],
+      }
+    },
+  )
 }
 
 export async function getTrendingSubreddits() {
-  const client = getRedditClient()
+  const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
-  if (!client) {
-    throw new UserError("Reddit client not initialized")
-  }
+  const result = await client.getTrendingSubreddits()
 
-  try {
-    // Getting trending subreddits
-    const trendingSubreddits = await client.getTrendingSubreddits()
-
-    return {
+  return result.fold(
+    (err) => {
+      // eslint-disable-next-line functional/no-throw-statements
+      throw new UserError(`Failed to fetch trending subreddits: ${err.message}`)
+    },
+    (trendingSubreddits) => ({
       content: [
         {
-          type: "text",
+          type: "text" as const,
           text: `
 # Trending Subreddits
 
@@ -84,9 +83,6 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
           `,
         },
       ],
-    }
-  } catch (error) {
-    // Error will be logged by the server
-    throw new UserError(`Failed to fetch trending subreddits: ${String(error)}`)
-  }
+    }),
+  )
 }

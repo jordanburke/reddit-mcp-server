@@ -1,4 +1,5 @@
 import { UserError } from "fastmcp"
+import { Left, Option, Right } from "functype"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getRedditClient } from "../../client/reddit-client"
@@ -13,7 +14,7 @@ describe("getPostComments", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRedditClient).mockReturnValue(mockRedditClient as any)
+    vi.mocked(getRedditClient).mockReturnValue(Option(mockRedditClient) as any)
   })
 
   it("should fetch post comments with default parameters", async () => {
@@ -56,7 +57,7 @@ describe("getPostComments", () => {
       ],
     }
 
-    mockRedditClient.getPostComments.mockResolvedValue(mockData)
+    mockRedditClient.getPostComments.mockResolvedValue(Right(mockData))
 
     const result = await getPostComments({
       post_id: "test123",
@@ -77,7 +78,7 @@ describe("getPostComments", () => {
   })
 
   it("should fetch comments with custom parameters", async () => {
-    mockRedditClient.getPostComments.mockResolvedValue({ post: {}, comments: [] })
+    mockRedditClient.getPostComments.mockResolvedValue(Right({ post: {}, comments: [] }))
 
     await getPostComments({
       post_id: "test456",
@@ -93,7 +94,7 @@ describe("getPostComments", () => {
   })
 
   it("should throw error if Reddit client is not initialized", async () => {
-    vi.mocked(getRedditClient).mockReturnValue(null)
+    vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
     await expect(getPostComments({ post_id: "test", subreddit: "test" })).rejects.toThrow(
       new UserError("Reddit client not initialized"),
@@ -111,10 +112,10 @@ describe("getPostComments", () => {
   })
 
   it("should handle API errors", async () => {
-    mockRedditClient.getPostComments.mockRejectedValue(new Error("API Error"))
+    mockRedditClient.getPostComments.mockResolvedValue(Left(new Error("API Error")))
 
     await expect(getPostComments({ post_id: "test", subreddit: "test" })).rejects.toThrow(
-      new UserError("Failed to fetch comments: Error: API Error"),
+      new UserError("Failed to fetch comments: API Error"),
     )
   })
 })

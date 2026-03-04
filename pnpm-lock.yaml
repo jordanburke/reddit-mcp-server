@@ -14,6 +14,9 @@ importers:
       fastmcp:
         specifier: ^3.33.0
         version: 3.33.0
+      functype:
+        specifier: ^0.49.0
+        version: 0.49.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -1462,6 +1465,10 @@ packages:
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
+
+  functype@0.49.0:
+    resolution: {integrity: sha512-OWqDdiItU52XvmoOy8a29cd5xrIrIGgvKClCVT8tdWAJnF01WiduwP73xsTIe9v5mArDUpwBum0W+Q5O5p9QFA==}
+    hasBin: true
 
   fuse.js@7.1.0:
     resolution: {integrity: sha512-trLf4SzuuUxfusZADLINj+dE8clK1frKdmqiJNb1Es75fmI5oY6X2mxLVUciLLjxqw/xr72Dhy+lER6dGd02FQ==}
@@ -3811,6 +3818,8 @@ snapshots:
     optional: true
 
   function-bind@1.1.2: {}
+
+  functype@0.49.0: {}
 
   fuse.js@7.1.0: {}
 

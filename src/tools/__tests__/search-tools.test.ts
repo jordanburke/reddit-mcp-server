@@ -1,4 +1,5 @@
 import { UserError } from "fastmcp"
+import { Left, Option, Right } from "functype"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getRedditClient } from "../../client/reddit-client"
@@ -13,7 +14,7 @@ describe("searchReddit", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRedditClient).mockReturnValue(mockRedditClient as any)
+    vi.mocked(getRedditClient).mockReturnValue(Option(mockRedditClient) as any)
   })
 
   it("should search Reddit with default parameters", async () => {
@@ -34,7 +35,7 @@ describe("searchReddit", () => {
       },
     ]
 
-    mockRedditClient.searchReddit.mockResolvedValue(mockPosts)
+    mockRedditClient.searchReddit.mockResolvedValue(Right(mockPosts))
 
     const result = await searchReddit({ query: "test query" })
 
@@ -53,7 +54,7 @@ describe("searchReddit", () => {
   })
 
   it("should search within a specific subreddit", async () => {
-    mockRedditClient.searchReddit.mockResolvedValue([])
+    mockRedditClient.searchReddit.mockResolvedValue(Right([]))
 
     await searchReddit({
       query: "test",
@@ -74,7 +75,7 @@ describe("searchReddit", () => {
   })
 
   it("should throw error if Reddit client is not initialized", async () => {
-    vi.mocked(getRedditClient).mockReturnValue(null)
+    vi.mocked(getRedditClient).mockReturnValue(Option.none() as any)
 
     await expect(searchReddit({ query: "test" })).rejects.toThrow(new UserError("Reddit client not initialized"))
   })
@@ -86,10 +87,8 @@ describe("searchReddit", () => {
   })
 
   it("should handle search errors", async () => {
-    mockRedditClient.searchReddit.mockRejectedValue(new Error("API Error"))
+    mockRedditClient.searchReddit.mockResolvedValue(Left(new Error("API Error")))
 
-    await expect(searchReddit({ query: "test" })).rejects.toThrow(
-      new UserError("Failed to search Reddit: Error: API Error"),
-    )
+    await expect(searchReddit({ query: "test" })).rejects.toThrow(new UserError("Failed to search Reddit: API Error"))
   })
 })
