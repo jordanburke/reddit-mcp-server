@@ -1,6 +1,8 @@
 import crypto from "crypto"
 
 import type {
+  BotDisclosureConfig,
+  ContentRecord,
   RedditApiCommentResponse,
   RedditApiCommentTreeData,
   RedditApiEditResponse,
@@ -37,7 +39,10 @@ export class RedditClient {
   // Safe mode properties
   private safeMode: SafeModeConfig
   private lastWriteTime: number = 0
-  private recentContentHashes: Set<string> = new Set()
+  private recentContentRecords: ContentRecord[] = []
+
+  // Bot disclosure
+  private botDisclosure: BotDisclosureConfig
 
   constructor(config: RedditClientConfig) {
     this.clientId = config.clientId
@@ -57,6 +62,9 @@ export class RedditClient {
       duplicateCheck: false,
       maxRecentHashes: 10,
     }
+
+    // Initialize bot disclosure config
+    this.botDisclosure = config.botDisclosure || { enabled: false, footer: "" }
   }
 
   private determineBaseUrl(): string {
@@ -222,29 +230,48 @@ export class RedditClient {
     return crypto.createHash("sha256").update(content.trim().toLowerCase()).digest("hex")
   }
 
-  private checkDuplicateContent(content: string): void {
+  private checkDuplicateContent(content: string, subreddit?: string): void {
     if (!this.safeMode.enabled || !this.safeMode.duplicateCheck) {
       return
     }
 
     const hash = this.hashContent(content)
-    if (this.recentContentHashes.has(hash)) {
-      throw new Error(
-        "Duplicate content detected. Reddit's spam filter may ban your account for posting identical content. " +
-          "Please modify your content and try again.",
-      )
-    }
 
-    // Add to recent hashes
-    this.recentContentHashes.add(hash)
-
-    // Remove oldest hash if over limit
-    if (this.recentContentHashes.size > this.safeMode.maxRecentHashes) {
-      const first = this.recentContentHashes.values().next().value
-      if (first) {
-        this.recentContentHashes.delete(first)
+    // Check for duplicates
+    for (const record of this.recentContentRecords) {
+      if (record.hash === hash) {
+        if (subreddit && record.subreddit && subreddit !== record.subreddit) {
+          throw new Error(
+            "Cross-subreddit duplicate detected. Reddit's Responsible Builder Policy prohibits " +
+              "posting identical or substantially similar content across multiple subreddits. " +
+              "Please create unique content for each subreddit.",
+          )
+        }
+        throw new Error(
+          "Duplicate content detected. Reddit's spam filter may ban your account for posting identical content. " +
+            "Please modify your content and try again.",
+        )
       }
     }
+
+    // Add to recent records
+    this.recentContentRecords.push({
+      hash,
+      subreddit: subreddit || "",
+      timestamp: Date.now(),
+    })
+
+    // Remove oldest records if over limit (FIFO)
+    while (this.recentContentRecords.length > this.safeMode.maxRecentHashes) {
+      this.recentContentRecords.shift()
+    }
+  }
+
+  private appendBotDisclosure(content: string): string {
+    if (!this.botDisclosure.enabled || !this.botDisclosure.footer) {
+      return content
+    }
+    return `${content}${this.botDisclosure.footer}`
   }
 
   async getUser(username: string): Promise<RedditUser> {
@@ -414,7 +441,10 @@ export class RedditClient {
 
     // Safe mode checks
     await this.enforceWriteRateLimit()
-    this.checkDuplicateContent(title + content)
+    this.checkDuplicateContent(title + content, subreddit)
+
+    // Apply bot disclosure to self post content
+    const finalContent = isSelf ? this.appendBotDisclosure(content) : content
 
     try {
       const kind = isSelf ? "self" : "link"
@@ -422,7 +452,7 @@ export class RedditClient {
       params.append("sr", subreddit)
       params.append("kind", kind)
       params.append("title", title)
-      params.append(isSelf ? "text" : "url", content)
+      params.append(isSelf ? "text" : "url", finalContent)
       params.append("api_type", "json") // Request standard JSON response format
 
       const response = await this.makeRequest("/api/submit", {
@@ -485,6 +515,9 @@ export class RedditClient {
     await this.enforceWriteRateLimit()
     this.checkDuplicateContent(content)
 
+    // Apply bot disclosure
+    const finalContent = this.appendBotDisclosure(content)
+
     try {
       const fullThingId = postId.startsWith("t3_") || postId.startsWith("t1_") ? postId : `t3_${postId}`
 
@@ -495,7 +528,7 @@ export class RedditClient {
 
       const params = new URLSearchParams()
       params.append("thing_id", fullThingId)
-      params.append("text", content)
+      params.append("text", finalContent)
       params.append("api_type", "json") // Request standard JSON response format
 
       const response = await this.makeRequest("/api/comment", {
@@ -601,13 +634,16 @@ export class RedditClient {
     await this.enforceWriteRateLimit()
     this.checkDuplicateContent(newText)
 
+    // Apply bot disclosure
+    const finalText = this.appendBotDisclosure(newText)
+
     try {
       // Ensure thing ID has the correct prefix (t3_ for posts, t1_ for comments)
       const fullThingId = thingId.startsWith("t3_") || thingId.startsWith("t1_") ? thingId : `t3_${thingId}`
 
       const params = new URLSearchParams()
       params.append("thing_id", fullThingId)
-      params.append("text", newText)
+      params.append("text", finalText)
       params.append("api_type", "json")
 
       const response = await this.makeRequest("/api/editusertext", {

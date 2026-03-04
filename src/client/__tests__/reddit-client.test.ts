@@ -876,6 +876,369 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("bot disclosure", () => {
+    it("should append bot footer to createPost content when enabled", async () => {
+      const botFooter = "\n\n---\n^(I am a bot)"
+      const clientWithDisclosure = new RedditClient({
+        ...mockConfig,
+        botDisclosure: { enabled: true, footer: botFooter },
+      })
+
+      const mockSubmitResponse = {
+        json: { data: { id: "newpost123" }, errors: [] },
+      }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "newpost123",
+                  title: "Test",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "Content",
+                  url: "https://reddit.com/r/test/newpost123",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: Date.now() / 1000,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/newpost123/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockSubmitResponse,
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPostData,
+      })
+
+      await clientWithDisclosure.createPost("test", "Test", "Content")
+
+      const submitCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(submitCall[1].body as string)
+      expect(body.get("text")).toBe(`Content${botFooter}`)
+    })
+
+    it("should append bot footer to replyToPost content when enabled", async () => {
+      const botFooter = "\n\n---\n^(I am a bot)"
+      const clientWithDisclosure = new RedditClient({
+        ...mockConfig,
+        botDisclosure: { enabled: true, footer: botFooter },
+      })
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { children: [{ data: { id: "post123" } }] } }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          json: {
+            data: {
+              things: [
+                {
+                  data: {
+                    id: "comment123",
+                    subreddit: "test",
+                    link_title: "Test",
+                    permalink: "/r/test/comments/post123/comment123",
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      })
+
+      await clientWithDisclosure.replyToPost("post123", "Great post!")
+
+      const commentCall = mockFetch.mock.calls[2]
+      const body = new URLSearchParams(commentCall[1].body as string)
+      expect(body.get("text")).toBe(`Great post!${botFooter}`)
+    })
+
+    it("should NOT append bot footer when disabled (default)", async () => {
+      const mockSubmitResponse = {
+        json: { data: { id: "newpost123" }, errors: [] },
+      }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "newpost123",
+                  title: "Test",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "Content",
+                  url: "https://reddit.com/r/test/newpost123",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: Date.now() / 1000,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/newpost123/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockSubmitResponse,
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPostData,
+      })
+
+      await client.createPost("test", "Test", "Content")
+
+      const submitCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(submitCall[1].body as string)
+      expect(body.get("text")).toBe("Content")
+    })
+  })
+
+  describe("cross-subreddit duplicate detection", () => {
+    it("should block same content posted to different subreddits", async () => {
+      const clientWithSafeMode = new RedditClient({
+        ...mockConfig,
+        safeMode: {
+          enabled: true,
+          mode: "standard",
+          writeDelayMs: 0,
+          duplicateCheck: true,
+          maxRecentHashes: 10,
+        },
+      })
+
+      const mockSubmitResponse = {
+        json: { data: { id: "post1" }, errors: [] },
+      }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "post1",
+                  title: "Test",
+                  author: "testuser",
+                  subreddit: "sub1",
+                  selftext: "Same content",
+                  url: "https://reddit.com/r/sub1/post1",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: Date.now() / 1000,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/sub1/comments/post1/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      // First post succeeds
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockSubmitResponse,
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPostData,
+      })
+
+      await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+
+      // Second post to different subreddit with same content should fail
+      await expect(clientWithSafeMode.createPost("sub2", "Test", "Same content")).rejects.toThrow(
+        "Cross-subreddit duplicate detected",
+      )
+    })
+
+    it("should block same content posted to same subreddit", async () => {
+      const clientWithSafeMode = new RedditClient({
+        ...mockConfig,
+        safeMode: {
+          enabled: true,
+          mode: "standard",
+          writeDelayMs: 0,
+          duplicateCheck: true,
+          maxRecentHashes: 10,
+        },
+      })
+
+      const mockSubmitResponse = {
+        json: { data: { id: "post1" }, errors: [] },
+      }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "post1",
+                  title: "Test",
+                  author: "testuser",
+                  subreddit: "sub1",
+                  selftext: "Same content",
+                  url: "https://reddit.com/r/sub1/post1",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: Date.now() / 1000,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/sub1/comments/post1/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockSubmitResponse,
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPostData,
+      })
+
+      await clientWithSafeMode.createPost("sub1", "Test", "Same content")
+
+      // Same content to same subreddit should still be blocked
+      await expect(clientWithSafeMode.createPost("sub1", "Test", "Same content")).rejects.toThrow(
+        "Duplicate content detected",
+      )
+    })
+
+    it("should allow different content to same subreddit", async () => {
+      const clientWithSafeMode = new RedditClient({
+        ...mockConfig,
+        safeMode: {
+          enabled: true,
+          mode: "standard",
+          writeDelayMs: 0,
+          duplicateCheck: true,
+          maxRecentHashes: 10,
+        },
+      })
+
+      const createMockPostResponse = (id: string) => ({
+        json: { data: { id }, errors: [] },
+      })
+      const createMockPostData = (id: string, subreddit: string) => [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id,
+                  title: "Test",
+                  author: "testuser",
+                  subreddit,
+                  selftext: "Content",
+                  url: `https://reddit.com/r/${subreddit}/${id}`,
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: Date.now() / 1000,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: `/r/${subreddit}/comments/${id}/`,
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      // First post
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => createMockPostResponse("post1"),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => createMockPostData("post1", "sub1"),
+      })
+
+      await clientWithSafeMode.createPost("sub1", "Test", "First content")
+
+      // Second post with different content to same subreddit should work
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => createMockPostResponse("post2"),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => createMockPostData("post2", "sub1"),
+      })
+
+      const post = await clientWithSafeMode.createPost("sub1", "Test 2", "Different content")
+      expect(post.id).toBe("post2")
+    })
+  })
+
   describe("editComment", () => {
     it("should edit a comment", async () => {
       // Mock authentication

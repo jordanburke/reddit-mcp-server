@@ -2,6 +2,19 @@ export type RedditAuthMode = "auto" | "authenticated" | "anonymous"
 
 export type RedditSafeMode = "off" | "standard" | "strict"
 
+export type BotDisclosureMode = "auto" | "off"
+
+export type BotDisclosureConfig = {
+  enabled: boolean
+  footer: string
+}
+
+export type ContentRecord = {
+  hash: string
+  subreddit: string
+  timestamp: number
+}
+
 export interface SafeModeConfig {
   enabled: boolean
   mode: RedditSafeMode
@@ -18,6 +31,7 @@ export interface RedditClientConfig {
   password?: string
   authMode?: RedditAuthMode
   safeMode?: SafeModeConfig
+  botDisclosure?: BotDisclosureConfig
 }
 
 export interface RedditUser {

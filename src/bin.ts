@@ -26,11 +26,15 @@ Options:
   -h, --help           Show help
 
 Environment Variables:
-  REDDIT_CLIENT_ID      Reddit API client ID (required)
-  REDDIT_CLIENT_SECRET  Reddit API client secret (required)
+  REDDIT_CLIENT_ID      Reddit API client ID (optional, for OAuth)
+  REDDIT_CLIENT_SECRET  Reddit API client secret (optional, for OAuth)
   REDDIT_USERNAME       Reddit username (optional, for write operations)
   REDDIT_PASSWORD       Reddit password (optional, for write operations)
   REDDIT_USER_AGENT     Custom user agent (optional)
+  REDDIT_AUTH_MODE      Authentication mode: auto, authenticated, anonymous (default: auto)
+  REDDIT_SAFE_MODE      Spam protection: off, standard, strict (default: standard)
+  REDDIT_BOT_DISCLOSURE Bot disclosure footer: auto, off (default: off)
+  REDDIT_BOT_FOOTER     Custom bot footer text (optional, used with REDDIT_BOT_DISCLOSURE=auto)
 
 For more information, visit: https://github.com/jordanburke/reddit-mcp-server
 `)

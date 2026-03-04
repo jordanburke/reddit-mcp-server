@@ -20,6 +20,8 @@ A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts,
 | **Edit Posts/Comments**         | :white_check_mark: |        :x:         |
 | **Delete Posts/Comments**       | :white_check_mark: |        :x:         |
 | **Spam Protection (Safe Mode)** | :white_check_mark: |        :x:         |
+| **Bot Disclosure Footer**       | :white_check_mark: |        :x:         |
+| **Policy Compliance Built-in**  | :white_check_mark: |        :x:         |
 | Browse Subreddits               | :white_check_mark: | :white_check_mark: |
 | Search Reddit                   | :white_check_mark: | :white_check_mark: |
 | User Analysis                   | :white_check_mark: | :white_check_mark: |
@@ -91,15 +93,17 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 
 ### Environment Variables
 
-| Variable               | Required | Default        | Description                                               |
-| ---------------------- | -------- | -------------- | --------------------------------------------------------- |
-| `REDDIT_CLIENT_ID`     | No\*     | -              | Reddit app client ID                                      |
-| `REDDIT_CLIENT_SECRET` | No\*     | -              | Reddit app client secret                                  |
-| `REDDIT_USERNAME`      | No       | -              | Reddit username (for write operations)                    |
-| `REDDIT_PASSWORD`      | No       | -              | Reddit password (for write operations)                    |
-| `REDDIT_USER_AGENT`    | No       | Auto-generated | Custom User-Agent string                                  |
-| `REDDIT_AUTH_MODE`     | No       | `auto`         | Authentication mode: `auto`, `authenticated`, `anonymous` |
-| `REDDIT_SAFE_MODE`     | No       | `off`          | Write safeguards: `off`, `standard`, `strict`             |
+| Variable                | Required | Default        | Description                                               |
+| ----------------------- | -------- | -------------- | --------------------------------------------------------- |
+| `REDDIT_CLIENT_ID`      | No\*     | -              | Reddit app client ID                                      |
+| `REDDIT_CLIENT_SECRET`  | No\*     | -              | Reddit app client secret                                  |
+| `REDDIT_USERNAME`       | No       | -              | Reddit username (for write operations)                    |
+| `REDDIT_PASSWORD`       | No       | -              | Reddit password (for write operations)                    |
+| `REDDIT_USER_AGENT`     | No       | Auto-generated | Custom User-Agent string                                  |
+| `REDDIT_AUTH_MODE`      | No       | `auto`         | Authentication mode: `auto`, `authenticated`, `anonymous` |
+| `REDDIT_SAFE_MODE`      | No       | `standard`     | Write safeguards: `off`, `standard`, `strict`             |
+| `REDDIT_BOT_DISCLOSURE` | No       | `off`          | Bot disclosure footer: `auto`, `off`                      |
+| `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)        |
 
 \*Required only if using `authenticated` mode.
 
@@ -125,7 +129,7 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 
 ## Safe Mode (Spam Protection)
 
-**New!** Protect your Reddit account from spam detection and bans with built-in safeguards.
+Protect your Reddit account from spam detection and bans with built-in safeguards. **Enabled by default** (`standard` mode) per Reddit's Responsible Builder Policy.
 
 ### Why Use Safe Mode?
 
@@ -133,40 +137,57 @@ Reddit's spam detection can flag accounts for:
 
 - Rapid posting or commenting
 - Duplicate or similar content
+- Posting the same content across multiple subreddits
 - Non-standard User-Agent strings
 
 Safe Mode helps prevent these issues automatically.
 
 ### Mode Options
 
-| Mode       | Write Delay | Duplicate Detection | Use Case                       |
-| ---------- | ----------- | ------------------- | ------------------------------ |
-| `off`      | None        | No                  | Default, no safeguards         |
-| `standard` | 2 seconds   | Last 10 items       | Recommended for normal use     |
-| `strict`   | 5 seconds   | Last 20 items       | For cautious automated posting |
+| Mode       | Write Delay | Duplicate Detection       | Use Case                       |
+| ---------- | ----------- | ------------------------- | ------------------------------ |
+| `off`      | None        | No                        | Explicit opt-out only          |
+| `standard` | 2 seconds   | Last 10 items + cross-sub | **Default**, recommended       |
+| `strict`   | 5 seconds   | Last 20 items + cross-sub | For cautious automated posting |
 
-### Enable Safe Mode
+### Disable Safe Mode
+
+Safe mode is enabled by default. To explicitly disable:
 
 ```bash
-export REDDIT_SAFE_MODE=standard
+export REDDIT_SAFE_MODE=off
 npx reddit-mcp-server
-```
-
-Or in your MCP config:
-
-```json
-{
-  "env": {
-    "REDDIT_SAFE_MODE": "standard"
-  }
-}
 ```
 
 ### What Safe Mode Does
 
 1. **Rate Limiting**: Enforces minimum delays between write operations
 2. **Duplicate Detection**: Blocks identical content from being posted twice
-3. **Smart User-Agent**: Auto-generates Reddit-compliant User-Agent format when username is provided
+3. **Cross-Subreddit Detection**: Prevents posting the same content to multiple subreddits (per Reddit policy)
+4. **Smart User-Agent**: Auto-generates Reddit-compliant User-Agent format when username is provided
+
+## Bot Disclosure
+
+Reddit's Responsible Builder Policy requires bots to disclose their automated nature. Enable automatic bot footers on all posted content:
+
+```bash
+export REDDIT_BOT_DISCLOSURE=auto
+npx reddit-mcp-server
+```
+
+When enabled, a footer is appended to all posts, replies, and edits:
+
+```
+---
+🤖 I am a bot | Built with reddit-mcp-server
+```
+
+Customize the footer with `REDDIT_BOT_FOOTER`:
+
+```bash
+export REDDIT_BOT_DISCLOSURE=auto
+export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
+```
 
 ## Authentication Modes
 
@@ -306,6 +327,17 @@ services:
 docker build -t reddit-mcp-server .
 docker run -d --name reddit-mcp -p 3000:3000 --env-file .env reddit-mcp-server
 ```
+
+## Reddit Responsible Builder Policy
+
+This server is designed with [Reddit's Responsible Builder Policy](https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy) in mind:
+
+- **Safe mode on by default** — rate limiting and duplicate detection prevent spam
+- **Cross-subreddit duplicate detection** — blocks identical content across subreddits
+- **Bot disclosure support** — optional automated footer for transparency
+- **No voting/karma manipulation** — upvote/downvote tools are intentionally excluded
+- **No private messaging** — DM tools are intentionally excluded
+- **Policy-aware AI instructions** — MCP server instructions remind AI assistants of data usage restrictions
 
 ## Credits
 

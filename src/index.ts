@@ -4,7 +4,7 @@ import { FastMCP } from "fastmcp"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
-import type { RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
+import type { BotDisclosureConfig, RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
@@ -87,7 +87,7 @@ async function setupRedditClient() {
   const username = process.env.REDDIT_USERNAME
   const password = process.env.REDDIT_PASSWORD
   const authMode = (process.env.REDDIT_AUTH_MODE || "auto") as RedditAuthMode
-  const safeMode = (process.env.REDDIT_SAFE_MODE || "off") as RedditSafeMode
+  const safeMode = (process.env.REDDIT_SAFE_MODE || "standard") as RedditSafeMode
 
   // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
@@ -118,6 +118,15 @@ async function setupRedditClient() {
   // Build safe mode config
   const safeModeConfig = buildSafeModeConfig(safeMode)
 
+  // Build bot disclosure config
+  const botDisclosureMode = process.env.REDDIT_BOT_DISCLOSURE || "off"
+  const defaultFooter =
+    "\n\n---\n^(🤖 I am a bot | Built with) [^reddit-mcp-server](https://github.com/jordanburke/reddit-mcp-server)"
+  const botDisclosureConfig: BotDisclosureConfig = {
+    enabled: botDisclosureMode === "auto",
+    footer: botDisclosureMode === "auto" ? process.env.REDDIT_BOT_FOOTER || defaultFooter : "",
+  }
+
   try {
     const client = initializeRedditClient({
       clientId: clientId || "",
@@ -127,6 +136,7 @@ async function setupRedditClient() {
       password,
       authMode,
       safeMode: safeModeConfig,
+      botDisclosure: botDisclosureConfig,
     })
 
     console.error("[Setup] Reddit client initialized")
@@ -163,8 +173,17 @@ async function setupRedditClient() {
       console.error(`[Setup]   - Write delay: ${safeModeConfig.writeDelayMs}ms between operations`)
       console.error(`[Setup]   - Duplicate detection: enabled (tracking last ${safeModeConfig.maxRecentHashes} items)`)
     } else {
-      console.error("[Setup] Safe mode: off (no write operation safeguards)")
-      console.error("[Setup] Consider enabling REDDIT_SAFE_MODE=standard for spam protection")
+      console.error(
+        "[Setup] Safe mode: off (explicitly disabled — ensure compliance with Reddit's Responsible Builder Policy)",
+      )
+    }
+
+    // Log bot disclosure status
+    if (botDisclosureConfig.enabled) {
+      console.error("[Setup] ✓ Bot disclosure: enabled (automated content will include bot footer)")
+    } else {
+      console.error("[Setup] Bot disclosure: off")
+      console.error("[Setup] For Reddit policy compliance, consider REDDIT_BOT_DISCLOSURE=auto")
     }
   } catch (error) {
     console.error("[Error] ✗ Reddit API connection failed:", error instanceof Error ? error.message : error)
@@ -194,7 +213,17 @@ Available capabilities:
 - Delete your own posts and comments (with authentication)
 - Analyze engagement metrics and community insights
 
-For write operations (posting, replying, editing, deleting), ensure REDDIT_USERNAME and REDDIT_PASSWORD are configured.`,
+For write operations (posting, replying, editing, deleting), ensure REDDIT_USERNAME and REDDIT_PASSWORD are configured.
+
+IMPORTANT - Reddit Responsible Builder Policy compliance:
+- Data retrieved via these tools must NOT be used for AI model training without Reddit's written approval
+- Data must NOT be sold, licensed, or commercially redistributed
+- Do NOT attempt to de-anonymize or re-identify Reddit users
+- Do NOT post identical or substantially similar content across multiple subreddits
+- Do NOT use these tools to manipulate votes, karma, or circumvent Reddit safety mechanisms
+- All bot-generated content must clearly disclose its automated nature
+- Bots must NOT send private/direct messages without explicit user consent
+For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy`,
 
   // Optional OAuth configuration for HTTP transport
   ...(process.env.OAUTH_ENABLED === "true" && {

@@ -231,6 +231,14 @@ curl -H "Authorization: Bearer your-token" http://localhost:3000/mcp
 6. **Edit Operations**: Only self-text posts can be edited. Titles and link posts cannot be edited per Reddit API limitations.
 7. **Delete Operations**: Deletions are permanent and cannot be undone. The content is removed but the post/comment ID remains.
 
+### Intentionally Excluded (Policy Compliance)
+
+The following Reddit API capabilities are intentionally NOT implemented per Reddit's Responsible Builder Policy:
+
+- **Direct Messages/Private Messages**: Bots must get explicit consent for private communications
+- **Voting (upvote/downvote)**: Manipulating Reddit features like voting or karma is prohibited
+- **Bulk data export/scraping**: Reddit data must not be scraped for AI training or commercialized without approval
+
 ## Testing Approach
 
 The project uses Vitest for testing:
