@@ -8,7 +8,7 @@ import type { BotDisclosureConfig, RedditAuthMode, RedditSafeMode, SafeModeConfi
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
-dotenv.config()
+dotenv.config({ quiet: true })
 
 // Version injected at build time by tsdown
 declare const __VERSION__: string
