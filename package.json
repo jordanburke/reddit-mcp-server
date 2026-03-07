@@ -70,12 +70,12 @@
   "homepage": "https://github.com/jordanburke/reddit-mcp-server#readme",
   "dependencies": {
     "dotenv": "^17.3.1",
-    "fastmcp": "^3.33.0",
+    "fastmcp": "^3.34.0",
     "functype": "^0.49.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^22.19.13",
+    "@types/node": "^22.19.15",
     "ajv-cli": "^5.0.0",
     "cross-env": "^10.1.0",
     "msw": "^2.12.10",
