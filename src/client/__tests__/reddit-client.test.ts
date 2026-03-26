@@ -7,7 +7,6 @@ import { RedditClient } from "../reddit-client"
 const originalFetch = global.fetch
 
 describe("RedditClient", () => {
-  // eslint-disable-next-line functional/no-let
   let client: RedditClient
   const mockConfig: RedditClientConfig = {
     clientId: "test-client-id",
@@ -22,13 +21,11 @@ describe("RedditClient", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFetch.mockReset()
-    // eslint-disable-next-line functional/immutable-data
     global.fetch = mockFetch
     client = new RedditClient(mockConfig)
   })
 
   afterEach(() => {
-    // eslint-disable-next-line functional/immutable-data
     global.fetch = originalFetch
     vi.restoreAllMocks()
   })

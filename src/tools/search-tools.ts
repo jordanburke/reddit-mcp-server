@@ -16,7 +16,6 @@ export async function searchReddit(params: {
   const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
   if (query.trim().length === 0) {
-    // eslint-disable-next-line functional/no-throw-statements
     throw new UserError("Search query cannot be empty")
   }
 
@@ -30,7 +29,6 @@ export async function searchReddit(params: {
 
   return result.fold(
     (err) => {
-      // eslint-disable-next-line functional/no-throw-statements
       throw new UserError(`Failed to search Reddit: ${err.message}`)
     },
     (posts) => ({

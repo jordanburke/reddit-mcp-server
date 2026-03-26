@@ -71,16 +71,16 @@
   "dependencies": {
     "dotenv": "^17.3.1",
     "fastmcp": "^3.34.0",
-    "functype": "^0.49.0",
+    "functype": "^0.51.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.19.15",
     "ajv-cli": "^5.0.0",
     "cross-env": "^10.1.0",
-    "msw": "^2.12.10",
+    "msw": "^2.12.14",
     "rimraf": "^6.1.3",
-    "ts-builds": "^2.5.0",
+    "ts-builds": "^2.6.2",
     "tsdown": "^0.20.3",
     "tsx": "^4.21.0"
   },

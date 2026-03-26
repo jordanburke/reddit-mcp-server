@@ -122,7 +122,6 @@ export class RedditClient {
       }
 
       if (requiresAuth && this.accessToken !== undefined) {
-        // eslint-disable-next-line functional/immutable-data
         headers["Authorization"] = `Bearer ${this.accessToken}`
       }
 
@@ -154,7 +153,6 @@ export class RedditClient {
 
   async authenticate(): Promise<Either<Error, void>> {
     if (this.authMode === "anonymous") {
-      // eslint-disable-next-line functional/immutable-data
       this.authenticated = false
       return Right(undefined as void)
     }
@@ -164,7 +162,6 @@ export class RedditClient {
     }
 
     if (this.authMode === "auto" && !this.hasCredentials) {
-      // eslint-disable-next-line functional/immutable-data
       this.authenticated = false
       return Right(undefined as void)
     }
@@ -206,11 +203,8 @@ export class RedditClient {
       }
 
       const data = (await response.json()) as { access_token: string; expires_in: number }
-      // eslint-disable-next-line functional/immutable-data
       this.accessToken = data.access_token
-      // eslint-disable-next-line functional/immutable-data
       this.tokenExpiry = now + data.expires_in * 1000
-      // eslint-disable-next-line functional/immutable-data
       this.authenticated = true
       return Right(undefined as void)
     } catch (error) {
@@ -229,13 +223,11 @@ export class RedditClient {
   private validateWriteAccess(): void {
     if (this.username === undefined || this.password === undefined) {
       if (this.authMode === "anonymous") {
-        // eslint-disable-next-line functional/no-throw-statements
         throw new Error(
           "Write operations not available in anonymous mode. " +
             "Set REDDIT_USERNAME, REDDIT_PASSWORD and use 'auto' or 'authenticated' mode.",
         )
       }
-      // eslint-disable-next-line functional/no-throw-statements
       throw new Error("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
     }
   }
@@ -252,7 +244,6 @@ export class RedditClient {
       console.error(`[SafeMode] Rate limit: waiting ${waitTime}ms before write operation`)
       await new Promise((resolve) => setTimeout(resolve, waitTime))
     }
-    // eslint-disable-next-line functional/immutable-data
     this.lastWriteTime = Date.now()
   }
 
@@ -270,28 +261,24 @@ export class RedditClient {
     const duplicate = this.recentContentRecords.find((record) => record.hash === hash)
     if (duplicate !== undefined) {
       if (subreddit !== undefined && duplicate.subreddit !== "" && subreddit !== duplicate.subreddit) {
-        // eslint-disable-next-line functional/no-throw-statements
         throw new Error(
           "Cross-subreddit duplicate detected. Reddit's Responsible Builder Policy prohibits " +
             "posting identical or substantially similar content across multiple subreddits. " +
             "Please create unique content for each subreddit.",
         )
       }
-      // eslint-disable-next-line functional/no-throw-statements
       throw new Error(
         "Duplicate content detected. Reddit's spam filter may ban your account for posting identical content. " +
           "Please modify your content and try again.",
       )
     }
 
-    // eslint-disable-next-line functional/immutable-data
     this.recentContentRecords.push({
       hash,
       subreddit: subreddit ?? "",
       timestamp: Date.now(),
     })
 
-    // eslint-disable-next-line functional/immutable-data
     this.recentContentRecords = this.recentContentRecords.slice(-this.safeMode.maxRecentHashes)
   }
 
@@ -342,8 +329,8 @@ export class RedditClient {
       const subreddit: RedditSubreddit = {
         displayName: data.display_name,
         title: data.title,
-        description: data.description ?? "",
-        publicDescription: data.public_description ?? "",
+        description: data.description,
+        publicDescription: data.public_description,
         subscribers: data.subscribers,
         activeUserCount: data.active_user_count ?? undefined,
         createdUtc: data.created_utc,
@@ -395,7 +382,6 @@ export class RedditClient {
         return Left(new Error(`Failed to get post with ID ${postId}: HTTP ${response.status}`))
       }
 
-      // eslint-disable-next-line functional/no-let
       let post: RedditApiPostData
       if (subreddit !== undefined) {
         const json = (await response.json()) as [RedditApiListingResponse<RedditApiPostData>, unknown]
@@ -467,12 +453,12 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiSubmitResponse
 
-      if (json.json?.errors !== undefined && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e[1] ?? e[0]).join(", ")
+      if (json.json.errors !== undefined && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e) => e[1]).join(", ")
         return Left(new Error(`Reddit API errors: ${errors}`))
       }
 
-      const postId = json.json?.data?.id ?? json.json?.data?.name?.replace("t3_", "")
+      const postId = json.json.data?.id ?? json.json.data?.name?.replace("t3_", "")
 
       if (postId === undefined) {
         return Left(new Error("No post ID returned from Reddit"))
@@ -535,7 +521,7 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiCommentResponse
 
-      if (json.json?.data?.things !== undefined && json.json.data.things.length > 0) {
+      if (json.json.data?.things !== undefined && json.json.data.things.length > 0) {
         const commentData = json.json.data.things[0].data
         const author = this.username ?? "[unknown]"
         const comment: RedditComment = {
@@ -552,8 +538,8 @@ export class RedditClient {
           permalink: commentData.permalink,
         }
         return Right(comment)
-      } else if (json.json?.errors !== undefined && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e[1] ?? e[0]).join(", ")
+      } else if (json.json.errors !== undefined && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e) => e[1]).join(", ")
         return Left(new Error(`Reddit API errors: ${errors}`))
       } else {
         return Left(new Error("Failed to parse reply response"))
@@ -632,8 +618,8 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiEditResponse
 
-      if (json.json?.errors !== undefined && json.json.errors.length > 0) {
-        const errors = json.json.errors.map((e) => e[1] ?? e[0]).join(", ")
+      if (json.json.errors !== undefined && json.json.errors.length > 0) {
+        const errors = json.json.errors.map((e) => e[1]).join(", ")
         return Left(new Error(`Reddit API errors: ${errors}`))
       }
 
@@ -737,15 +723,13 @@ export class RedditClient {
 
           const { replies } = item.data
           const childComments =
-            replies !== undefined && typeof replies !== "string" && replies.data?.children !== undefined
-              ? parseComments(replies.data.children, depth + 1)
-              : []
+            replies !== undefined && typeof replies !== "string" ? parseComments(replies.data.children, depth + 1) : []
 
           return [comment, ...childComments]
         })
 
       const comments: readonly RedditComment[] =
-        json[1]?.data?.children !== undefined ? parseComments(json[1].data.children) : []
+        json[1].data.children.length > 0 ? parseComments(json[1].data.children) : []
 
       return Right({ post, comments })
     } catch (error) {
@@ -835,7 +819,6 @@ export class RedditClient {
 }
 
 // Create and export singleton instance
-// eslint-disable-next-line functional/no-let
 let clientInstance: Option<RedditClient> = Option.none()
 
 export function initializeRedditClient(config: RedditClientConfig): RedditClient {

@@ -15,7 +15,6 @@ export async function getPostComments(params: {
   const client = getRedditClient().orThrow(new UserError("Reddit client not initialized"))
 
   if (post_id === "" || subreddit === "") {
-    // eslint-disable-next-line functional/no-throw-statements
     throw new UserError("post_id and subreddit are required")
   }
 
@@ -26,7 +25,6 @@ export async function getPostComments(params: {
 
   return result.fold(
     (err) => {
-      // eslint-disable-next-line functional/no-throw-statements
       throw new UserError(`Failed to fetch comments: ${err.message}`)
     },
     ({ post, comments }) => {

@@ -3,7 +3,6 @@
 declare const __VERSION__: string
 
 // Force stdio mode for CLI/npx usage (unless explicitly overridden)
-// eslint-disable-next-line functional/immutable-data
 process.env.TRANSPORT_TYPE ??= "stdio"
 
 // Handle command line arguments BEFORE any other imports

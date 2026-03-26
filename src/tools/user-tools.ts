@@ -12,7 +12,6 @@ export async function getUserInfo(params: { readonly username: string }) {
 
   return result.fold(
     (err) => {
-      // eslint-disable-next-line functional/no-throw-statements
       throw new UserError(`Failed to fetch user data: ${err.message}`)
     },
     (user) => {
@@ -66,7 +65,6 @@ export async function getUserPosts(params: {
 
   return result.fold(
     (err) => {
-      // eslint-disable-next-line functional/no-throw-statements
       throw new UserError(`Failed to fetch user posts: ${err.message}`)
     },
     (posts) => ({
@@ -120,7 +118,6 @@ export async function getUserComments(params: {
 
   return result.fold(
     (err) => {
-      // eslint-disable-next-line functional/no-throw-statements
       throw new UserError(`Failed to fetch user comments: ${err.message}`)
     },
     (comments) => ({
