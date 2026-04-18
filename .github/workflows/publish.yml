@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.x"
+          node-version-file: ".nvmrc"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
@@ -32,9 +32,6 @@ jobs:
 
       - name: Run validation pipeline
         run: pnpm run validate
-
-      - name: Update npm
-        run: npm install -g npm@latest
 
       - name: Verify package contents
         run: |
