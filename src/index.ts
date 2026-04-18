@@ -1,6 +1,7 @@
 import crypto from "crypto"
 import dotenv from "dotenv"
 import { FastMCP } from "fastmcp"
+import { Option } from "functype"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
@@ -225,6 +226,7 @@ For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Res
     authenticate: (request: { readonly headers: { readonly authorization?: string } }) => {
       const authHeader = request.headers.authorization
       if (!authHeader?.startsWith("Bearer ")) {
+        // eslint-disable-next-line functype/prefer-either
         throw new Response(null, {
           status: 401,
           statusText: "Missing or invalid Authorization header",
@@ -237,6 +239,7 @@ For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Res
       const tokenHash = crypto.createHash("sha256").update(tokenBuffer).digest()
       const expectedHash = crypto.createHash("sha256").update(expectedBuffer).digest()
       if (!crypto.timingSafeEqual(tokenHash, expectedHash)) {
+        // eslint-disable-next-line functype/prefer-either
         throw new Response(null, {
           status: 403,
           statusText: "Invalid token",
@@ -288,6 +291,7 @@ server.addTool({
     const result = await client.getUser(args.username)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get user info: ${err.message}`)
       },
       (user) => {
@@ -338,6 +342,7 @@ server.addTool({
 
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get user posts: ${err.message}`)
       },
       (posts) => {
@@ -389,6 +394,7 @@ server.addTool({
 
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get user comments: ${err.message}`)
       },
       (comments) => {
@@ -436,6 +442,7 @@ server.addTool({
     const result = await client.getPost(args.post_id, args.subreddit)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get post: ${err.message}`)
       },
       (post) => {
@@ -492,11 +499,15 @@ server.addTool({
     const result = await client.getTopPosts(args.subreddit ?? "", args.time_filter, args.limit)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get top posts: ${err.message}`)
       },
       (posts) => {
         if (posts.length === 0) {
-          const location = args.subreddit !== undefined ? `r/${args.subreddit}` : "home feed"
+          const location = Option(args.subreddit).fold(
+            () => "home feed",
+            (sr) => `r/${sr}`,
+          )
           return `No posts found in ${location} for the specified time period.`
         }
 
@@ -512,7 +523,10 @@ server.addTool({
           )
           .join("\n\n")
 
-        const location = args.subreddit !== undefined ? `r/${args.subreddit}` : "Home Feed"
+        const location = Option(args.subreddit).fold(
+          () => "Home Feed",
+          (sr) => `r/${sr}`,
+        )
         return `# Top Posts from ${location} (${args.time_filter})
 
 ${postSummaries}`
@@ -534,6 +548,7 @@ server.addTool({
     const result = await client.getSubredditInfo(args.subreddit_name)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get subreddit info: ${err.message}`)
       },
       (subreddit) => {
@@ -585,6 +600,7 @@ server.addTool({
     const result = await client.getTrendingSubreddits()
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get trending subreddits: ${err.message}`)
       },
       (trendingSubreddits) => `# Trending Subreddits
@@ -610,6 +626,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (args.query.trim() === "") {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error("Search query cannot be empty")
     }
 
@@ -623,11 +640,15 @@ server.addTool({
 
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to search: ${err.message}`)
       },
       (posts) => {
         if (posts.length === 0) {
-          const searchLocation = args.subreddit !== undefined ? ` in r/${args.subreddit}` : ""
+          const searchLocation = Option(args.subreddit).fold(
+            () => "",
+            (sr) => ` in r/${sr}`,
+          )
           return `No results found for "${args.query}"${searchLocation}.`
         }
 
@@ -645,7 +666,10 @@ server.addTool({
           })
           .join("\n\n")
 
-        const searchLocation = args.subreddit !== undefined ? ` in r/${args.subreddit}` : ""
+        const searchLocation = Option(args.subreddit).fold(
+          () => "",
+          (sr) => ` in r/${sr}`,
+        )
         return `# Reddit Search Results for: "${args.query}"${searchLocation}
 
 Sorted by: ${args.sort} | Time: ${args.time_filter} | Type: ${args.type}
@@ -673,6 +697,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -681,6 +706,7 @@ server.addTool({
     const result = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to create post: ${err.message}`)
       },
       (post) => {
@@ -714,6 +740,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -722,6 +749,7 @@ server.addTool({
     const result = await client.replyToPost(args.post_id, args.content)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to reply: ${err.message}`)
       },
       (comment) => `# Reply Posted Successfully
@@ -751,6 +779,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -759,6 +788,7 @@ server.addTool({
     const result = await client.deletePost(args.thing_id)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to delete post: ${err.message}`)
       },
       () => `# Post Deleted Successfully
@@ -785,6 +815,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -793,6 +824,7 @@ server.addTool({
     const result = await client.deleteComment(args.thing_id)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to delete comment: ${err.message}`)
       },
       () => `# Comment Deleted Successfully
@@ -822,6 +854,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -830,6 +863,7 @@ server.addTool({
     const result = await client.editPost(args.thing_id, args.new_text)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to edit post: ${err.message}`)
       },
       () => `# Post Edited Successfully
@@ -863,6 +897,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -871,6 +906,7 @@ server.addTool({
     const result = await client.editComment(args.thing_id, args.new_text)
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to edit comment: ${err.message}`)
       },
       () => `# Comment Edited Successfully
@@ -896,6 +932,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (args.post_id === "" || args.subreddit === "") {
+      // eslint-disable-next-line functype/prefer-either
       throw new Error("post_id and subreddit are required")
     }
 
@@ -906,6 +943,7 @@ server.addTool({
 
     return result.fold(
       (err) => {
+        // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get comments: ${err.message}`)
       },
       ({ post, comments }) => {

@@ -12,6 +12,7 @@ export async function getRedditPost(params: { readonly subreddit: string; readon
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch post data: ${err.message}`)
     },
     (post) => {
@@ -72,6 +73,7 @@ export async function getTopPosts(params: {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch top posts: ${err.message}`)
     },
     (posts) => {
@@ -120,6 +122,7 @@ export async function createPost(params: {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to create post: ${err.message}`)
     },
     (post) => {
@@ -160,6 +163,7 @@ export async function replyToPost(params: {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to reply to post: ${err.message}`)
     },
     (comment) => {

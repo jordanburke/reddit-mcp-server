@@ -1,3 +1,11 @@
+/* eslint-disable functype/prefer-either --
+ * This module is the imperative-to-functional boundary for the Reddit HTTP client.
+ * Each method already returns Either<Error, T>; the try/catch blocks are the mechanism
+ * that captures thrown errors from fetch, JSON parsing, and orThrow() into Either.left.
+ * Wrapping every block in Try.fromPromise would add indirection without changing the
+ * effective contract. Throws inside this file are internal validation helpers that
+ * the surrounding try/catch converts into Either.left at the method boundary.
+ */
 import crypto from "crypto"
 import type { Either } from "functype"
 import { Left, Option, Right } from "functype"
@@ -118,6 +126,7 @@ export class RedditClient {
       const url = `${this.baseUrl}${path}`
       const headers: Record<string, string> = {
         "User-Agent": this.userAgent,
+        // eslint-disable-next-line functype/prefer-option -- RequestInit.headers is external fetch typing; used in spread
         ...(options.headers as Record<string, string> | undefined),
       }
 
@@ -373,8 +382,10 @@ export class RedditClient {
   }
 
   async getPost(postId: string, subreddit?: string): Promise<Either<Error, RedditPost>> {
-    const endpoint =
-      subreddit !== undefined ? `/r/${subreddit}/comments/${postId}.json` : `/api/info.json?id=t3_${postId}`
+    const endpoint = Option(subreddit).fold(
+      () => `/api/info.json?id=t3_${postId}`,
+      (sr) => `/r/${sr}/comments/${postId}.json`,
+    )
 
     try {
       const response = (await this.makeRequest(endpoint)).orThrow()
@@ -383,6 +394,7 @@ export class RedditClient {
       }
 
       let post: RedditApiPostData
+      // eslint-disable-next-line functype/prefer-fold -- native nullable branching with early-return on empty listing
       if (subreddit !== undefined) {
         const json = (await response.json()) as [RedditApiListingResponse<RedditApiPostData>, unknown]
         post = json[0].data.children[0].data
@@ -645,7 +657,10 @@ export class RedditClient {
     } = {},
   ): Promise<Either<Error, readonly RedditPost[]>> {
     const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
-    const endpoint = subreddit !== undefined ? `/r/${subreddit}/search.json` : "/search.json"
+    const endpoint = Option(subreddit).fold(
+      () => "/search.json",
+      (sr) => `/r/${sr}/search.json`,
+    )
 
     const params = new URLSearchParams({
       q: query,
@@ -653,6 +668,7 @@ export class RedditClient {
       t: timeFilter,
       limit: limit.toString(),
       type,
+      // eslint-disable-next-line functype/prefer-fold -- conditional spread of native string | undefined into URLSearchParams init
       ...(subreddit !== undefined ? { restrict_sr: "true" } : {}),
     })
 
@@ -728,8 +744,7 @@ export class RedditClient {
           return [comment, ...childComments]
         })
 
-      const comments: readonly RedditComment[] =
-        json[1].data.children.length > 0 ? parseComments(json[1].data.children) : []
+      const comments: readonly RedditComment[] = parseComments(json[1].data.children)
 
       return Right({ post, comments })
     } catch (error) {

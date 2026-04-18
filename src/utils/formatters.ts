@@ -60,7 +60,7 @@ export function analyzePostEngagement(score: number, ratio: number, numComments:
   return insights.join("\n  - ")
 }
 
-export function analyzeSubredditHealth(subscribers: number, activeUsers: number | undefined, ageDays: number): string {
+export function analyzeSubredditHealth(subscribers: number, activeUsers: Option<number>, ageDays: number): string {
   const sizeInsights: readonly string[] =
     subscribers > 1000000
       ? ["Major subreddit with massive following"]
@@ -70,7 +70,7 @@ export function analyzeSubredditHealth(subscribers: number, activeUsers: number 
           ? ["Niche community, potential for growth"]
           : []
 
-  const activityInsights: readonly string[] = Option(activeUsers)
+  const activityInsights: readonly string[] = activeUsers
     .map((active) => active / subscribers)
     .fold(
       () => [] as readonly string[],
@@ -217,7 +217,10 @@ export function formatPostInfo(post: RedditPost): FormattedPostInfo {
 export function formatSubredditInfo(subreddit: RedditSubreddit): FormattedSubredditInfo {
   const flags: readonly string[] = [
     ...(subreddit.over18 ? ["NSFW"] : []),
-    ...(subreddit.subredditType !== undefined ? [`Type: ${subreddit.subredditType}`] : []),
+    ...Option(subreddit.subredditType).fold(
+      () => [] as readonly string[],
+      (type) => [`Type: ${type}`] as readonly string[],
+    ),
   ]
 
   const ageDays = (Date.now() / 1000 - subreddit.createdUtc) / (24 * 3600)
@@ -245,7 +248,7 @@ export function formatSubredditInfo(subreddit: RedditSubreddit): FormattedSubred
       subreddit: `https://reddit.com${subreddit.url}`,
       wiki: `https://reddit.com/r/${subreddit.displayName}/wiki`,
     },
-    communityAnalysis: analyzeSubredditHealth(subreddit.subscribers, subreddit.activeUserCount, ageDays),
+    communityAnalysis: analyzeSubredditHealth(subreddit.subscribers, Option(subreddit.activeUserCount), ageDays),
     engagementTips: getSubredditEngagementTips(subreddit),
   }
 }

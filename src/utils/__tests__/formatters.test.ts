@@ -1,3 +1,4 @@
+import { Option } from "functype"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -122,33 +123,33 @@ describe("formatters", () => {
 
   describe("analyzeSubredditHealth", () => {
     it("should analyze major subreddits", () => {
-      const result = analyzeSubredditHealth(2000000, 10000, 365 * 10)
+      const result = analyzeSubredditHealth(2000000, Option(10000), 365 * 10)
 
       expect(result).toContain("Major subreddit with massive following")
       expect(result).toContain("Mature subreddit with established culture")
     })
 
     it("should analyze well-established communities", () => {
-      const result = analyzeSubredditHealth(500000, 5000, 365 * 3)
+      const result = analyzeSubredditHealth(500000, Option(5000), 365 * 3)
 
       expect(result).toContain("Well-established community")
     })
 
     it("should analyze niche communities", () => {
-      const result = analyzeSubredditHealth(500, 50, 30)
+      const result = analyzeSubredditHealth(500, Option(50), 30)
 
       expect(result).toContain("Niche community, potential for growth")
       expect(result).toContain("New subreddit still forming its community")
     })
 
     it("should handle active user analysis", () => {
-      const result = analyzeSubredditHealth(10000, 1500, 365)
+      const result = analyzeSubredditHealth(10000, Option(1500), 365)
 
       expect(result).toContain("Highly active community with strong engagement")
     })
 
     it("should handle low activity analysis", () => {
-      const result = analyzeSubredditHealth(100000, 50, 365)
+      const result = analyzeSubredditHealth(100000, Option(50), 365)
 
       expect(result).toContain("Could benefit from more community engagement initiatives")
     })

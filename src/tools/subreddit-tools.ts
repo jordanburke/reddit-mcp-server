@@ -12,6 +12,7 @@ export async function getSubredditInfo(params: { readonly subreddit_name: string
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch subreddit data: ${err.message}`)
     },
     (subreddit) => {
@@ -68,6 +69,7 @@ export async function getTrendingSubreddits() {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch trending subreddits: ${err.message}`)
     },
     (trendingSubreddits) => ({

@@ -1,4 +1,5 @@
 import { UserError } from "fastmcp"
+import { Option } from "functype"
 
 import { getRedditClient } from "../client/reddit-client"
 import { formatUserInfo } from "../utils/formatters"
@@ -12,6 +13,7 @@ export async function getUserInfo(params: { readonly username: string }) {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch user data: ${err.message}`)
     },
     (user) => {
@@ -65,6 +67,7 @@ export async function getUserPosts(params: {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch user posts: ${err.message}`)
     },
     (posts) => ({
@@ -78,10 +81,10 @@ export async function getUserPosts(params: {
 ${posts
   .map((post, index) => {
     const date = new Date(post.createdUtc * 1000).toLocaleString()
-    const selftext =
-      post.selftext !== undefined
-        ? `\n${post.selftext.substring(0, 200)}${post.selftext.length > 200 ? "..." : ""}\n`
-        : ""
+    const selftext = Option(post.selftext).fold(
+      () => "",
+      (text) => `\n${text.substring(0, 200)}${text.length > 200 ? "..." : ""}\n`,
+    )
 
     return `### ${index + 1}. ${post.title}
 - Subreddit: r/${post.subreddit}
@@ -118,6 +121,7 @@ export async function getUserComments(params: {
 
   return result.fold(
     (err) => {
+      // eslint-disable-next-line functype/prefer-either
       throw new UserError(`Failed to fetch user comments: ${err.message}`)
     },
     (comments) => ({

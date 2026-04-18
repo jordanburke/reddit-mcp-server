@@ -198,6 +198,7 @@ export type RedditApiSubredditResponse = {
     readonly description: string
     readonly public_description: string
     readonly subscribers: number
+    // eslint-disable-next-line functype/prefer-option -- wire format: Reddit's JSON API returns literal null here
     readonly active_user_count: number | null
     readonly created_utc: number
     readonly over18: boolean
@@ -222,6 +223,7 @@ export type RedditApiPostData = {
   readonly spoiler: boolean
   readonly edited: boolean | number
   readonly is_self: boolean
+  // eslint-disable-next-line functype/prefer-option -- wire format: Reddit's JSON API returns literal null here
   readonly link_flair_text: string | null
   readonly permalink: string
   readonly [key: string]: unknown
