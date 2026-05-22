@@ -393,20 +393,16 @@ export class RedditClient {
         return Left(new Error(`Failed to get post with ID ${postId}: HTTP ${response.status}`))
       }
 
-      let post: RedditApiPostData
-      // eslint-disable-next-line functype/prefer-fold -- native nullable branching with early-return on empty listing
       if (subreddit !== undefined) {
         const json = (await response.json()) as [RedditApiListingResponse<RedditApiPostData>, unknown]
-        post = json[0].data.children[0].data
-      } else {
-        const json = (await response.json()) as RedditApiInfoResponse
-        if (json.data.children.length === 0) {
-          return Left(new Error(`Post with ID ${postId} not found`))
-        }
-        post = json.data.children[0].data
+        return Right(parsePostData(json[0].data.children[0].data))
       }
 
-      return Right(parsePostData(post))
+      const json = (await response.json()) as RedditApiInfoResponse
+      if (json.data.children.length === 0) {
+        return Left(new Error(`Post with ID ${postId} not found`))
+      }
+      return Right(parsePostData(json.data.children[0].data))
     } catch (error) {
       return Left(new Error(`Failed to get post with ID ${postId}: ${toError(error).message}`))
     }
@@ -834,15 +830,15 @@ export class RedditClient {
 }
 
 // Create and export singleton instance
-let clientInstance: Option<RedditClient> = Option.none()
+const clientHolder: { instance: Option<RedditClient> } = { instance: Option.none() }
 
 export function initializeRedditClient(config: RedditClientConfig): RedditClient {
   const client = new RedditClient(config)
 
-  clientInstance = Option(client)
+  clientHolder.instance = Option(client)
   return client
 }
 
 export function getRedditClient(): Option<RedditClient> {
-  return clientInstance
+  return clientHolder.instance
 }
