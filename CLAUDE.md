@@ -271,3 +271,50 @@ The project uses Vitest for testing:
    - Verify environment variables are set correctly
    - Review console.error logs for Reddit API responses
    - Test with real Reddit API using test scripts (e.g., create test post, edit, delete)
+
+## Releasing / Version Bumping
+
+**CRITICAL**: Three files must stay in lockstep on every release:
+
+- `package.json` — `.version`
+- `server.json` — `.version` AND `.packages[0].version`
+- `manifest.json` — `.version`
+
+`npm version <patch|minor|major>` only bumps `package.json`. CI's `prepublishOnly` runs `pnpm check:versions` and **will fail the publish** if the other two drift (this has bitten v1.4.6 — see commit `49f232e`).
+
+### Correct release workflow
+
+```bash
+# 1. Make sure check:versions passes BEFORE bumping
+pnpm check:versions
+
+# 2. Bump package.json without committing/tagging yet
+npm version patch --no-git-tag-version
+
+# 3. Hand-edit server.json (both version fields) and manifest.json to match
+#    Or use sed/jq — the file structure is stable
+
+# 4. Verify, validate, then commit + tag together
+pnpm check:versions
+pnpm validate
+git add package.json server.json manifest.json pnpm-lock.yaml
+git commit -m "x.y.z"
+git tag "v$(node -p "require('./package.json').version")"
+git push --follow-tags
+```
+
+### Or: use the `vbctp` skill, but stage the JSON files first
+
+The `vbctp` skill runs `pnpm validate` → `npm version patch` → `git push --follow-tags`. `pnpm validate` does NOT include `pnpm check:versions` — only `prepublishOnly` does, which means the mismatch is only caught in CI. **Before invoking vbctp, bump server.json + manifest.json by hand and stage them**; `npm version` will then refuse to run (dirty tree), so commit those changes first, then run vbctp.
+
+### Long-term fix (not yet implemented)
+
+A `"version"` npm lifecycle script can auto-sync the two JSON files and `git add` them, making `npm version patch` atomic. Pattern:
+
+```json
+"scripts": {
+  "version": "tsx scripts/sync-versions.ts && git add server.json manifest.json"
+}
+```
+
+Until that exists, treat the three-file sync as a manual checklist item.
