@@ -5,7 +5,7 @@ import { Option } from "functype"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
-import type { BotDisclosureConfig, RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
+import type { BotDisclosureConfig, CacheConfig, RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
@@ -129,6 +129,14 @@ async function setupRedditClient() {
     footer: botDisclosureMode === "auto" ? (process.env.REDDIT_BOT_FOOTER ?? defaultFooter) : "",
   }
 
+  // Build cache config (enabled by default to ease Reddit rate limits; opt out with REDDIT_CACHE=off)
+  const cacheEnabled = (process.env.REDDIT_CACHE ?? "on") !== "off"
+  const cacheMaxMb = Number(process.env.REDDIT_CACHE_MAX_MB ?? "50")
+  const cacheConfig: CacheConfig = {
+    enabled: cacheEnabled,
+    maxBytes: (Number.isFinite(cacheMaxMb) && cacheMaxMb > 0 ? cacheMaxMb : 50) * 1024 * 1024,
+  }
+
   const client = initializeRedditClient({
     clientId: clientId ?? "",
     clientSecret: clientSecret ?? "",
@@ -138,6 +146,7 @@ async function setupRedditClient() {
     authMode,
     safeMode: safeModeConfig,
     botDisclosure: botDisclosureConfig,
+    cache: cacheConfig,
   })
 
   console.error("[Setup] Reddit client initialized")
@@ -528,6 +537,60 @@ server.addTool({
           (sr) => `r/${sr}`,
         )
         return `# Top Posts from ${location} (${args.time_filter})
+
+${postSummaries}`
+      },
+    )
+  },
+})
+
+server.addTool({
+  name: "browse_subreddit",
+  description:
+    "Browse posts from a subreddit or the Reddit home feed with a sort order (hot, new, top, rising, controversial). " +
+    "The time_filter only applies to top and controversial sorts.",
+  parameters: z.object({
+    subreddit: z.string().optional().describe("The subreddit name (without r/ prefix). Leave empty for home feed"),
+    sort: z.enum(["hot", "new", "top", "rising", "controversial"]).default("hot").describe("Sort order for posts"),
+    time_filter: z
+      .enum(["hour", "day", "week", "month", "year", "all"])
+      .default("week")
+      .describe("Time period (only applies to top and controversial sorts)"),
+    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.browseSubreddit(args.subreddit ?? "", args.sort, args.time_filter, args.limit)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to browse subreddit: ${err.message}`)
+      },
+      (posts) => {
+        const location = Option(args.subreddit).fold(
+          () => "home feed",
+          (sr) => `r/${sr}`,
+        )
+        if (posts.length === 0) {
+          return `No posts found in ${location}.`
+        }
+
+        const formattedPosts = posts.map(formatPostInfo)
+        const postSummaries = formattedPosts
+          .map(
+            (post, index) => `### ${index + 1}. ${post.title}
+- Author: u/${post.author}
+- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
+- Comments: ${post.stats.comments.toLocaleString()}
+- Posted: ${post.metadata.posted}
+- Link: ${post.links.shortLink}`,
+          )
+          .join("\n\n")
+
+        const timeSuffix = args.sort === "top" || args.sort === "controversial" ? `, ${args.time_filter}` : ""
+        const heading = location === "home feed" ? "Home Feed" : location
+        return `# ${args.sort} posts from ${heading} (${args.sort}${timeSuffix})
 
 ${postSummaries}`
       },

@@ -337,6 +337,153 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("browseSubreddit", () => {
+    const mockPostsData = {
+      data: {
+        children: [
+          {
+            kind: "t3",
+            data: {
+              id: "post1",
+              title: "Test Post 1",
+              author: "author1",
+              subreddit: "programming",
+              selftext: "Post content",
+              url: "https://reddit.com/r/programming/post1",
+              score: 100,
+              upvote_ratio: 0.95,
+              num_comments: 50,
+              created_utc: 1234567890,
+              over_18: false,
+              spoiler: false,
+              edited: false,
+              is_self: true,
+              link_flair_text: null,
+              permalink: "/r/programming/comments/post1/",
+            },
+          },
+        ],
+      },
+    }
+
+    const mockAuthThenPosts = () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPostsData,
+      })
+    }
+
+    it("should fetch hot posts without a time filter param", async () => {
+      mockAuthThenPosts()
+
+      const result = await client.browseSubreddit("programming", "hot", "week", 10)
+
+      const lastCallUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastCallUrl).toContain("/r/programming/hot.json?")
+      expect(lastCallUrl).toContain("limit=10")
+      expect(lastCallUrl).not.toMatch(/[?&]t=/)
+
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()[0].id).toBe("post1")
+    })
+
+    it("should include the time filter for top sort", async () => {
+      mockAuthThenPosts()
+
+      await client.browseSubreddit("programming", "top", "month", 5)
+
+      const lastCallUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastCallUrl).toContain("/r/programming/top.json?")
+      expect(lastCallUrl).toContain("t=month")
+      expect(lastCallUrl).toContain("limit=5")
+    })
+
+    it("should include the time filter for controversial sort", async () => {
+      mockAuthThenPosts()
+
+      await client.browseSubreddit("programming", "controversial", "year", 5)
+
+      const lastCallUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastCallUrl).toContain("/r/programming/controversial.json?")
+      expect(lastCallUrl).toContain("t=year")
+    })
+
+    it("should browse the home feed when no subreddit is specified", async () => {
+      mockAuthThenPosts()
+
+      await client.browseSubreddit("", "new", "week", 5)
+
+      const lastCallUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastCallUrl).toContain("/new.json?")
+      expect(lastCallUrl).not.toMatch(/[?&]t=/)
+    })
+
+    it("should reject an invalid sort", async () => {
+      const result = await client.browseSubreddit("programming", "bogus", "week", 5)
+
+      expect(result.isLeft()).toBe(true)
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("response caching", () => {
+    const postsBody = JSON.stringify({
+      data: {
+        children: [{ kind: "t3", data: { id: "cached1", title: "Cached", subreddit: "x", score: 1, num_comments: 0 } }],
+      },
+    })
+
+    it("serves a repeated identical GET from cache without re-fetching", async () => {
+      const cachedClient = new RedditClient({ ...mockConfig, cache: { enabled: true, maxBytes: 1_000_000 } })
+
+      // auth
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      // first (and only) data fetch — must expose text() for caching
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => postsBody,
+      })
+
+      const first = await cachedClient.browseSubreddit("x", "hot", "week", 10)
+      const second = await cachedClient.browseSubreddit("x", "hot", "week", 10)
+
+      expect(first.orThrow()[0].id).toBe("cached1")
+      expect(second.orThrow()[0].id).toBe("cached1")
+      // auth (1) + single data fetch (1) = 2; the second browse is served from cache
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it("does not cache when caching is disabled", async () => {
+      // default mockConfig has no cache config
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => JSON.parse(postsBody),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => JSON.parse(postsBody),
+      })
+
+      await client.browseSubreddit("x", "hot", "week", 10)
+      await client.browseSubreddit("x", "hot", "week", 10)
+
+      // auth (1) + two data fetches = 3
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+  })
+
   describe("createPost", () => {
     it("should create a new post", async () => {
       // With api_type=json, response is wrapped in json object

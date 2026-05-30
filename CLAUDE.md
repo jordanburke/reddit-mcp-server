@@ -12,6 +12,7 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 
 - `get_reddit_post` - Get a specific Reddit post with engagement analysis
 - `get_top_posts` - Get top posts from a subreddit or home feed
+- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial
 - `get_user_info` - Get detailed information about a Reddit user
 - `get_subreddit_info` - Get subreddit details, stats, and community insights
 - `get_trending_subreddits` - Get currently trending/popular subreddits
@@ -139,6 +140,15 @@ The server includes optional safeguards to protect against Reddit's spam detecti
 - **Duplicate Detection**: Blocks identical content from being posted, with clear error messages
 - **Smart User-Agent**: Auto-generates Reddit-compliant User-Agent format (`typescript:reddit-mcp-server:1.1.0 (by /u/USERNAME)`) when username is provided
 
+### Response Caching (Rate-Limit Relief)
+
+Read-only GET requests are cached in-memory to reduce pressure on Reddit's tight rate limits (~10 req/min anonymous, 60-100 authenticated). Configured via `REDDIT_CACHE` (default `on`, set `off` to disable) and `REDDIT_CACHE_MAX_MB` (default `50`).
+
+- **Adaptive TTLs** (`src/client/response-cache.ts`): volatile listings (hot/new/rising) and comment threads cache for 60s; top/controversial, search, and user/subreddit `about` cache for 300s; everything else 120s.
+- **Bounded LRU**: total cached bytes are capped at `REDDIT_CACHE_MAX_MB`; least-recently-used entries are evicted first. A single response larger than the cap is never cached.
+- **Scope**: only successful `GET` responses are cached, keyed by full URL. Write operations and auth requests are never cached. The cache layer lives in `RedditClient.makeRequest`, which re-wraps cached bodies in a fresh `Response` (a fetch body can only be consumed once).
+- Only active when enabled; when disabled the client behaves exactly as before (raw `Response` passthrough).
+
 ## Environment Setup
 
 Environment variables:
@@ -158,6 +168,10 @@ REDDIT_AUTH_MODE=auto            # Options: auto, authenticated, anonymous
 
 # Safe Mode (optional, defaults to 'off')
 REDDIT_SAFE_MODE=standard        # Options: off, standard, strict
+
+# Response Caching (optional, defaults to 'on')
+REDDIT_CACHE=on                  # Options: on, off
+REDDIT_CACHE_MAX_MB=50           # Cache size cap in MB (LRU eviction beyond this)
 
 # Transport Configuration
 # TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)

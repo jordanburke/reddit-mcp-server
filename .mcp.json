@@ -4,7 +4,7 @@
       "command": "node",
       "args": ["./dist/index.js"],
       "env": {
-        "REDDIT_AUTH_MODE": "anonymous"
+        "REDDIT_AUTH_MODE": "auto"
       }
     }
   }

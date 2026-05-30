@@ -23,6 +23,11 @@ export type SafeModeConfig = {
   readonly maxRecentHashes: number
 }
 
+export type CacheConfig = {
+  readonly enabled: boolean
+  readonly maxBytes: number
+}
+
 export type RedditClientConfig = {
   readonly clientId: string
   readonly clientSecret: string
@@ -32,6 +37,7 @@ export type RedditClientConfig = {
   readonly authMode?: RedditAuthMode
   readonly safeMode?: SafeModeConfig
   readonly botDisclosure?: BotDisclosureConfig
+  readonly cache?: CacheConfig
 }
 
 export type RedditUser = {

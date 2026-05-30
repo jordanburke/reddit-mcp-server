@@ -66,17 +66,18 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 
 ### Read-only Tools
 
-| Tool                      | Description                                         |
-| ------------------------- | --------------------------------------------------- |
-| `get_reddit_post`         | Get a specific Reddit post with engagement analysis |
-| `get_top_posts`           | Get top posts from a subreddit or home feed         |
-| `get_user_info`           | Get detailed information about a Reddit user        |
-| `get_user_posts`          | Get posts submitted by a specific user              |
-| `get_user_comments`       | Get comments made by a specific user                |
-| `get_subreddit_info`      | Get subreddit details and statistics                |
-| `get_trending_subreddits` | Get currently trending subreddits                   |
-| `get_post_comments`       | Get comments from a specific post with threading    |
-| `search_reddit`           | Search for posts across Reddit                      |
+| Tool                      | Description                                                                 |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `get_reddit_post`         | Get a specific Reddit post with engagement analysis                         |
+| `get_top_posts`           | Get top posts from a subreddit or home feed                                 |
+| `browse_subreddit`        | Browse a subreddit/home feed by sort (hot, new, top, rising, controversial) |
+| `get_user_info`           | Get detailed information about a Reddit user                                |
+| `get_user_posts`          | Get posts submitted by a specific user                                      |
+| `get_user_comments`       | Get comments made by a specific user                                        |
+| `get_subreddit_info`      | Get subreddit details and statistics                                        |
+| `get_trending_subreddits` | Get currently trending subreddits                                           |
+| `get_post_comments`       | Get comments from a specific post with threading                            |
+| `search_reddit`           | Search for posts across Reddit                                              |
 
 ### Write Tools (Require User Credentials)
 
@@ -104,6 +105,8 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 | `REDDIT_SAFE_MODE`      | No       | `standard`     | Write safeguards: `off`, `standard`, `strict`             |
 | `REDDIT_BOT_DISCLOSURE` | No       | `off`          | Bot disclosure footer: `auto`, `off`                      |
 | `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)        |
+| `REDDIT_CACHE`          | No       | `on`           | In-memory caching of read requests: `on`, `off`           |
+| `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)           |
 
 \*Required only if using `authenticated` mode.
 

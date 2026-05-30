@@ -32,6 +32,7 @@ import type {
   RedditUser,
   SafeModeConfig,
 } from "../types"
+import { ResponseCache } from "./response-cache"
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
@@ -69,6 +70,7 @@ export class RedditClient {
   private readonly hasCredentials: boolean
   private readonly safeMode: SafeModeConfig
   private readonly botDisclosure: BotDisclosureConfig
+  private readonly cache?: ResponseCache
 
   // Mutable state — inherent to a stateful HTTP client with token refresh
 
@@ -101,6 +103,8 @@ export class RedditClient {
     }
 
     this.botDisclosure = config.botDisclosure ?? { enabled: false, footer: "" }
+
+    this.cache = config.cache?.enabled === true ? new ResponseCache({ maxBytes: config.cache.maxBytes }) : undefined
   }
 
   private determineBaseUrl(): string {
@@ -116,6 +120,17 @@ export class RedditClient {
 
   private async makeRequest(path: string, options: RequestInit = {}): Promise<Either<Error, Response>> {
     try {
+      const url = `${this.baseUrl}${path}`
+      const method = (options.method ?? "GET").toUpperCase()
+      const cacheable = this.cache !== undefined && method === "GET"
+
+      if (cacheable) {
+        const cached = this.cache!.get(url)
+        if (cached !== undefined) {
+          return Right(new Response(cached.body, { status: cached.status }))
+        }
+      }
+
       const requiresAuth = this.authMode === "authenticated" || (this.authMode === "auto" && this.hasCredentials)
 
       if (requiresAuth && (Date.now() >= this.tokenExpiry || !this.authenticated)) {
@@ -123,7 +138,6 @@ export class RedditClient {
         authResult.orThrow()
       }
 
-      const url = `${this.baseUrl}${path}`
       const headers: Record<string, string> = {
         "User-Agent": this.userAgent,
         // eslint-disable-next-line functype/prefer-option -- RequestInit.headers is external fetch typing; used in spread
@@ -152,6 +166,14 @@ export class RedditClient {
             headers: retryHeaders,
           }),
         )
+      }
+
+      // Cache successful read responses and return a fresh, readable Response.
+      // (A fetch Response body can only be consumed once, so we re-wrap the text.)
+      if (cacheable && response.ok) {
+        const text = await response.text()
+        this.cache!.set(url, text, response.status)
+        return Right(new Response(text, { status: response.status }))
       }
 
       return Right(response)
@@ -377,6 +399,40 @@ export class RedditClient {
     } catch (error) {
       return Left(
         new Error(`Failed to get top posts for ${subreddit !== "" ? subreddit : "home"}: ${toError(error).message}`),
+      )
+    }
+  }
+
+  async browseSubreddit(
+    subreddit: string,
+    sort: string = "hot",
+    timeFilter: string = "week",
+    limit: number = 10,
+  ): Promise<Either<Error, readonly RedditPost[]>> {
+    const validSorts = ["hot", "new", "top", "rising", "controversial"]
+    if (!validSorts.includes(sort)) {
+      return Left(new Error(`Invalid sort "${sort}". Valid options are: ${validSorts.join(", ")}`))
+    }
+
+    const endpoint = subreddit !== "" ? `/r/${subreddit}/${sort}.json` : `/${sort}.json`
+    const params = new URLSearchParams({ limit: limit.toString() })
+    // The time filter only applies to top/controversial listings.
+    if (sort === "top" || sort === "controversial") {
+      params.set("t", timeFilter)
+    }
+
+    try {
+      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
+      if (!response.ok) {
+        return Left(new Error(`Failed to browse r/${subreddit !== "" ? subreddit : "home"}: HTTP ${response.status}`))
+      }
+
+      const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
+      const posts: readonly RedditPost[] = json.data.children.map((child) => parsePostData(child.data))
+      return Right(posts)
+    } catch (error) {
+      return Left(
+        new Error(`Failed to browse r/${subreddit !== "" ? subreddit : "home"} (${sort}): ${toError(error).message}`),
       )
     }
   }

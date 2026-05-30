@@ -6,12 +6,12 @@
     "url": "https://github.com/jordanburke/reddit-mcp-server",
     "source": "github"
   },
-  "version": "1.4.7",
+  "version": "1.4.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "reddit-mcp-server",
-      "version": "1.4.7",
+      "version": "1.4.8",
       "transport": {
         "type": "stdio"
       },
