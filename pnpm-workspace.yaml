@@ -5,7 +5,6 @@ allowBuilds:
   msw: true
   tldjs: true
 minimumReleaseAgeExclude:
-  - "@types/node@22.19.20"
   - "ts-builds"
   - "functype"
 
