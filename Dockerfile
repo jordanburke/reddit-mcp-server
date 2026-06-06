@@ -2,13 +2,13 @@
 FROM node:22-alpine AS builder
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -24,7 +24,7 @@ RUN pnpm build
 FROM node:22-alpine
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -34,7 +34,7 @@ RUN addgroup -g 1001 -S nodejs && \
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
