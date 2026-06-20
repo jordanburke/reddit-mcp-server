@@ -1949,6 +1949,84 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("getMoreComments", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("expands a 'more' stub into a flat list of comments and forwards ids", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          json: {
+            data: {
+              things: [
+                {
+                  kind: "t1",
+                  data: {
+                    id: "c1",
+                    author: "alice",
+                    body: "hello",
+                    score: 5,
+                    controversiality: 0,
+                    subreddit: "test",
+                    created_utc: 1,
+                    edited: false,
+                    is_submitter: true,
+                    permalink: "/r/test/comments/p1/c1",
+                    parent_id: "t3_p1",
+                  },
+                },
+                { kind: "more", data: { id: "x", children: ["c9"] } },
+              ],
+            },
+          },
+        }),
+      })
+
+      const result = await client.getMoreComments("p1", ["c1", "c2"])
+
+      const lastUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastUrl).toContain("/api/morechildren?")
+      expect(lastUrl).toContain("link_id=t3_p1")
+      expect(lastUrl).toContain("children=c1%2Cc2")
+
+      expect(result.isRight()).toBe(true)
+      const comments = result.orThrow()
+      expect(comments).toHaveLength(1) // the "more" stub is filtered out
+      expect(comments[0].id).toBe("c1")
+      expect(comments[0].author).toBe("alice")
+      expect(comments[0].parentId).toBe("t3_p1")
+      expect(comments[0].isSubmitter).toBe(true)
+    })
+
+    it("does not double-prefix an already-prefixed link id", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ json: { data: { things: [] } } }) })
+
+      await client.getMoreComments("t3_p1", ["c1"])
+
+      const lastUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastUrl).toContain("link_id=t3_p1")
+      expect(lastUrl).not.toContain("t3_t3_")
+    })
+
+    it("returns a typed HttpError on a non-ok response", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 400 })
+
+      const result = await client.getMoreComments("p1", ["c1"])
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to expand comments for t3_p1: HTTP 400")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
   describe("getPostFlairs", () => {
     const mockAuth = () =>
       mockFetch.mockResolvedValueOnce({

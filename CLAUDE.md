@@ -19,6 +19,7 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `get_trending_subreddits` - Get currently trending/popular subreddits
 - `search_reddit` - Search for posts across Reddit with filters
 - `get_post_comments` - Get comments from a specific post with threading
+- `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren
 - `get_user_posts` - Get posts submitted by a specific user
 - `get_user_comments` - Get comments made by a specific user
 - `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 anonymously)

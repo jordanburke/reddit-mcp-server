@@ -1194,6 +1194,48 @@ ${comment.body}
   },
 })
 
+server.addTool({
+  name: "get_more_comments",
+  description:
+    "Expand truncated 'load more comments' stubs in a thread. Pass the post's link id and the comment ids from a 'more' node (returned by get_post_comments) to fetch those comments.",
+  parameters: z.object({
+    link_id: z.string().describe("The post (link) id, with or without the t3_ prefix"),
+    comment_ids: z.array(z.string()).min(1).describe("Comment ids to expand (from a 'more' node)"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getMoreComments(args.link_id, args.comment_ids)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to expand comments: ${err.message}`)
+      },
+      (comments) => {
+        if (comments.length === 0) {
+          return "No additional comments were returned for those ids."
+        }
+
+        const commentList = comments
+          .map((comment, index) => {
+            const truncated = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
+            const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
+            return `### ${index + 1}. u/${comment.author} ${flags.join(" ")}
+> ${truncated}
+
+- Score: ${comment.score.toLocaleString()}
+- Link: https://reddit.com${comment.permalink}`
+          })
+          .join("\n\n")
+
+        return `# Expanded Comments (${comments.length})
+
+${commentList}`
+      },
+    )
+  },
+})
+
 // Initialize and start server
 async function main() {
   await setupRedditClient()
