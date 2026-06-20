@@ -158,6 +158,15 @@ Read-only GET requests are cached in-memory to reduce pressure on Reddit's tight
 - **Implementation**: `fetchWithRetry` is recursive (functional style — no mutable loop) and `retryAfterMs` returns `Option<number>`. The 401 re-auth path also flows through it, so a post-reauth request gets 429 handling too.
 - Retries apply to all requests (reads and writes); a 429 means the request was rejected, so retrying is safe.
 
+### Pagination
+
+Listing tools (`get_top_posts`, `browse_subreddit`, `search_reddit`, `get_user_posts`, `get_user_comments`) support Reddit's cursor pagination.
+
+- Each accepts an optional `after` param (the cursor from a previous page) to fetch the next page.
+- The client methods return `Page<T>` (`src/types.ts`): `{ items, after?, before? }`. `after`/`before` are surfaced only when Reddit returns a string cursor (its `null` is dropped), parsed by `listingCursor` in `RedditClient`.
+- The MCP tools render `items` and append a "More results available — call again with after=…" footer (`nextPageHint`) when `page.after` is present, so an agent can walk pages.
+- Forward paging only for now (`after`); `before` is returned but not yet accepted as input.
+
 ## Environment Setup
 
 Environment variables:

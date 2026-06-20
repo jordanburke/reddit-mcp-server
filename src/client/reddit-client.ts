@@ -14,6 +14,7 @@ import { Left, Option, Right, Try } from "functype"
 import type {
   BotDisclosureConfig,
   ContentRecord,
+  Page,
   RedditApiCommentResponse,
   RedditApiCommentTreeData,
   RedditApiEditResponse,
@@ -45,6 +46,15 @@ import {
   ValidationError,
 } from "./errors"
 import { ResponseCache } from "./response-cache"
+
+// Extract Reddit's pagination cursors from a listing's `data`. Reddit returns `after`/`before`
+// as a fullname string or null; we surface only present string cursors (no undefined keys, so
+// this is safe under exactOptionalPropertyTypes).
+function listingCursor(data: { readonly [key: string]: unknown }): Pick<Page<unknown>, "after" | "before"> {
+  const after = typeof data.after === "string" ? { after: data.after } : {}
+  const before = typeof data.before === "string" ? { before: data.before } : {}
+  return { ...after, ...before }
+}
 
 function parsePostData(post: RedditApiPostData): RedditPost {
   return {
@@ -444,22 +454,27 @@ export class RedditClient {
     subreddit: string,
     timeFilter: string = "week",
     limit: number = 10,
-  ): Promise<Either<RedditError, readonly RedditPost[]>> {
+    after?: string,
+  ): Promise<Either<RedditError, Page<RedditPost>>> {
     const endpoint = subreddit !== "" ? `/r/${subreddit}/top.json` : "/top.json"
     const params = new URLSearchParams({
       t: timeFilter,
       limit: limit.toString(),
     })
+    if (after !== undefined) {
+      params.set("after", after)
+    }
     const context = `Failed to get top posts for ${subreddit !== "" ? subreddit : "home"}`
 
-    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
+    const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to get top posts: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
-      return json.data.children.map((child) => parsePostData(child.data))
+      const items = json.data.children.map((child) => parsePostData(child.data))
+      return { items, ...listingCursor(json.data) }
     })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
@@ -470,7 +485,8 @@ export class RedditClient {
     sort: string = "hot",
     timeFilter: string = "week",
     limit: number = 10,
-  ): Promise<Either<RedditError, readonly RedditPost[]>> {
+    after?: string,
+  ): Promise<Either<RedditError, Page<RedditPost>>> {
     const validSorts = ["hot", "new", "top", "rising", "controversial"]
     if (!validSorts.includes(sort)) {
       return Left(new ValidationError(`Invalid sort "${sort}". Valid options are: ${validSorts.join(", ")}`))
@@ -482,17 +498,21 @@ export class RedditClient {
     if (sort === "top" || sort === "controversial") {
       params.set("t", timeFilter)
     }
+    if (after !== undefined) {
+      params.set("after", after)
+    }
     const home = subreddit !== "" ? subreddit : "home"
     const context = `Failed to browse r/${home} (${sort})`
 
-    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
+    const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to browse r/${home}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
-      return json.data.children.map((child) => parsePostData(child.data))
+      const items = json.data.children.map((child) => parsePostData(child.data))
+      return { items, ...listingCursor(json.data) }
     })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
@@ -771,9 +791,11 @@ export class RedditClient {
       readonly timeFilter?: string
       readonly limit?: number
       readonly type?: string
+      readonly after?: string
+      readonly before?: string
     } = {},
-  ): Promise<Either<RedditError, readonly RedditPost[]>> {
-    const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
+  ): Promise<Either<RedditError, Page<RedditPost>>> {
+    const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link", after, before } = options
     const endpoint = Option(subreddit).fold(
       () => "/search.json",
       (sr) => `/r/${sr}/search.json`,
@@ -787,10 +809,14 @@ export class RedditClient {
       type,
       // eslint-disable-next-line functype/prefer-fold -- conditional spread of native string | undefined into URLSearchParams init
       ...(subreddit !== undefined ? { restrict_sr: "true" } : {}),
+      // eslint-disable-next-line functype/prefer-fold -- conditional spread of cursors into URLSearchParams init
+      ...(after !== undefined ? { after } : {}),
+      // eslint-disable-next-line functype/prefer-fold -- conditional spread of cursors into URLSearchParams init
+      ...(before !== undefined ? { before } : {}),
     })
     const context = `Failed to search Reddit for: ${query}`
 
-    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
+    const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to search Reddit: HTTP ${response.status}`)
@@ -798,7 +824,8 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
-      return json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+      const items = json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+      return { items, ...listingCursor(json.data) }
     })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
@@ -878,17 +905,21 @@ export class RedditClient {
       readonly sort?: string
       readonly timeFilter?: string
       readonly limit?: number
+      readonly after?: string
     } = {},
-  ): Promise<Either<RedditError, readonly RedditPost[]>> {
-    const { sort = "new", timeFilter = "all", limit = 25 } = options
+  ): Promise<Either<RedditError, Page<RedditPost>>> {
+    const { sort = "new", timeFilter = "all", limit = 25, after } = options
     const params = new URLSearchParams({
       sort,
       t: timeFilter,
       limit: limit.toString(),
     })
+    if (after !== undefined) {
+      params.set("after", after)
+    }
     const context = `Failed to get posts for user ${username}`
 
-    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
+    const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const response = (await this.makeRequest(`/user/${username}/submitted.json?${params}`)).orThrow()
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
@@ -896,7 +927,8 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
-      return json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+      const items = json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+      return { items, ...listingCursor(json.data) }
     })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
@@ -908,17 +940,21 @@ export class RedditClient {
       readonly sort?: string
       readonly timeFilter?: string
       readonly limit?: number
+      readonly after?: string
     } = {},
-  ): Promise<Either<RedditError, readonly RedditComment[]>> {
-    const { sort = "new", timeFilter = "all", limit = 25 } = options
+  ): Promise<Either<RedditError, Page<RedditComment>>> {
+    const { sort = "new", timeFilter = "all", limit = 25, after } = options
     const params = new URLSearchParams({
       sort,
       t: timeFilter,
       limit: limit.toString(),
     })
+    if (after !== undefined) {
+      params.set("after", after)
+    }
     const context = `Failed to get comments for user ${username}`
 
-    const attempt = await Try.async(async (): Promise<readonly RedditComment[]> => {
+    const attempt = await Try.async(async (): Promise<Page<RedditComment>> => {
       const response = (await this.makeRequest(`/user/${username}/comments.json?${params}`)).orThrow()
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
@@ -926,7 +962,7 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiCommentTreeData>
 
-      return json.data.children
+      const items = json.data.children
         .filter((child) => child.kind === "t1")
         .map((child) => {
           const comment = child.data
@@ -944,6 +980,7 @@ export class RedditClient {
             permalink: comment.permalink,
           }
         })
+      return { items, ...listingCursor(json.data) }
     })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
