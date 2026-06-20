@@ -706,6 +706,81 @@ ${formattedSubreddit.description.full}
 })
 
 server.addTool({
+  name: "get_subreddit_rules",
+  description:
+    "Get a subreddit's posting rules. Useful to check requirements before creating a post to avoid auto-removal.",
+  parameters: z.object({
+    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getSubredditRules(args.subreddit_name)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get subreddit rules: ${err.message}`)
+      },
+      (rules) => {
+        if (rules.length === 0) {
+          return `r/${args.subreddit_name} has no listed subreddit-specific rules.`
+        }
+
+        const ruleList = rules
+          .map((rule, index) => {
+            const applies = rule.kind === "all" ? "posts & comments" : `${rule.kind}s`
+            const detail = rule.description.trim() === "" ? "" : `\n${rule.description.trim()}`
+            return `### ${index + 1}. ${rule.shortName} _(applies to ${applies})_${detail}`
+          })
+          .join("\n\n")
+
+        return `# Posting Rules for r/${args.subreddit_name}
+
+${ruleList}`
+      },
+    )
+  },
+})
+
+server.addTool({
+  name: "get_post_flairs",
+  description:
+    "List the available link flairs for a subreddit (use a flair_id with create_post). Requires user credentials; many subreddits only expose flairs to members, so this may fail in anonymous mode.",
+  parameters: z.object({
+    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getPostFlairs(args.subreddit_name)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get post flairs: ${err.message}`)
+      },
+      (flairs) => {
+        if (flairs.length === 0) {
+          return `r/${args.subreddit_name} has no selectable link flairs (or none are visible to this account).`
+        }
+
+        const flairList = flairs
+          .map((flair) => {
+            const editable = flair.textEditable === true ? " _(text editable)_" : ""
+            return `- ${flair.text}${editable} — \`flair_id: ${flair.id}\``
+          })
+          .join("\n")
+
+        return `# Available Link Flairs for r/${args.subreddit_name}
+
+${flairList}
+
+Pass the desired \`flair_id\` to \`create_post\`.`
+      },
+    )
+  },
+})
+
+server.addTool({
   name: "get_trending_subreddits",
   description: "Get a list of currently trending subreddits",
   parameters: z.object({}),
@@ -818,6 +893,11 @@ server.addTool({
     title: z.string().describe("The post title"),
     content: z.string().describe("The post content (text for self posts, URL for link posts)"),
     is_self: z.boolean().default(true).describe("Whether this is a self post (text) or link post"),
+    flair_id: z
+      .string()
+      .optional()
+      .describe("Link flair template id (from get_post_flairs); many subreddits require a flair"),
+    flair_text: z.string().optional().describe("Custom flair text, only for flairs whose template is text-editable"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -829,7 +909,14 @@ server.addTool({
       )
     }
 
-    const result = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
+    const result = await client.createPost(
+      args.subreddit,
+      args.title,
+      args.content,
+      args.is_self,
+      args.flair_id,
+      args.flair_text,
+    )
     return result.fold(
       (err) => {
         // eslint-disable-next-line functype/prefer-either

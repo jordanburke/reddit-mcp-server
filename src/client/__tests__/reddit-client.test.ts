@@ -703,6 +703,91 @@ describe("RedditClient", () => {
       expect(post.title).toBe("My New Post")
     })
 
+    it("includes flair_id and flair_text in the submit body when provided", async () => {
+      const mockSubmitResponse = { json: { data: { id: "p1" }, errors: [] } }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "p1",
+                  title: "T",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "C",
+                  url: "https://reddit.com/r/test/p1",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: 1,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/p1/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "t", expires_in: 3600 }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockSubmitResponse })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockPostData })
+
+      const result = await client.createPost("test", "T", "C", true, "flair-abc", "custom flair")
+      expect(result.isRight()).toBe(true)
+
+      const submitBody = new URLSearchParams(mockFetch.mock.calls[1][1].body as string)
+      expect(submitBody.get("flair_id")).toBe("flair-abc")
+      expect(submitBody.get("flair_text")).toBe("custom flair")
+    })
+
+    it("omits flair params when none are provided", async () => {
+      const mockSubmitResponse = { json: { data: { id: "p2" }, errors: [] } }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "p2",
+                  title: "T",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "C",
+                  url: "https://reddit.com/r/test/p2",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: 1,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/p2/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "t", expires_in: 3600 }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockSubmitResponse })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockPostData })
+
+      await client.createPost("test", "T", "C")
+
+      const submitBody = new URLSearchParams(mockFetch.mock.calls[1][1].body as string)
+      expect(submitBody.get("flair_id")).toBeNull()
+      expect(submitBody.get("flair_text")).toBeNull()
+    })
+
     it("should return Left when user is not authenticated for write", async () => {
       const clientReadOnly = new RedditClient({
         clientId: "test-client-id",
@@ -1797,6 +1882,111 @@ describe("RedditClient", () => {
       if (result.isLeft()) {
         expect(result.value.message).toBe("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
         expect(result.value._tag).toBe("NotAuthenticatedError")
+      }
+    })
+  })
+
+  describe("getSubredditRules", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("fetches and maps subreddit rules", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          rules: [
+            {
+              short_name: "No spam",
+              description: "Do not spam.",
+              kind: "all",
+              violation_reason: "Spam",
+              priority: 0,
+              created_utc: 1,
+            },
+            { short_name: "Flair required", description: "", kind: "link" },
+          ],
+        }),
+      })
+
+      const result = await client.getSubredditRules("programming")
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        "https://oauth.reddit.com/r/programming/about/rules.json",
+        expect.any(Object),
+      )
+      expect(result.isRight()).toBe(true)
+      const rules = result.orThrow()
+      expect(rules).toHaveLength(2)
+      expect(rules[0].shortName).toBe("No spam")
+      expect(rules[0].kind).toBe("all")
+      expect(rules[0].violationReason).toBe("Spam")
+      expect(rules[1].shortName).toBe("Flair required")
+      expect(rules[1].kind).toBe("link")
+    })
+
+    it("returns an empty list when the subreddit has no rules", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ rules: [] }) })
+
+      const result = await client.getSubredditRules("programming")
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toHaveLength(0)
+    })
+
+    it("returns a typed HttpError on a non-ok response", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+
+      const result = await client.getSubredditRules("ghost")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get rules for r/ghost: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
+  describe("getPostFlairs", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("fetches and maps link flairs from the bare array response", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { id: "abc", text: "Discussion", type: "text", text_editable: false },
+          { id: "def", text: "Help", type: "richtext", text_editable: true },
+        ],
+      })
+
+      const result = await client.getPostFlairs("programming")
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        "https://oauth.reddit.com/r/programming/api/link_flair_v2.json",
+        expect.any(Object),
+      )
+      expect(result.isRight()).toBe(true)
+      const flairs = result.orThrow()
+      expect(flairs).toHaveLength(2)
+      expect(flairs[0]).toEqual({ id: "abc", text: "Discussion", type: "text", textEditable: false })
+      expect(flairs[1].textEditable).toBe(true)
+    })
+
+    it("returns a typed HttpError when flairs are not accessible (e.g. 403)", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
+
+      const result = await client.getPostFlairs("programming")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get post flairs for r/programming: HTTP 403")
+        expect(result.value._tag).toBe("HttpError")
       }
     })
   })

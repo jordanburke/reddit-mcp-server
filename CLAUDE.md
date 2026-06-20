@@ -15,17 +15,19 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial
 - `get_user_info` - Get detailed information about a Reddit user
 - `get_subreddit_info` - Get subreddit details, stats, and community insights
+- `get_subreddit_rules` - Get a subreddit's posting rules (check before posting to avoid auto-removal)
 - `get_trending_subreddits` - Get currently trending/popular subreddits
 - `search_reddit` - Search for posts across Reddit with filters
 - `get_post_comments` - Get comments from a specific post with threading
 - `get_user_posts` - Get posts submitted by a specific user
 - `get_user_comments` - Get comments made by a specific user
+- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 anonymously)
 
 ### Write Tools (User Credentials Required)
 
 **IMPORTANT**: These tools require both REDDIT_USERNAME and REDDIT_PASSWORD to be configured.
 
-- `create_post` - Create a new post in a subreddit (text or link)
+- `create_post` - Create a new post in a subreddit (text or link); accepts optional `flair_id`/`flair_text` (from `get_post_flairs`)
 - `reply_to_post` - Post a reply to an existing Reddit post or comment
 - `edit_post` - Edit your own Reddit post (self-text posts only, titles cannot be edited)
 - `edit_comment` - Edit your own Reddit comment

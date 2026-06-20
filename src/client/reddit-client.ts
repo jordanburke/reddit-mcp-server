@@ -19,17 +19,21 @@ import type {
   RedditApiCommentTreeData,
   RedditApiEditResponse,
   RedditApiInfoResponse,
+  RedditApiLinkFlairResponse,
   RedditApiListingResponse,
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
   RedditApiPostData,
+  RedditApiRulesResponse,
   RedditApiSubmitResponse,
   RedditApiSubredditResponse,
   RedditApiUserResponse,
   RedditAuthMode,
   RedditClientConfig,
   RedditComment,
+  RedditFlair,
   RedditPost,
+  RedditRule,
   RedditSubreddit,
   RedditUser,
   RetryConfig,
@@ -450,6 +454,48 @@ export class RedditClient {
     return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
+  async getSubredditRules(subreddit: string): Promise<Either<RedditError, readonly RedditRule[]>> {
+    const context = `Failed to get rules for r/${subreddit}`
+    const attempt = await Try.async(async (): Promise<readonly RedditRule[]> => {
+      const response = (await this.makeRequest(`/r/${subreddit}/about/rules.json`)).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as RedditApiRulesResponse
+      return json.rules.map((rule) => ({
+        shortName: rule.short_name,
+        description: rule.description,
+        kind: rule.kind,
+        violationReason: rule.violation_reason,
+        priority: rule.priority,
+        createdUtc: rule.created_utc,
+      }))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  async getPostFlairs(subreddit: string): Promise<Either<RedditError, readonly RedditFlair[]>> {
+    const context = `Failed to get post flairs for r/${subreddit}`
+    const attempt = await Try.async(async (): Promise<readonly RedditFlair[]> => {
+      const response = (await this.makeRequest(`/r/${subreddit}/api/link_flair_v2.json`)).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as RedditApiLinkFlairResponse
+      return json.map((flair) => ({
+        id: flair.id,
+        text: flair.text,
+        type: flair.type,
+        textEditable: flair.text_editable,
+      }))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
   async getTopPosts(
     subreddit: string,
     timeFilter: string = "week",
@@ -568,6 +614,8 @@ export class RedditClient {
     title: string,
     content: string,
     isSelf: boolean = true,
+    flairId?: string,
+    flairText?: string,
   ): Promise<Either<RedditError, RedditPost>> {
     const attempt = await Try.async(async (): Promise<RedditPost> => {
       this.validateWriteAccess()
@@ -582,6 +630,12 @@ export class RedditClient {
       params.append("title", title)
       params.append(isSelf ? "text" : "url", finalContent)
       params.append("api_type", "json")
+      if (flairId !== undefined) {
+        params.append("flair_id", flairId)
+      }
+      if (flairText !== undefined) {
+        params.append("flair_text", flairText)
+      }
 
       const response = (
         await this.makeRequest("/api/submit", {

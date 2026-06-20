@@ -121,6 +121,24 @@ export type Page<T> = {
   readonly before?: string
 }
 
+/** A subreddit posting rule (from /r/{sr}/about/rules). `kind` is "link" | "comment" | "all". */
+export type RedditRule = {
+  readonly shortName: string
+  readonly description: string
+  readonly kind: string
+  readonly violationReason?: string
+  readonly priority?: number
+  readonly createdUtc?: number
+}
+
+/** An available link flair template (from /r/{sr}/api/link_flair_v2). `id` is passed to create_post. */
+export type RedditFlair = {
+  readonly id: string
+  readonly text: string
+  readonly type?: string
+  readonly textEditable?: boolean
+}
+
 export type FormattedUserInfo = {
   readonly username: string
   readonly karma: {
@@ -264,6 +282,28 @@ export type RedditApiListingResponse<T> = {
     readonly [key: string]: unknown
   }
 }
+
+export type RedditApiRulesResponse = {
+  readonly rules: ReadonlyArray<{
+    readonly short_name: string
+    readonly description: string
+    readonly kind: string
+    readonly violation_reason?: string
+    readonly priority?: number
+    readonly created_utc?: number
+    readonly [key: string]: unknown
+  }>
+  readonly [key: string]: unknown
+}
+
+// /r/{sr}/api/link_flair_v2 returns a bare JSON array of flair templates.
+export type RedditApiLinkFlairResponse = ReadonlyArray<{
+  readonly id: string
+  readonly text: string
+  readonly type?: string
+  readonly text_editable?: boolean
+  readonly [key: string]: unknown
+}>
 
 export type RedditApiCommentData = {
   readonly id: string
