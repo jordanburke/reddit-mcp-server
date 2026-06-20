@@ -1932,6 +1932,101 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("getMyOverview / getMySaved", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+    const mixedListing = {
+      data: {
+        children: [
+          {
+            kind: "t3",
+            data: {
+              id: "post1",
+              title: "A post",
+              author: "testuser",
+              subreddit: "s",
+              selftext: "",
+              url: "https://reddit.com",
+              score: 9,
+              upvote_ratio: 1,
+              num_comments: 2,
+              created_utc: 1,
+              over_18: false,
+              spoiler: false,
+              edited: false,
+              is_self: true,
+              link_flair_text: null,
+              permalink: "/r/s/comments/post1/",
+            },
+          },
+          {
+            kind: "t1",
+            data: {
+              id: "c1",
+              author: "testuser",
+              body: "a comment",
+              score: 3,
+              controversiality: 0,
+              subreddit: "s",
+              created_utc: 1,
+              edited: false,
+              is_submitter: false,
+              permalink: "/r/s/comments/post1/c1",
+              parent_id: "t3_post1",
+            },
+          },
+        ],
+        after: "t1_next",
+        before: null,
+      },
+    }
+
+    it("splits overview into posts and comments and surfaces the cursor", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mixedListing })
+
+      const result = await client.getMyOverview({ limit: 10 })
+      const lastUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastUrl).toContain("/user/testuser/overview.json")
+
+      expect(result.isRight()).toBe(true)
+      const content = result.orThrow()
+      expect(content.posts).toHaveLength(1)
+      expect(content.posts[0].id).toBe("post1")
+      expect(content.comments).toHaveLength(1)
+      expect(content.comments[0].id).toBe("c1")
+      expect(content.after).toBe("t1_next")
+    })
+
+    it("getMySaved hits the saved endpoint", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mixedListing })
+
+      await client.getMySaved({})
+      const lastUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastUrl).toContain("/user/testuser/saved.json")
+    })
+
+    it("returns NotAuthenticatedError when no username is configured", async () => {
+      const readOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      const result = await readOnly.getMySaved({})
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("NotAuthenticatedError")
+        expect(result.value.message).toBe("Fetching saved content requires REDDIT_USERNAME")
+      }
+    })
+  })
+
   describe("getSubredditRules", () => {
     const mockAuth = () =>
       mockFetch.mockResolvedValueOnce({

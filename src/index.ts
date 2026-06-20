@@ -12,6 +12,7 @@ import type {
   RedditSafeMode,
   RetryConfig,
   SafeModeConfig,
+  UserContent,
 } from "./types"
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
@@ -94,6 +95,33 @@ function nextPageHint(after?: string): string {
     () => "",
     (cursor) => `\n\n---\nMore results available — call again with after="${cursor}" for the next page.`,
   )
+}
+
+// Render a mixed posts+comments listing (saved / overview).
+function formatUserContent(heading: string, content: UserContent): string {
+  const postsSection =
+    content.posts.length === 0
+      ? ""
+      : `## Posts (${content.posts.length})\n${content.posts
+          .map(
+            (post, index) =>
+              `${index + 1}. ${post.title} — r/${post.subreddit}, score ${post.score.toLocaleString()} — https://reddit.com${post.permalink}`,
+          )
+          .join("\n")}\n\n`
+
+  const commentsSection =
+    content.comments.length === 0
+      ? ""
+      : `## Comments (${content.comments.length})\n${content.comments
+          .map((comment, index) => {
+            const body = comment.body.length > 200 ? `${comment.body.substring(0, 200)}...` : comment.body
+            return `${index + 1}. in r/${comment.subreddit}: ${body} — https://reddit.com${comment.permalink}`
+          })
+          .join("\n")}\n\n`
+
+  const empty = content.posts.length === 0 && content.comments.length === 0 ? "No items found.\n\n" : ""
+
+  return `# ${heading}\n\n${postsSection}${commentsSection}${empty}`.trimEnd() + nextPageHint(content.after)
 }
 
 // Initialize Reddit client
@@ -381,6 +409,50 @@ server.addTool({
 - Account Created: ${formattedUser.accountCreated}
 - Profile URL: ${formattedUser.profileUrl}`
       },
+    )
+  },
+})
+
+server.addTool({
+  name: "get_my_overview",
+  description:
+    "Get your own recent activity (posts and comments combined). Requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD).",
+  parameters: z.object({
+    limit: z.number().min(1).max(100).default(25).describe("Number of items to retrieve"),
+    after: z.string().optional().describe("Pagination cursor: pass the `after` value from a previous page"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getMyOverview({ limit: args.limit, after: args.after })
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get your overview: ${err.message}`)
+      },
+      (content) => formatUserContent("Your Overview", content),
+    )
+  },
+})
+
+server.addTool({
+  name: "get_my_saved",
+  description:
+    "Get your saved posts and comments. Requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD); saved content is private.",
+  parameters: z.object({
+    limit: z.number().min(1).max(100).default(25).describe("Number of items to retrieve"),
+    after: z.string().optional().describe("Pagination cursor: pass the `after` value from a previous page"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getMySaved({ limit: args.limit, after: args.after })
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get saved content: ${err.message}`)
+      },
+      (content) => formatUserContent("Your Saved Content", content),
     )
   },
 })

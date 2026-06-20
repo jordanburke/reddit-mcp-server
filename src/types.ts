@@ -121,6 +121,17 @@ export type Page<T> = {
   readonly before?: string
 }
 
+/**
+ * A mixed page of a user's posts and comments (saved / overview listings), split by kind, plus
+ * the pagination cursor.
+ */
+export type UserContent = {
+  readonly posts: readonly RedditPost[]
+  readonly comments: readonly RedditComment[]
+  readonly after?: string
+  readonly before?: string
+}
+
 /** A subreddit posting rule (from /r/{sr}/about/rules). `kind` is "link" | "comment" | "all". */
 export type RedditRule = {
   readonly shortName: string
