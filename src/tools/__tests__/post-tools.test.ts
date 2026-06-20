@@ -6,7 +6,6 @@ import { getRedditClient } from "../../client/reddit-client"
 import { getRedditPost, getTopPosts } from "../post-tools"
 
 vi.mock("../../client/reddit-client")
-vi.mock("../../utils/formatters")
 
 // Mock the formatters
 vi.mock("../../utils/formatters", () => ({

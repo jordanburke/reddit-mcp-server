@@ -6,7 +6,6 @@ import { getRedditClient } from "../../client/reddit-client"
 import { getSubredditInfo, getTrendingSubreddits } from "../subreddit-tools"
 
 vi.mock("../../client/reddit-client")
-vi.mock("../../utils/formatters")
 
 // Mock the formatters
 vi.mock("../../utils/formatters", () => ({
