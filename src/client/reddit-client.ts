@@ -31,6 +31,7 @@ import type {
   RedditPost,
   RedditSubreddit,
   RedditUser,
+  RetryConfig,
   SafeModeConfig,
 } from "../types"
 import type { RedditError } from "./errors"
@@ -78,6 +79,7 @@ export class RedditClient {
   private readonly safeMode: SafeModeConfig
   private readonly botDisclosure: BotDisclosureConfig
   private readonly cache?: ResponseCache
+  private readonly retry: RetryConfig
 
   // Mutable state — inherent to a stateful HTTP client with token refresh
 
@@ -112,6 +114,8 @@ export class RedditClient {
     this.botDisclosure = config.botDisclosure ?? { enabled: false, footer: "" }
 
     this.cache = config.cache?.enabled === true ? new ResponseCache({ maxBytes: config.cache.maxBytes }) : undefined
+
+    this.retry = config.retry ?? { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 60000 }
   }
 
   private determineBaseUrl(): string {
@@ -157,23 +161,13 @@ export class RedditClient {
         headers["Authorization"] = `Bearer ${this.accessToken}`
       }
 
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      })
+      const first = await this.fetchWithRetry(url, options, headers, path, 0)
 
-      if (response.status === 401 && this.authenticated) {
-        const reAuthResult = await this.authenticate()
-        reAuthResult.orThrow()
-        const retryHeaders = {
-          ...headers,
-          Authorization: `Bearer ${this.accessToken}`,
-        }
-        return await fetch(url, {
-          ...options,
-          headers: retryHeaders,
-        })
-      }
+      // 401 once-off re-auth, then retry the request (which itself honors 429 backoff).
+      const response =
+        first.status === 401 && this.authenticated
+          ? await this.fetchWithRetry(url, options, { ...headers, Authorization: await this.reauthorize() }, path, 0)
+          : first
 
       // Cache successful read responses and return a fresh, readable Response.
       // (A fetch Response body can only be consumed once, so we re-wrap the text.)
@@ -317,6 +311,70 @@ export class RedditClient {
     })
 
     this.recentContentRecords = this.recentContentRecords.slice(-this.safeMode.maxRecentHashes)
+  }
+
+  // Re-authenticate and return a fresh Bearer header value (throws via orThrow on failure).
+  private async reauthorize(): Promise<string> {
+    const result = await this.authenticate()
+    result.orThrow()
+    return `Bearer ${this.accessToken}`
+  }
+
+  // Fetch with transparent retry on HTTP 429. Honors Retry-After / x-ratelimit-reset, else
+  // exponential backoff; surfaces the 429 once retries are exhausted or the required wait
+  // exceeds the cap. Recursive (not a loop) to satisfy the functional style.
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+    headers: Record<string, string>,
+    path: string,
+    attempt: number,
+  ): Promise<Response> {
+    const response = await fetch(url, { ...options, headers })
+    if (response.status !== 429 || attempt >= this.retry.maxRetries) {
+      return response
+    }
+
+    const wait = this.retryAfterMs(response).fold(
+      () => Math.min(this.retry.baseDelayMs * 2 ** attempt, this.retry.maxDelayMs),
+      (ms) => ms,
+    )
+    if (wait > this.retry.maxDelayMs) {
+      return response
+    }
+
+    console.error(`[RateLimit] 429 from ${path} — retry ${attempt + 1}/${this.retry.maxRetries} in ${wait}ms`)
+    await new Promise((resolve) => setTimeout(resolve, wait))
+    return this.fetchWithRetry(url, options, headers, path, attempt + 1)
+  }
+
+  // Parse a retry delay (ms) from a 429 response: prefer Retry-After (delta-seconds or
+  // HTTP-date), then x-ratelimit-reset (seconds). None when no usable header is present,
+  // signalling the caller to fall back to exponential backoff.
+  private retryAfterMs(response: Response): Option<number> {
+    const { headers } = response
+
+    const retryAfter = headers.get("retry-after")
+    if (retryAfter !== null && retryAfter !== "") {
+      const seconds = Number(retryAfter)
+      if (!Number.isNaN(seconds)) {
+        return Option(seconds * 1000)
+      }
+      const when = Date.parse(retryAfter)
+      if (!Number.isNaN(when)) {
+        return Option(Math.max(0, when - Date.now()))
+      }
+    }
+
+    const reset = headers.get("x-ratelimit-reset")
+    if (reset !== null && reset !== "") {
+      const seconds = Number(reset)
+      if (!Number.isNaN(seconds)) {
+        return Option(seconds * 1000)
+      }
+    }
+
+    return Option.none()
   }
 
   private appendBotDisclosure(content: string): string {
