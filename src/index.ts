@@ -5,7 +5,14 @@ import { Option } from "functype"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
-import type { BotDisclosureConfig, CacheConfig, RedditAuthMode, RedditSafeMode, SafeModeConfig } from "./types"
+import type {
+  BotDisclosureConfig,
+  CacheConfig,
+  RedditAuthMode,
+  RedditSafeMode,
+  RetryConfig,
+  SafeModeConfig,
+} from "./types"
 import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
@@ -137,6 +144,14 @@ async function setupRedditClient() {
     maxBytes: (Number.isFinite(cacheMaxMb) && cacheMaxMb > 0 ? cacheMaxMb : 50) * 1024 * 1024,
   }
 
+  // Retry on HTTP 429 with Retry-After backoff (opt out with REDDIT_MAX_RETRIES=0)
+  const maxRetriesRaw = Number(process.env.REDDIT_MAX_RETRIES ?? "3")
+  const retryConfig: RetryConfig = {
+    maxRetries: Number.isFinite(maxRetriesRaw) && maxRetriesRaw >= 0 ? Math.floor(maxRetriesRaw) : 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 60_000,
+  }
+
   const client = initializeRedditClient({
     clientId: clientId ?? "",
     clientSecret: clientSecret ?? "",
@@ -147,6 +162,7 @@ async function setupRedditClient() {
     safeMode: safeModeConfig,
     botDisclosure: botDisclosureConfig,
     cache: cacheConfig,
+    retry: retryConfig,
   })
 
   console.error("[Setup] Reddit client initialized")
@@ -680,7 +696,12 @@ server.addTool({
   parameters: z.object({
     query: z.string().describe("Search query"),
     subreddit: z.string().optional().describe("Limit search to specific subreddit (without r/ prefix)"),
-    sort: z.enum(["relevance", "hot", "top", "new", "comments"]).default("relevance").describe("Sort order"),
+    sort: z
+      .enum(["relevance", "hot", "top", "new", "comments"])
+      .default("relevance")
+      .describe(
+        "Sort order. Prefer 'relevance' (default) for finding posts about a topic. Use 'top'/'hot' only for what's currently popular and 'new' for the latest — these rank by karma/recency and, especially combined with a narrow time_filter, can surface loosely-matching posts over the best topical results.",
+      ),
     time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all").describe("Time filter"),
     limit: z.number().min(1).max(100).default(10).describe("Number of results"),
     type: z.enum(["link", "sr", "user"]).default("link").describe("Type of content to search"),

@@ -28,6 +28,15 @@ export type CacheConfig = {
   readonly maxBytes: number
 }
 
+export type RetryConfig = {
+  /** Max retries on HTTP 429 (rate limit). 0 disables retrying. */
+  readonly maxRetries: number
+  /** Base delay for exponential backoff when no Retry-After header is present (ms). */
+  readonly baseDelayMs: number
+  /** Upper bound on any single wait; if the required wait exceeds this, give up and surface the 429 (ms). */
+  readonly maxDelayMs: number
+}
+
 export type RedditClientConfig = {
   readonly clientId: string
   readonly clientSecret: string
@@ -38,6 +47,7 @@ export type RedditClientConfig = {
   readonly safeMode?: SafeModeConfig
   readonly botDisclosure?: BotDisclosureConfig
   readonly cache?: CacheConfig
+  readonly retry?: RetryConfig
 }
 
 export type RedditUser = {

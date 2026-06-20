@@ -149,6 +149,15 @@ Read-only GET requests are cached in-memory to reduce pressure on Reddit's tight
 - **Scope**: only successful `GET` responses are cached, keyed by full URL. Write operations and auth requests are never cached. The cache layer lives in `RedditClient.makeRequest`, which re-wraps cached bodies in a fresh `Response` (a fetch body can only be consumed once).
 - Only active when enabled; when disabled the client behaves exactly as before (raw `Response` passthrough).
 
+### Rate-Limit Retry (429)
+
+`RedditClient.makeRequest` transparently retries HTTP 429 responses. Configured via `REDDIT_MAX_RETRIES` (default `3`, set `0` to disable).
+
+- **Delay**: honors `Retry-After` (delta-seconds or HTTP-date), then `x-ratelimit-reset`; otherwise exponential backoff (`baseDelayMs * 2^attempt`).
+- **Cap**: a single wait is bounded by `maxDelayMs` (60s); if the required wait exceeds the cap, it gives up and surfaces the typed `HttpError(429)` rather than blocking.
+- **Implementation**: `fetchWithRetry` is recursive (functional style — no mutable loop) and `retryAfterMs` returns `Option<number>`. The 401 re-auth path also flows through it, so a post-reauth request gets 429 handling too.
+- Retries apply to all requests (reads and writes); a 429 means the request was rejected, so retrying is safe.
+
 ## Environment Setup
 
 Environment variables:
@@ -172,6 +181,9 @@ REDDIT_SAFE_MODE=standard        # Options: off, standard, strict
 # Response Caching (optional, defaults to 'on')
 REDDIT_CACHE=on                  # Options: on, off
 REDDIT_CACHE_MAX_MB=50           # Cache size cap in MB (LRU eviction beyond this)
+
+# Rate-Limit Retry (optional, defaults to 3)
+REDDIT_MAX_RETRIES=3             # Retries on HTTP 429 with Retry-After backoff (0 disables)
 
 # Transport Configuration
 # TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)
