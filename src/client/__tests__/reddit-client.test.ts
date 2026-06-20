@@ -1801,6 +1801,69 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("getSubredditRules", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("fetches and maps subreddit rules", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          rules: [
+            {
+              short_name: "No spam",
+              description: "Do not spam.",
+              kind: "all",
+              violation_reason: "Spam",
+              priority: 0,
+              created_utc: 1,
+            },
+            { short_name: "Flair required", description: "", kind: "link" },
+          ],
+        }),
+      })
+
+      const result = await client.getSubredditRules("programming")
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        "https://oauth.reddit.com/r/programming/about/rules.json",
+        expect.any(Object),
+      )
+      expect(result.isRight()).toBe(true)
+      const rules = result.orThrow()
+      expect(rules).toHaveLength(2)
+      expect(rules[0].shortName).toBe("No spam")
+      expect(rules[0].kind).toBe("all")
+      expect(rules[0].violationReason).toBe("Spam")
+      expect(rules[1].shortName).toBe("Flair required")
+      expect(rules[1].kind).toBe("link")
+    })
+
+    it("returns an empty list when the subreddit has no rules", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ rules: [] }) })
+
+      const result = await client.getSubredditRules("programming")
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toHaveLength(0)
+    })
+
+    it("returns a typed HttpError on a non-ok response", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+
+      const result = await client.getSubredditRules("ghost")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get rules for r/ghost: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
   describe("rate-limit retry (429)", () => {
     const mockAuth = () =>
       mockFetch.mockResolvedValueOnce({

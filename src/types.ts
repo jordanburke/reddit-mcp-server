@@ -121,6 +121,16 @@ export type Page<T> = {
   readonly before?: string
 }
 
+/** A subreddit posting rule (from /r/{sr}/about/rules). `kind` is "link" | "comment" | "all". */
+export type RedditRule = {
+  readonly shortName: string
+  readonly description: string
+  readonly kind: string
+  readonly violationReason?: string
+  readonly priority?: number
+  readonly createdUtc?: number
+}
+
 export type FormattedUserInfo = {
   readonly username: string
   readonly karma: {
@@ -263,6 +273,19 @@ export type RedditApiListingResponse<T> = {
     }>
     readonly [key: string]: unknown
   }
+}
+
+export type RedditApiRulesResponse = {
+  readonly rules: ReadonlyArray<{
+    readonly short_name: string
+    readonly description: string
+    readonly kind: string
+    readonly violation_reason?: string
+    readonly priority?: number
+    readonly created_utc?: number
+    readonly [key: string]: unknown
+  }>
+  readonly [key: string]: unknown
 }
 
 export type RedditApiCommentData = {

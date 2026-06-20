@@ -23,6 +23,7 @@ import type {
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
   RedditApiPostData,
+  RedditApiRulesResponse,
   RedditApiSubmitResponse,
   RedditApiSubredditResponse,
   RedditApiUserResponse,
@@ -30,6 +31,7 @@ import type {
   RedditClientConfig,
   RedditComment,
   RedditPost,
+  RedditRule,
   RedditSubreddit,
   RedditUser,
   RetryConfig,
@@ -445,6 +447,28 @@ export class RedditClient {
         subredditType: data.subreddit_type,
         url: data.url,
       }
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  async getSubredditRules(subreddit: string): Promise<Either<RedditError, readonly RedditRule[]>> {
+    const context = `Failed to get rules for r/${subreddit}`
+    const attempt = await Try.async(async (): Promise<readonly RedditRule[]> => {
+      const response = (await this.makeRequest(`/r/${subreddit}/about/rules.json`)).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as RedditApiRulesResponse
+      return json.rules.map((rule) => ({
+        shortName: rule.short_name,
+        description: rule.description,
+        kind: rule.kind,
+        violationReason: rule.violation_reason,
+        priority: rule.priority,
+        createdUtc: rule.created_utc,
+      }))
     })
 
     return attempt.toEither((error) => classifyRedditError(error, context))

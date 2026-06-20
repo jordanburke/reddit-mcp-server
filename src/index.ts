@@ -706,6 +706,43 @@ ${formattedSubreddit.description.full}
 })
 
 server.addTool({
+  name: "get_subreddit_rules",
+  description:
+    "Get a subreddit's posting rules. Useful to check requirements before creating a post to avoid auto-removal.",
+  parameters: z.object({
+    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getSubredditRules(args.subreddit_name)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get subreddit rules: ${err.message}`)
+      },
+      (rules) => {
+        if (rules.length === 0) {
+          return `r/${args.subreddit_name} has no listed subreddit-specific rules.`
+        }
+
+        const ruleList = rules
+          .map((rule, index) => {
+            const applies = rule.kind === "all" ? "posts & comments" : `${rule.kind}s`
+            const detail = rule.description.trim() === "" ? "" : `\n${rule.description.trim()}`
+            return `### ${index + 1}. ${rule.shortName} _(applies to ${applies})_${detail}`
+          })
+          .join("\n\n")
+
+        return `# Posting Rules for r/${args.subreddit_name}
+
+${ruleList}`
+      },
+    )
+  },
+})
+
+server.addTool({
   name: "get_trending_subreddits",
   description: "Get a list of currently trending subreddits",
   parameters: z.object({}),
