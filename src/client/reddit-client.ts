@@ -1,14 +1,15 @@
 /* eslint-disable functype/prefer-either --
  * This module is the imperative-to-functional boundary for the Reddit HTTP client.
- * Each method already returns Either<Error, T>; the try/catch blocks are the mechanism
- * that captures thrown errors from fetch, JSON parsing, and orThrow() into Either.left.
- * Wrapping every block in Try.fromPromise would add indirection without changing the
- * effective contract. Throws inside this file are internal validation helpers that
- * the surrounding try/catch converts into Either.left at the method boundary.
+ * Each public method runs its failure-producing region inside a `Try` and converts the
+ * result to `Either<RedditError, T>` via the total `classifyRedditError`. Because the body
+ * of `Try.async(() => Promise<T>)` can only signal failure by throwing, the `throw`s here
+ * (HTTP/validation/domain errors, and the validateWriteAccess/checkDuplicateContent helpers
+ * they call) are local control-flow captured by that `Try` — they never escape the method
+ * boundary. prefer-either's "return Either.left" suggestion does not apply inside a Try body.
  */
 import crypto from "crypto"
 import type { Either } from "functype"
-import { Left, Option, Right } from "functype"
+import { Left, Option, Right, Try } from "functype"
 
 import type {
   BotDisclosureConfig,
@@ -32,11 +33,17 @@ import type {
   RedditUser,
   SafeModeConfig,
 } from "../types"
+import type { RedditError } from "./errors"
+import {
+  ApiError,
+  classifyRedditError,
+  HttpError,
+  isRedditError,
+  NotAuthenticatedError,
+  NotFoundError,
+  ValidationError,
+} from "./errors"
 import { ResponseCache } from "./response-cache"
-
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error))
-}
 
 function parsePostData(post: RedditApiPostData): RedditPost {
   return {
@@ -118,8 +125,10 @@ export class RedditClient {
     }
   }
 
+  // Low-level HTTP boundary. Returns Either<Error, Response>: a Right even for non-ok HTTP
+  // statuses (callers inspect response.ok); only thrown failures (network, auth) become Left.
   private async makeRequest(path: string, options: RequestInit = {}): Promise<Either<Error, Response>> {
-    try {
+    const attempt = await Try.async(async (): Promise<Response> => {
       const url = `${this.baseUrl}${path}`
       const method = (options.method ?? "GET").toUpperCase()
       const cacheable = this.cache !== undefined && method === "GET"
@@ -127,7 +136,7 @@ export class RedditClient {
       if (cacheable) {
         const cached = this.cache!.get(url)
         if (cached !== undefined) {
-          return Right(new Response(cached.body, { status: cached.status }))
+          return new Response(cached.body, { status: cached.status })
         }
       }
 
@@ -140,7 +149,7 @@ export class RedditClient {
 
       const headers: Record<string, string> = {
         "User-Agent": this.userAgent,
-        // eslint-disable-next-line functype/prefer-option -- RequestInit.headers is external fetch typing; used in spread
+
         ...(options.headers as Record<string, string> | undefined),
       }
 
@@ -160,12 +169,10 @@ export class RedditClient {
           ...headers,
           Authorization: `Bearer ${this.accessToken}`,
         }
-        return Right(
-          await fetch(url, {
-            ...options,
-            headers: retryHeaders,
-          }),
-        )
+        return await fetch(url, {
+          ...options,
+          headers: retryHeaders,
+        })
       }
 
       // Cache successful read responses and return a fresh, readable Response.
@@ -173,13 +180,13 @@ export class RedditClient {
       if (cacheable && response.ok) {
         const text = await response.text()
         this.cache!.set(url, text, response.status)
-        return Right(new Response(text, { status: response.status }))
+        return new Response(text, { status: response.status })
       }
 
-      return Right(response)
-    } catch (error) {
-      return Left(toError(error))
-    }
+      return response
+    })
+
+    return attempt.toEither((error) => error)
   }
 
   async authenticate(): Promise<Either<Error, void>> {
@@ -197,10 +204,10 @@ export class RedditClient {
       return Right(undefined as void)
     }
 
-    try {
+    const attempt = await Try.async(async (): Promise<void> => {
       const now = Date.now()
       if (this.accessToken !== undefined && now < this.tokenExpiry) {
-        return Right(undefined as void)
+        return
       }
 
       const authUrl = "https://www.reddit.com/api/v1/access_token"
@@ -230,17 +237,16 @@ export class RedditClient {
 
       if (!response.ok) {
         const statusText = response.statusText !== "" ? response.statusText : "Unknown Error"
-        return Left(new Error(`Authentication failed: ${response.status} ${statusText}`))
+        throw new Error(`Authentication failed: ${response.status} ${statusText}`)
       }
 
       const data = (await response.json()) as { access_token: string; expires_in: number }
       this.accessToken = data.access_token
       this.tokenExpiry = now + data.expires_in * 1000
       this.authenticated = true
-      return Right(undefined as void)
-    } catch (error) {
-      return Left(toError(error))
-    }
+    })
+
+    return attempt.toEither((error) => error)
   }
 
   async checkAuthentication(): Promise<boolean> {
@@ -254,12 +260,12 @@ export class RedditClient {
   private validateWriteAccess(): void {
     if (this.username === undefined || this.password === undefined) {
       if (this.authMode === "anonymous") {
-        throw new Error(
+        throw new NotAuthenticatedError(
           "Write operations not available in anonymous mode. " +
             "Set REDDIT_USERNAME, REDDIT_PASSWORD and use 'auto' or 'authenticated' mode.",
         )
       }
-      throw new Error("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      throw new NotAuthenticatedError("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
     }
   }
 
@@ -292,13 +298,13 @@ export class RedditClient {
     const duplicate = this.recentContentRecords.find((record) => record.hash === hash)
     if (duplicate !== undefined) {
       if (subreddit !== undefined && duplicate.subreddit !== "" && subreddit !== duplicate.subreddit) {
-        throw new Error(
+        throw new ValidationError(
           "Cross-subreddit duplicate detected. Reddit's Responsible Builder Policy prohibits " +
             "posting identical or substantially similar content across multiple subreddits. " +
             "Please create unique content for each subreddit.",
         )
       }
-      throw new Error(
+      throw new ValidationError(
         "Duplicate content detected. Reddit's spam filter may ban your account for posting identical content. " +
           "Please modify your content and try again.",
       )
@@ -320,17 +326,18 @@ export class RedditClient {
     return `${content}${this.botDisclosure.footer}`
   }
 
-  async getUser(username: string): Promise<Either<Error, RedditUser>> {
-    try {
+  async getUser(username: string): Promise<Either<RedditError, RedditUser>> {
+    const context = `Failed to get user info for ${username}`
+    const attempt = await Try.async(async (): Promise<RedditUser> => {
       const response = (await this.makeRequest(`/user/${username}/about.json`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get user info for ${username}: HTTP ${response.status}`))
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiUserResponse
       const { data } = json
 
-      return Right({
+      return {
         name: data.name,
         id: data.id,
         commentKarma: data.comment_karma,
@@ -341,23 +348,24 @@ export class RedditClient {
         isEmployee: data.is_employee,
         createdUtc: data.created_utc,
         profileUrl: `https://reddit.com/user/${data.name}`,
-      })
-    } catch (error) {
-      return Left(new Error(`Failed to get user info for ${username}: ${toError(error).message}`))
-    }
+      }
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
-  async getSubredditInfo(subredditName: string): Promise<Either<Error, RedditSubreddit>> {
-    try {
+  async getSubredditInfo(subredditName: string): Promise<Either<RedditError, RedditSubreddit>> {
+    const context = `Failed to get subreddit info for ${subredditName}`
+    const attempt = await Try.async(async (): Promise<RedditSubreddit> => {
       const response = (await this.makeRequest(`/r/${subredditName}/about.json`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get subreddit info for ${subredditName}: HTTP ${response.status}`))
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiSubredditResponse
       const { data } = json
 
-      const subreddit: RedditSubreddit = {
+      return {
         displayName: data.display_name,
         title: data.title,
         description: data.description,
@@ -369,38 +377,34 @@ export class RedditClient {
         subredditType: data.subreddit_type,
         url: data.url,
       }
+    })
 
-      return Right(subreddit)
-    } catch (error) {
-      return Left(new Error(`Failed to get subreddit info for ${subredditName}: ${toError(error).message}`))
-    }
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
   async getTopPosts(
     subreddit: string,
     timeFilter: string = "week",
     limit: number = 10,
-  ): Promise<Either<Error, readonly RedditPost[]>> {
+  ): Promise<Either<RedditError, readonly RedditPost[]>> {
     const endpoint = subreddit !== "" ? `/r/${subreddit}/top.json` : "/top.json"
     const params = new URLSearchParams({
       t: timeFilter,
       limit: limit.toString(),
     })
+    const context = `Failed to get top posts for ${subreddit !== "" ? subreddit : "home"}`
 
-    try {
+    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
       const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get top posts: HTTP ${response.status}`))
+        throw new HttpError(response.status, `Failed to get top posts: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
-      const posts: readonly RedditPost[] = json.data.children.map((child) => parsePostData(child.data))
-      return Right(posts)
-    } catch (error) {
-      return Left(
-        new Error(`Failed to get top posts for ${subreddit !== "" ? subreddit : "home"}: ${toError(error).message}`),
-      )
-    }
+      return json.data.children.map((child) => parsePostData(child.data))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
   async browseSubreddit(
@@ -408,10 +412,10 @@ export class RedditClient {
     sort: string = "hot",
     timeFilter: string = "week",
     limit: number = 10,
-  ): Promise<Either<Error, readonly RedditPost[]>> {
+  ): Promise<Either<RedditError, readonly RedditPost[]>> {
     const validSorts = ["hot", "new", "top", "rising", "controversial"]
     if (!validSorts.includes(sort)) {
-      return Left(new Error(`Invalid sort "${sort}". Valid options are: ${validSorts.join(", ")}`))
+      return Left(new ValidationError(`Invalid sort "${sort}". Valid options are: ${validSorts.join(", ")}`))
     }
 
     const endpoint = subreddit !== "" ? `/r/${subreddit}/${sort}.json` : `/${sort}.json`
@@ -420,65 +424,65 @@ export class RedditClient {
     if (sort === "top" || sort === "controversial") {
       params.set("t", timeFilter)
     }
+    const home = subreddit !== "" ? subreddit : "home"
+    const context = `Failed to browse r/${home} (${sort})`
 
-    try {
+    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
       const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to browse r/${subreddit !== "" ? subreddit : "home"}: HTTP ${response.status}`))
+        throw new HttpError(response.status, `Failed to browse r/${home}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
-      const posts: readonly RedditPost[] = json.data.children.map((child) => parsePostData(child.data))
-      return Right(posts)
-    } catch (error) {
-      return Left(
-        new Error(`Failed to browse r/${subreddit !== "" ? subreddit : "home"} (${sort}): ${toError(error).message}`),
-      )
-    }
+      return json.data.children.map((child) => parsePostData(child.data))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
-  async getPost(postId: string, subreddit?: string): Promise<Either<Error, RedditPost>> {
+  async getPost(postId: string, subreddit?: string): Promise<Either<RedditError, RedditPost>> {
     const endpoint = Option(subreddit).fold(
       () => `/api/info.json?id=t3_${postId}`,
       (sr) => `/r/${sr}/comments/${postId}.json`,
     )
+    const context = `Failed to get post with ID ${postId}`
 
-    try {
+    const attempt = await Try.async(async (): Promise<RedditPost> => {
       const response = (await this.makeRequest(endpoint)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get post with ID ${postId}: HTTP ${response.status}`))
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
 
       if (subreddit !== undefined) {
         const json = (await response.json()) as [RedditApiListingResponse<RedditApiPostData>, unknown]
-        return Right(parsePostData(json[0].data.children[0].data))
+        return parsePostData(json[0].data.children[0].data)
       }
 
       const json = (await response.json()) as RedditApiInfoResponse
       if (json.data.children.length === 0) {
-        return Left(new Error(`Post with ID ${postId} not found`))
+        throw new NotFoundError(`Post with ID ${postId} not found`)
       }
-      return Right(parsePostData(json.data.children[0].data))
-    } catch (error) {
-      return Left(new Error(`Failed to get post with ID ${postId}: ${toError(error).message}`))
-    }
+      return parsePostData(json.data.children[0].data)
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
-  async getTrendingSubreddits(limit: number = 5): Promise<Either<Error, readonly string[]>> {
+  async getTrendingSubreddits(limit: number = 5): Promise<Either<RedditError, readonly string[]>> {
     const params = new URLSearchParams({ limit: limit.toString() })
+    const context = `Failed to get trending subreddits`
 
-    try {
+    const attempt = await Try.async(async (): Promise<readonly string[]> => {
       const response = (await this.makeRequest(`/subreddits/popular.json?${params}`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get trending subreddits: HTTP ${response.status}`))
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiPopularSubredditsResponse
-      const names: readonly string[] = json.data.children.map((child) => child.data.display_name)
-      return Right(names)
-    } catch (error) {
-      return Left(new Error(`Failed to get trending subreddits: ${toError(error).message}`))
-    }
+      return json.data.children.map((child) => child.data.display_name)
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
   async createPost(
@@ -486,8 +490,8 @@ export class RedditClient {
     title: string,
     content: string,
     isSelf: boolean = true,
-  ): Promise<Either<Error, RedditPost>> {
-    try {
+  ): Promise<Either<RedditError, RedditPost>> {
+    const attempt = await Try.async(async (): Promise<RedditPost> => {
       this.validateWriteAccess()
       await this.enforceWriteRateLimit()
       this.checkDuplicateContent(title + content, subreddit)
@@ -512,30 +516,30 @@ export class RedditClient {
       ).orThrow()
 
       if (!response.ok) {
-        return Left(new Error(`Failed to create post: HTTP ${response.status}`))
+        throw new HttpError(response.status, `Failed to create post: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiSubmitResponse
 
       if (json.json.errors !== undefined && json.json.errors.length > 0) {
         const errors = json.json.errors.map((e) => e[1]).join(", ")
-        return Left(new Error(`Reddit API errors: ${errors}`))
+        throw new ApiError(`Reddit API errors: ${errors}`)
       }
 
       const postId = json.json.data?.id ?? json.json.data?.name?.replace("t3_", "")
 
       if (postId === undefined) {
-        return Left(new Error("No post ID returned from Reddit"))
+        throw new ApiError("No post ID returned from Reddit")
       }
 
-      return this.getPost(postId, subreddit)
-    } catch (error) {
-      return Left(toError(error))
-    }
+      return (await this.getPost(postId, subreddit)).orThrow()
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error))
   }
 
   async checkPostExists(postId: string): Promise<boolean> {
-    try {
+    const attempt = await Try.async(async (): Promise<boolean> => {
       const response = (await this.makeRequest(`/api/info.json?id=t3_${postId}`)).orThrow()
       if (!response.ok) {
         return false
@@ -543,13 +547,13 @@ export class RedditClient {
 
       const json = (await response.json()) as RedditApiInfoResponse
       return json.data.children.length > 0
-    } catch {
-      return false
-    }
+    })
+
+    return attempt.orElse(false)
   }
 
-  async replyToPost(postId: string, content: string): Promise<Either<Error, RedditComment>> {
-    try {
+  async replyToPost(postId: string, content: string): Promise<Either<RedditError, RedditComment>> {
+    const attempt = await Try.async(async (): Promise<RedditComment> => {
       this.validateWriteAccess()
       await this.enforceWriteRateLimit()
       this.checkDuplicateContent(content)
@@ -560,7 +564,7 @@ export class RedditClient {
       if (!postId.startsWith("t1_")) {
         const exists = await this.checkPostExists(postId.replace(/^t3_/, ""))
         if (!exists) {
-          return Left(new Error(`Post with ID ${postId} does not exist or is not accessible`))
+          throw new NotFoundError(`Post with ID ${postId} does not exist or is not accessible`)
         }
       }
 
@@ -580,7 +584,7 @@ export class RedditClient {
       ).orThrow()
 
       if (!response.ok) {
-        return Left(new Error(`Failed to reply: HTTP ${response.status}`))
+        throw new HttpError(response.status, `Failed to reply: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiCommentResponse
@@ -588,7 +592,7 @@ export class RedditClient {
       if (json.json.data?.things !== undefined && json.json.data.things.length > 0) {
         const commentData = json.json.data.things[0].data
         const author = this.username ?? "[unknown]"
-        const comment: RedditComment = {
+        return {
           id: commentData.id,
           author,
           body: content,
@@ -601,20 +605,19 @@ export class RedditClient {
           isSubmitter: false,
           permalink: commentData.permalink,
         }
-        return Right(comment)
       } else if (json.json.errors !== undefined && json.json.errors.length > 0) {
         const errors = json.json.errors.map((e) => e[1]).join(", ")
-        return Left(new Error(`Reddit API errors: ${errors}`))
+        throw new ApiError(`Reddit API errors: ${errors}`)
       } else {
-        return Left(new Error("Failed to parse reply response"))
+        throw new ApiError("Failed to parse reply response")
       }
-    } catch (error) {
-      return Left(toError(error))
-    }
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error))
   }
 
-  async deletePost(thingId: string): Promise<Either<Error, boolean>> {
-    try {
+  async deletePost(thingId: string): Promise<Either<RedditError, boolean>> {
+    const attempt = await Try.async(async (): Promise<boolean> => {
       this.validateWriteAccess()
 
       const fullThingId = thingId.startsWith("t3_") || thingId.startsWith("t1_") ? thingId : `t3_${thingId}`
@@ -636,24 +639,28 @@ export class RedditClient {
         const errorText = await response.text()
         console.error(`[Reddit API] Delete failed: ${response.status} ${response.statusText}`)
         console.error(`[Reddit API] Error response: ${errorText}`)
-        return Left(new Error(`HTTP ${response.status}: ${errorText}`))
+        throw new HttpError(response.status, `HTTP ${response.status}: ${errorText}`)
       }
 
       console.error(`[Reddit API] Successfully deleted ${fullThingId}`)
-      return Right(true)
-    } catch (error) {
-      console.error(`[Reddit API] Delete exception:`, error)
-      return Left(toError(error))
-    }
+      return true
+    })
+
+    return attempt.toEither((error) => {
+      if (!isRedditError(error)) {
+        console.error(`[Reddit API] Delete exception:`, error)
+      }
+      return classifyRedditError(error)
+    })
   }
 
-  async deleteComment(thingId: string): Promise<Either<Error, boolean>> {
+  async deleteComment(thingId: string): Promise<Either<RedditError, boolean>> {
     const fullThingId = thingId.startsWith("t1_") ? thingId : `t1_${thingId}`
     return this.deletePost(fullThingId)
   }
 
-  async editPost(thingId: string, newText: string): Promise<Either<Error, boolean>> {
-    try {
+  async editPost(thingId: string, newText: string): Promise<Either<RedditError, boolean>> {
+    const attempt = await Try.async(async (): Promise<boolean> => {
       this.validateWriteAccess()
       await this.enforceWriteRateLimit()
       this.checkDuplicateContent(newText)
@@ -677,23 +684,23 @@ export class RedditClient {
       ).orThrow()
 
       if (!response.ok) {
-        return Left(new Error(`Failed to edit: HTTP ${response.status}`))
+        throw new HttpError(response.status, `Failed to edit: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiEditResponse
 
       if (json.json.errors !== undefined && json.json.errors.length > 0) {
         const errors = json.json.errors.map((e) => e[1]).join(", ")
-        return Left(new Error(`Reddit API errors: ${errors}`))
+        throw new ApiError(`Reddit API errors: ${errors}`)
       }
 
-      return Right(true)
-    } catch (error) {
-      return Left(toError(error))
-    }
+      return true
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error))
   }
 
-  async editComment(thingId: string, newText: string): Promise<Either<Error, boolean>> {
+  async editComment(thingId: string, newText: string): Promise<Either<RedditError, boolean>> {
     const fullThingId = thingId.startsWith("t1_") ? thingId : `t1_${thingId}`
     return this.editPost(fullThingId, newText)
   }
@@ -707,7 +714,7 @@ export class RedditClient {
       readonly limit?: number
       readonly type?: string
     } = {},
-  ): Promise<Either<Error, readonly RedditPost[]>> {
+  ): Promise<Either<RedditError, readonly RedditPost[]>> {
     const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link" } = options
     const endpoint = Option(subreddit).fold(
       () => "/search.json",
@@ -723,22 +730,20 @@ export class RedditClient {
       // eslint-disable-next-line functype/prefer-fold -- conditional spread of native string | undefined into URLSearchParams init
       ...(subreddit !== undefined ? { restrict_sr: "true" } : {}),
     })
+    const context = `Failed to search Reddit for: ${query}`
 
-    try {
+    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
       const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to search Reddit: HTTP ${response.status}`))
+        throw new HttpError(response.status, `Failed to search Reddit: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
-      const posts: readonly RedditPost[] = json.data.children
-        .filter((child) => child.kind === "t3")
-        .map((child) => parsePostData(child.data))
-      return Right(posts)
-    } catch (error) {
-      return Left(new Error(`Failed to search Reddit for: ${query}: ${toError(error).message}`))
-    }
+      return json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
   async getPostComments(
@@ -748,60 +753,65 @@ export class RedditClient {
       readonly sort?: string
       readonly limit?: number
     } = {},
-  ): Promise<Either<Error, { readonly post: RedditPost; readonly comments: readonly RedditComment[] }>> {
+  ): Promise<Either<RedditError, { readonly post: RedditPost; readonly comments: readonly RedditComment[] }>> {
     const { sort = "best", limit = 100 } = options
     const params = new URLSearchParams({
       sort,
       limit: limit.toString(),
     })
+    const context = `Failed to get comments for post ${postId}`
 
-    try {
-      const response = (await this.makeRequest(`/r/${subreddit}/comments/${postId}.json?${params}`)).orThrow()
-      if (!response.ok) {
-        return Left(new Error(`Failed to get comments: HTTP ${response.status}`))
-      }
+    const attempt = await Try.async(
+      async (): Promise<{ readonly post: RedditPost; readonly comments: readonly RedditComment[] }> => {
+        const response = (await this.makeRequest(`/r/${subreddit}/comments/${postId}.json?${params}`)).orThrow()
+        if (!response.ok) {
+          throw new HttpError(response.status, `Failed to get comments: HTTP ${response.status}`)
+        }
 
-      const json = (await response.json()) as RedditApiPostCommentsResponse
+        const json = (await response.json()) as RedditApiPostCommentsResponse
 
-      const postData = json[0].data.children[0].data
-      const post = parsePostData(postData)
+        const postData = json[0].data.children[0].data
+        const post = parsePostData(postData)
 
-      const parseComments = (
-        commentData: ReadonlyArray<{ readonly kind: string; readonly data: RedditApiCommentTreeData }>,
-        depth: number = 0,
-      ): readonly RedditComment[] =>
-        commentData.flatMap((item) => {
-          if (item.kind !== "t1" || item.data.body === undefined) return []
+        const parseComments = (
+          commentData: ReadonlyArray<{ readonly kind: string; readonly data: RedditApiCommentTreeData }>,
+          depth: number = 0,
+        ): readonly RedditComment[] =>
+          commentData.flatMap((item) => {
+            if (item.kind !== "t1" || item.data.body === undefined) return []
 
-          const comment: RedditComment = {
-            id: item.data.id,
-            author: item.data.author,
-            body: item.data.body,
-            score: item.data.score,
-            controversiality: item.data.controversiality,
-            subreddit: item.data.subreddit,
-            submissionTitle: post.title,
-            createdUtc: item.data.created_utc,
-            edited: Boolean(item.data.edited),
-            isSubmitter: item.data.is_submitter,
-            permalink: item.data.permalink,
-            depth,
-            parentId: item.data.parent_id,
-          }
+            const comment: RedditComment = {
+              id: item.data.id,
+              author: item.data.author,
+              body: item.data.body,
+              score: item.data.score,
+              controversiality: item.data.controversiality,
+              subreddit: item.data.subreddit,
+              submissionTitle: post.title,
+              createdUtc: item.data.created_utc,
+              edited: Boolean(item.data.edited),
+              isSubmitter: item.data.is_submitter,
+              permalink: item.data.permalink,
+              depth,
+              parentId: item.data.parent_id,
+            }
 
-          const { replies } = item.data
-          const childComments =
-            replies !== undefined && typeof replies !== "string" ? parseComments(replies.data.children, depth + 1) : []
+            const { replies } = item.data
+            const childComments =
+              replies !== undefined && typeof replies !== "string"
+                ? parseComments(replies.data.children, depth + 1)
+                : []
 
-          return [comment, ...childComments]
-        })
+            return [comment, ...childComments]
+          })
 
-      const comments: readonly RedditComment[] = parseComments(json[1].data.children)
+        const comments: readonly RedditComment[] = parseComments(json[1].data.children)
 
-      return Right({ post, comments })
-    } catch (error) {
-      return Left(new Error(`Failed to get comments for post ${postId}: ${toError(error).message}`))
-    }
+        return { post, comments }
+      },
+    )
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
   async getUserPosts(
@@ -811,29 +821,27 @@ export class RedditClient {
       readonly timeFilter?: string
       readonly limit?: number
     } = {},
-  ): Promise<Either<Error, readonly RedditPost[]>> {
+  ): Promise<Either<RedditError, readonly RedditPost[]>> {
     const { sort = "new", timeFilter = "all", limit = 25 } = options
     const params = new URLSearchParams({
       sort,
       t: timeFilter,
       limit: limit.toString(),
     })
+    const context = `Failed to get posts for user ${username}`
 
-    try {
+    const attempt = await Try.async(async (): Promise<readonly RedditPost[]> => {
       const response = (await this.makeRequest(`/user/${username}/submitted.json?${params}`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get posts for user ${username}: HTTP ${response.status}`))
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
 
-      const posts: readonly RedditPost[] = json.data.children
-        .filter((child) => child.kind === "t3")
-        .map((child) => parsePostData(child.data))
-      return Right(posts)
-    } catch (error) {
-      return Left(new Error(`Failed to get posts for user ${username}: ${toError(error).message}`))
-    }
+      return json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 
   async getUserComments(
@@ -843,23 +851,24 @@ export class RedditClient {
       readonly timeFilter?: string
       readonly limit?: number
     } = {},
-  ): Promise<Either<Error, readonly RedditComment[]>> {
+  ): Promise<Either<RedditError, readonly RedditComment[]>> {
     const { sort = "new", timeFilter = "all", limit = 25 } = options
     const params = new URLSearchParams({
       sort,
       t: timeFilter,
       limit: limit.toString(),
     })
+    const context = `Failed to get comments for user ${username}`
 
-    try {
+    const attempt = await Try.async(async (): Promise<readonly RedditComment[]> => {
       const response = (await this.makeRequest(`/user/${username}/comments.json?${params}`)).orThrow()
       if (!response.ok) {
-        return Left(new Error(`Failed to get comments for user ${username}: HTTP ${response.status}`))
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
 
       const json = (await response.json()) as RedditApiListingResponse<RedditApiCommentTreeData>
 
-      const comments: readonly RedditComment[] = json.data.children
+      return json.data.children
         .filter((child) => child.kind === "t1")
         .map((child) => {
           const comment = child.data
@@ -877,11 +886,9 @@ export class RedditClient {
             permalink: comment.permalink,
           }
         })
+    })
 
-      return Right(comments)
-    } catch (error) {
-      return Left(new Error(`Failed to get comments for user ${username}: ${toError(error).message}`))
-    }
+    return attempt.toEither((error) => classifyRedditError(error, context))
   }
 }
 

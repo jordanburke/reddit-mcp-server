@@ -206,6 +206,142 @@ describe("RedditClient", () => {
     })
   })
 
+  // Characterization tests: these lock the OBSERVABLE behavior contract of getUser
+  // (Left/Right shape + exact error-message text). They must pass identically before
+  // and after the Try/typed-error migration — that is the behavior-preservation proof.
+  describe("getUser — behavior contract (characterization)", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("uses total_karma when present instead of summing comment+link karma", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            name: "testuser",
+            id: "123",
+            comment_karma: 100,
+            link_karma: 200,
+            total_karma: 999,
+            is_mod: false,
+            is_gold: false,
+            is_employee: false,
+            created_utc: 1234567890,
+          },
+        }),
+      })
+
+      const result = await client.getUser("testuser")
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow().totalKarma).toBe(999)
+    })
+
+    it("returns Left with the exact HTTP-status message on a non-ok response", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+
+      const result = await client.getUser("ghost")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get user info for ghost: HTTP 404")
+      }
+    })
+
+    it("returns Left (not a throw) when the network request fails", async () => {
+      mockAuth()
+      mockFetch.mockRejectedValueOnce(new Error("network down"))
+
+      const result = await client.getUser("testuser")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Failed to get user info for testuser")
+        expect(result.value.message).toContain("network down")
+      }
+    })
+
+    it("returns Left when the response body is not valid JSON", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("Unexpected token < in JSON")
+        },
+      })
+
+      const result = await client.getUser("testuser")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Failed to get user info for testuser")
+      }
+    })
+
+    it("returns Left when the response is missing the data field", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+
+      const result = await client.getUser("testuser")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Failed to get user info for testuser")
+      }
+    })
+  })
+
+  // The capability the migration ADDS: a typed, discriminated error channel that callers
+  // can branch on (`_tag`, `HttpError.status`) instead of string-matching messages.
+  describe("getUser — typed error contract", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("classifies a non-ok response as a HttpError carrying the status code", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 429 })
+
+      const result = await client.getUser("ratelimited")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("HttpError")
+        if (result.value._tag === "HttpError") {
+          expect(result.value.status).toBe(429)
+        }
+      }
+    })
+
+    it("classifies a network failure as an UnknownError", async () => {
+      mockAuth()
+      mockFetch.mockRejectedValueOnce(new Error("ECONNRESET"))
+
+      const result = await client.getUser("testuser")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("UnknownError")
+      }
+    })
+
+    it("classifies a malformed JSON body as an UnknownError", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("bad json")
+        },
+      })
+
+      const result = await client.getUser("testuser")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("UnknownError")
+      }
+    })
+  })
+
   describe("getSubredditInfo", () => {
     it("should fetch subreddit information", async () => {
       const mockSubredditData = {
@@ -1475,6 +1611,190 @@ describe("RedditClient", () => {
       const editCall = mockFetch.mock.calls[1]
       const body = new URLSearchParams(editCall[1].body as string)
       expect(body.get("thing_id")).toBe("t1_comment123")
+    })
+  })
+
+  // Rollout coverage: locks the exact error-message text (behavior preservation) AND the new
+  // typed `_tag` channel for every migrated method. Special attention to the ASYMMETRIC-message
+  // methods — getTopPosts/browseSubreddit/searchReddit/getPostComments — where the non-ok HTTP
+  // message intentionally differs from the catch-branch context and is hand-preserved.
+  describe("typed error contract (rollout)", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+    const okJson = (body: unknown) => mockFetch.mockResolvedValueOnce({ ok: true, json: async () => body })
+    const httpStatus = (status: number) => mockFetch.mockResolvedValueOnce({ ok: false, status })
+
+    it("getSubredditInfo: 404 -> HttpError with exact message + status", async () => {
+      mockAuth()
+      httpStatus(404)
+      const result = await client.getSubredditInfo("testsub")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get subreddit info for testsub: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+        if (result.value._tag === "HttpError") expect(result.value.status).toBe(404)
+      }
+    })
+
+    it("getTopPosts: 404 message omits the subreddit (asymmetric, preserved)", async () => {
+      mockAuth()
+      httpStatus(503)
+      const result = await client.getTopPosts("programming", "week", 10)
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get top posts: HTTP 503")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("getTopPosts: network failure uses the 'for <subreddit>' context (UnknownError)", async () => {
+      mockAuth()
+      mockFetch.mockRejectedValueOnce(new Error("boom"))
+      const result = await client.getTopPosts("programming", "week", 10)
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get top posts for programming: boom")
+        expect(result.value._tag).toBe("UnknownError")
+      }
+    })
+
+    it("browseSubreddit: invalid sort -> ValidationError, no fetch", async () => {
+      const result = await client.browseSubreddit("programming", "bogus", "week", 5)
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("ValidationError")
+        expect(result.value.message).toBe(
+          'Invalid sort "bogus". Valid options are: hot, new, top, rising, controversial',
+        )
+      }
+    })
+
+    it("browseSubreddit: 404 message omits the sort (asymmetric, preserved)", async () => {
+      mockAuth()
+      httpStatus(500)
+      const result = await client.browseSubreddit("programming", "hot", "week", 5)
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to browse r/programming: HTTP 500")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("getPost: empty info listing -> NotFoundError", async () => {
+      mockAuth()
+      okJson({ data: { children: [] } })
+      const result = await client.getPost("abc")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("NotFoundError")
+        expect(result.value.message).toBe("Post with ID abc not found")
+      }
+    })
+
+    it("getPost: 404 -> HttpError with context message", async () => {
+      mockAuth()
+      httpStatus(404)
+      const result = await client.getPost("abc")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get post with ID abc: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("getTrendingSubreddits: 404 -> HttpError exact message", async () => {
+      mockAuth()
+      httpStatus(429)
+      const result = await client.getTrendingSubreddits(5)
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get trending subreddits: HTTP 429")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("searchReddit: 404 message omits the query (asymmetric, preserved)", async () => {
+      mockAuth()
+      httpStatus(400)
+      const result = await client.searchReddit("cats", {})
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to search Reddit: HTTP 400")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("searchReddit: network failure includes the query context (UnknownError)", async () => {
+      mockAuth()
+      mockFetch.mockRejectedValueOnce(new Error("dns"))
+      const result = await client.searchReddit("cats", {})
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to search Reddit for: cats: dns")
+        expect(result.value._tag).toBe("UnknownError")
+      }
+    })
+
+    it("getPostComments: 404 message omits the postId (asymmetric, preserved)", async () => {
+      mockAuth()
+      httpStatus(404)
+      const result = await client.getPostComments("p1", "programming", {})
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get comments: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("getUserPosts: 404 -> HttpError exact message", async () => {
+      mockAuth()
+      httpStatus(404)
+      const result = await client.getUserPosts("bob", {})
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get posts for user bob: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("getUserComments: 404 -> HttpError exact message", async () => {
+      mockAuth()
+      httpStatus(404)
+      const result = await client.getUserComments("bob", {})
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get comments for user bob: HTTP 404")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("createPost: Reddit API errors -> ApiError (no context prefix, like the old write catch)", async () => {
+      mockAuth()
+      okJson({ json: { errors: [["BAD_TITLE", "title too long", "title"]] } })
+      const result = await client.createPost("test", "Title", "Content")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Reddit API errors: title too long")
+        expect(result.value._tag).toBe("ApiError")
+      }
+    })
+
+    it("createPost: missing credentials -> NotAuthenticatedError (raw message, no prefix)", async () => {
+      const readOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+      const result = await readOnly.createPost("test", "Title", "Content")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+        expect(result.value._tag).toBe("NotAuthenticatedError")
+      }
     })
   })
 })
