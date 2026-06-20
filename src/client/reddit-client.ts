@@ -19,6 +19,7 @@ import type {
   RedditApiCommentTreeData,
   RedditApiEditResponse,
   RedditApiInfoResponse,
+  RedditApiLinkFlairResponse,
   RedditApiListingResponse,
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
@@ -30,6 +31,7 @@ import type {
   RedditAuthMode,
   RedditClientConfig,
   RedditComment,
+  RedditFlair,
   RedditPost,
   RedditRule,
   RedditSubreddit,
@@ -468,6 +470,26 @@ export class RedditClient {
         violationReason: rule.violation_reason,
         priority: rule.priority,
         createdUtc: rule.created_utc,
+      }))
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  async getPostFlairs(subreddit: string): Promise<Either<RedditError, readonly RedditFlair[]>> {
+    const context = `Failed to get post flairs for r/${subreddit}`
+    const attempt = await Try.async(async (): Promise<readonly RedditFlair[]> => {
+      const response = (await this.makeRequest(`/r/${subreddit}/api/link_flair_v2.json`)).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as RedditApiLinkFlairResponse
+      return json.map((flair) => ({
+        id: flair.id,
+        text: flair.text,
+        type: flair.type,
+        textEditable: flair.text_editable,
       }))
     })
 

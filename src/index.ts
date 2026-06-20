@@ -743,6 +743,44 @@ ${ruleList}`
 })
 
 server.addTool({
+  name: "get_post_flairs",
+  description:
+    "List the available link flairs for a subreddit (use a flair_id with create_post). Requires user credentials; many subreddits only expose flairs to members, so this may fail in anonymous mode.",
+  parameters: z.object({
+    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    const result = await client.getPostFlairs(args.subreddit_name)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get post flairs: ${err.message}`)
+      },
+      (flairs) => {
+        if (flairs.length === 0) {
+          return `r/${args.subreddit_name} has no selectable link flairs (or none are visible to this account).`
+        }
+
+        const flairList = flairs
+          .map((flair) => {
+            const editable = flair.textEditable === true ? " _(text editable)_" : ""
+            return `- ${flair.text}${editable} — \`flair_id: ${flair.id}\``
+          })
+          .join("\n")
+
+        return `# Available Link Flairs for r/${args.subreddit_name}
+
+${flairList}
+
+Pass the desired \`flair_id\` to \`create_post\`.`
+      },
+    )
+  },
+})
+
+server.addTool({
   name: "get_trending_subreddits",
   description: "Get a list of currently trending subreddits",
   parameters: z.object({}),

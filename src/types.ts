@@ -131,6 +131,14 @@ export type RedditRule = {
   readonly createdUtc?: number
 }
 
+/** An available link flair template (from /r/{sr}/api/link_flair_v2). `id` is passed to create_post. */
+export type RedditFlair = {
+  readonly id: string
+  readonly text: string
+  readonly type?: string
+  readonly textEditable?: boolean
+}
+
 export type FormattedUserInfo = {
   readonly username: string
   readonly karma: {
@@ -287,6 +295,15 @@ export type RedditApiRulesResponse = {
   }>
   readonly [key: string]: unknown
 }
+
+// /r/{sr}/api/link_flair_v2 returns a bare JSON array of flair templates.
+export type RedditApiLinkFlairResponse = ReadonlyArray<{
+  readonly id: string
+  readonly text: string
+  readonly type?: string
+  readonly text_editable?: boolean
+  readonly [key: string]: unknown
+}>
 
 export type RedditApiCommentData = {
   readonly id: string

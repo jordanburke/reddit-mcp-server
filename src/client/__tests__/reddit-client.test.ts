@@ -1864,6 +1864,48 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("getPostFlairs", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+    it("fetches and maps link flairs from the bare array response", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { id: "abc", text: "Discussion", type: "text", text_editable: false },
+          { id: "def", text: "Help", type: "richtext", text_editable: true },
+        ],
+      })
+
+      const result = await client.getPostFlairs("programming")
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        "https://oauth.reddit.com/r/programming/api/link_flair_v2.json",
+        expect.any(Object),
+      )
+      expect(result.isRight()).toBe(true)
+      const flairs = result.orThrow()
+      expect(flairs).toHaveLength(2)
+      expect(flairs[0]).toEqual({ id: "abc", text: "Discussion", type: "text", textEditable: false })
+      expect(flairs[1].textEditable).toBe(true)
+    })
+
+    it("returns a typed HttpError when flairs are not accessible (e.g. 403)", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
+
+      const result = await client.getPostFlairs("programming")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get post flairs for r/programming: HTTP 403")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
   describe("rate-limit retry (429)", () => {
     const mockAuth = () =>
       mockFetch.mockResolvedValueOnce({
