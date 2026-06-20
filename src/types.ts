@@ -357,6 +357,19 @@ export type RedditApiCommentResponse = {
   }
 }
 
+// /api/morechildren returns a flat list of comment "things" (and possibly further "more" stubs).
+export type RedditApiMoreChildrenResponse = {
+  readonly json: {
+    readonly errors?: ReadonlyArray<readonly [string, string, string?]>
+    readonly data?: {
+      readonly things?: ReadonlyArray<{
+        readonly kind: string
+        readonly data: RedditApiCommentTreeData
+      }>
+    }
+  }
+}
+
 // Reddit API Edit Response (for editPost)
 export type RedditApiEditResponse = {
   readonly json: {

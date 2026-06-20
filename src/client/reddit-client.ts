@@ -21,6 +21,7 @@ import type {
   RedditApiInfoResponse,
   RedditApiLinkFlairResponse,
   RedditApiListingResponse,
+  RedditApiMoreChildrenResponse,
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
   RedditApiPostData,
@@ -949,6 +950,52 @@ export class RedditClient {
         return { post, comments }
       },
     )
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  // Expand "load more" comment stubs via /api/morechildren. `commentIds` are the ids from a
+  // `more` node returned by getPostComments. Returns a flat list of the expanded comments.
+  async getMoreComments(
+    linkId: string,
+    commentIds: readonly string[],
+  ): Promise<Either<RedditError, readonly RedditComment[]>> {
+    const fullLinkId = linkId.startsWith("t3_") ? linkId : `t3_${linkId}`
+    const context = `Failed to expand comments for ${fullLinkId}`
+    const params = new URLSearchParams({
+      api_type: "json",
+      link_id: fullLinkId,
+      children: commentIds.join(","),
+    })
+
+    const attempt = await Try.async(async (): Promise<readonly RedditComment[]> => {
+      const response = (await this.makeRequest(`/api/morechildren?${params}`)).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as RedditApiMoreChildrenResponse
+      const things = json.json.data?.things ?? []
+      return things
+        .filter((thing) => thing.kind === "t1" && thing.data.body !== undefined)
+        .map((thing) => {
+          const comment = thing.data
+          return {
+            id: comment.id,
+            author: comment.author,
+            body: comment.body ?? "",
+            score: comment.score,
+            controversiality: comment.controversiality,
+            subreddit: comment.subreddit,
+            submissionTitle: comment.link_title ?? "",
+            createdUtc: comment.created_utc,
+            edited: Boolean(comment.edited),
+            isSubmitter: comment.is_submitter,
+            permalink: comment.permalink,
+            parentId: comment.parent_id,
+          }
+        })
+    })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
   }
