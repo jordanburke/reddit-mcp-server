@@ -893,6 +893,11 @@ server.addTool({
     title: z.string().describe("The post title"),
     content: z.string().describe("The post content (text for self posts, URL for link posts)"),
     is_self: z.boolean().default(true).describe("Whether this is a self post (text) or link post"),
+    flair_id: z
+      .string()
+      .optional()
+      .describe("Link flair template id (from get_post_flairs); many subreddits require a flair"),
+    flair_text: z.string().optional().describe("Custom flair text, only for flairs whose template is text-editable"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -904,7 +909,14 @@ server.addTool({
       )
     }
 
-    const result = await client.createPost(args.subreddit, args.title, args.content, args.is_self)
+    const result = await client.createPost(
+      args.subreddit,
+      args.title,
+      args.content,
+      args.is_self,
+      args.flair_id,
+      args.flair_text,
+    )
     return result.fold(
       (err) => {
         // eslint-disable-next-line functype/prefer-either

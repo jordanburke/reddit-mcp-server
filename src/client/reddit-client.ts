@@ -614,6 +614,8 @@ export class RedditClient {
     title: string,
     content: string,
     isSelf: boolean = true,
+    flairId?: string,
+    flairText?: string,
   ): Promise<Either<RedditError, RedditPost>> {
     const attempt = await Try.async(async (): Promise<RedditPost> => {
       this.validateWriteAccess()
@@ -628,6 +630,12 @@ export class RedditClient {
       params.append("title", title)
       params.append(isSelf ? "text" : "url", finalContent)
       params.append("api_type", "json")
+      if (flairId !== undefined) {
+        params.append("flair_id", flairId)
+      }
+      if (flairText !== undefined) {
+        params.append("flair_text", flairText)
+      }
 
       const response = (
         await this.makeRequest("/api/submit", {

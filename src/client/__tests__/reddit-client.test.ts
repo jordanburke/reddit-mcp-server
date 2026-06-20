@@ -703,6 +703,91 @@ describe("RedditClient", () => {
       expect(post.title).toBe("My New Post")
     })
 
+    it("includes flair_id and flair_text in the submit body when provided", async () => {
+      const mockSubmitResponse = { json: { data: { id: "p1" }, errors: [] } }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "p1",
+                  title: "T",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "C",
+                  url: "https://reddit.com/r/test/p1",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: 1,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/p1/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "t", expires_in: 3600 }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockSubmitResponse })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockPostData })
+
+      const result = await client.createPost("test", "T", "C", true, "flair-abc", "custom flair")
+      expect(result.isRight()).toBe(true)
+
+      const submitBody = new URLSearchParams(mockFetch.mock.calls[1][1].body as string)
+      expect(submitBody.get("flair_id")).toBe("flair-abc")
+      expect(submitBody.get("flair_text")).toBe("custom flair")
+    })
+
+    it("omits flair params when none are provided", async () => {
+      const mockSubmitResponse = { json: { data: { id: "p2" }, errors: [] } }
+      const mockPostData = [
+        {
+          data: {
+            children: [
+              {
+                data: {
+                  id: "p2",
+                  title: "T",
+                  author: "testuser",
+                  subreddit: "test",
+                  selftext: "C",
+                  url: "https://reddit.com/r/test/p2",
+                  score: 1,
+                  upvote_ratio: 1,
+                  num_comments: 0,
+                  created_utc: 1,
+                  over_18: false,
+                  spoiler: false,
+                  edited: false,
+                  is_self: true,
+                  link_flair_text: null,
+                  permalink: "/r/test/comments/p2/",
+                },
+              },
+            ],
+          },
+        },
+      ]
+
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "t", expires_in: 3600 }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockSubmitResponse })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => mockPostData })
+
+      await client.createPost("test", "T", "C")
+
+      const submitBody = new URLSearchParams(mockFetch.mock.calls[1][1].body as string)
+      expect(submitBody.get("flair_id")).toBeNull()
+      expect(submitBody.get("flair_text")).toBeNull()
+    })
+
     it("should return Left when user is not authenticated for write", async () => {
       const clientReadOnly = new RedditClient({
         clientId: "test-client-id",
