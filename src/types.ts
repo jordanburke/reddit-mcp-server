@@ -220,6 +220,21 @@ export type FormattedCommentInfo = {
 }
 
 // Reddit API Response Types (Raw API structures)
+
+// /api/v1/me returns the account fields at the top level (no "data" wrapper).
+export type RedditApiMeResponse = {
+  readonly name: string
+  readonly id: string
+  readonly comment_karma: number
+  readonly link_karma: number
+  readonly total_karma?: number
+  readonly is_mod: boolean
+  readonly is_gold: boolean
+  readonly is_employee: boolean
+  readonly created_utc: number
+  readonly [key: string]: unknown
+}
+
 export type RedditApiUserResponse = {
   readonly data: {
     readonly name: string

@@ -353,6 +353,39 @@ server.addTool({
 })
 
 server.addTool({
+  name: "get_me",
+  description:
+    "Get the authenticated user's own account info (karma, account status). Requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD); fails in anonymous mode.",
+  parameters: z.object({}),
+  execute: async () => {
+    const client = unwrapClient()
+
+    const result = await client.getMe()
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to get authenticated user: ${err.message}`)
+      },
+      (user) => {
+        const formattedUser = formatUserInfo(user)
+
+        return `# Your Account: u/${formattedUser.username}
+
+## Profile Overview
+- Username: u/${formattedUser.username}
+- Karma:
+  - Comment Karma: ${formattedUser.karma.commentKarma.toLocaleString()}
+  - Post Karma: ${formattedUser.karma.postKarma.toLocaleString()}
+  - Total Karma: ${formattedUser.karma.totalKarma.toLocaleString()}
+- Account Status: ${formattedUser.accountStatus.join(", ")}
+- Account Created: ${formattedUser.accountCreated}
+- Profile URL: ${formattedUser.profileUrl}`
+      },
+    )
+  },
+})
+
+server.addTool({
   name: "get_user_posts",
   description: "Get recent posts by a Reddit user with sorting and filtering options",
   parameters: z.object({

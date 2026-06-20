@@ -21,6 +21,7 @@ import type {
   RedditApiInfoResponse,
   RedditApiLinkFlairResponse,
   RedditApiListingResponse,
+  RedditApiMeResponse,
   RedditApiMoreChildrenResponse,
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
@@ -410,6 +411,33 @@ export class RedditClient {
       const json = (await response.json()) as RedditApiUserResponse
       const { data } = json
 
+      return {
+        name: data.name,
+        id: data.id,
+        commentKarma: data.comment_karma,
+        linkKarma: data.link_karma,
+        totalKarma: data.total_karma ?? data.comment_karma + data.link_karma,
+        isMod: data.is_mod,
+        isGold: data.is_gold,
+        isEmployee: data.is_employee,
+        createdUtc: data.created_utc,
+        profileUrl: `https://reddit.com/user/${data.name}`,
+      }
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  // The authenticated user's own account (requires user credentials — /api/v1/me needs identity).
+  async getMe(): Promise<Either<RedditError, RedditUser>> {
+    const context = "Failed to get authenticated user info"
+    const attempt = await Try.async(async (): Promise<RedditUser> => {
+      const response = (await this.makeRequest("/api/v1/me")).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const data = (await response.json()) as RedditApiMeResponse
       return {
         name: data.name,
         id: data.id,

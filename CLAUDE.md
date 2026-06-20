@@ -14,6 +14,7 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `get_top_posts` - Get top posts from a subreddit or home feed
 - `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial
 - `get_user_info` - Get detailed information about a Reddit user
+- `get_me` - Get the authenticated user's own account info (requires user credentials)
 - `get_subreddit_info` - Get subreddit details, stats, and community insights
 - `get_subreddit_rules` - Get a subreddit's posting rules (check before posting to avoid auto-removal)
 - `get_trending_subreddits` - Get currently trending/popular subreddits

@@ -1886,6 +1886,52 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("getMe", () => {
+    it("fetches the authenticated user from the top-level /api/v1/me shape", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      // /api/v1/me returns account fields at the ROOT (no data wrapper)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: "testuser",
+          id: "abc",
+          comment_karma: 10,
+          link_karma: 20,
+          is_mod: false,
+          is_gold: true,
+          is_employee: false,
+          created_utc: 123,
+        }),
+      })
+
+      const result = await client.getMe()
+      expect(mockFetch).toHaveBeenLastCalledWith("https://oauth.reddit.com/api/v1/me", expect.any(Object))
+      expect(result.isRight()).toBe(true)
+      const me = result.orThrow()
+      expect(me.name).toBe("testuser")
+      expect(me.totalKarma).toBe(30) // computed from comment + link when total_karma absent
+      expect(me.profileUrl).toBe("https://reddit.com/user/testuser")
+    })
+
+    it("returns a typed HttpError when not authenticated (403)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
+
+      const result = await client.getMe()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toBe("Failed to get authenticated user info: HTTP 403")
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
   describe("getSubredditRules", () => {
     const mockAuth = () =>
       mockFetch.mockResolvedValueOnce({
