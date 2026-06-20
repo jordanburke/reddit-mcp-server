@@ -14,6 +14,9 @@ describe("RedditClient", () => {
     userAgent: "TestApp/1.0.0",
     username: "testuser",
     password: "testpass",
+    // Disable 429 retry by default so existing single-response mocks stay deterministic;
+    // the rate-limit suite below opts in with its own retry config.
+    retry: { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 60000 },
   }
 
   const mockFetch = vi.fn()
@@ -1795,6 +1798,115 @@ describe("RedditClient", () => {
         expect(result.value.message).toBe("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
         expect(result.value._tag).toBe("NotAuthenticatedError")
       }
+    })
+  })
+
+  describe("rate-limit retry (429)", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+    // Use real Headers objects (case-insensitive get, native string|null) so the mocks match
+    // production fetch and don't introduce nullable annotations of our own.
+    const res429 = (retryAfter: string) =>
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 429, headers: new Headers({ "retry-after": retryAfter }) })
+    // 429 with no rate-limit headers (exercises the exponential-backoff fallback).
+    const res429NoHeader = () => mockFetch.mockResolvedValueOnce({ ok: false, status: 429, headers: new Headers() })
+    const okSubreddit = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            display_name: "programming",
+            title: "Programming",
+            description: "d",
+            public_description: "pd",
+            subscribers: 1,
+            created_utc: 1,
+            over18: false,
+            subreddit_type: "public",
+            url: "/r/programming/",
+          },
+        }),
+      })
+    const retrying = (overrides: Partial<{ maxRetries: number; baseDelayMs: number; maxDelayMs: number }> = {}) =>
+      new RedditClient({
+        ...mockConfig,
+        retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 60_000, ...overrides },
+      })
+
+    it("retries on 429 (honoring Retry-After) then succeeds", async () => {
+      const client2 = retrying()
+      mockAuth()
+      res429("0")
+      okSubreddit()
+
+      const result = await client2.getSubredditInfo("programming")
+
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow().displayName).toBe("programming")
+      // auth + first 429 + successful retry
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
+    it("gives up after maxRetries and surfaces a typed HttpError(429)", async () => {
+      const client2 = retrying({ maxRetries: 2 })
+      mockAuth()
+      res429("0") // initial
+      res429("0") // retry 1
+      res429("0") // retry 2
+
+      const result = await client2.getSubredditInfo("programming")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("HttpError")
+        if (result.value._tag === "HttpError") expect(result.value.status).toBe(429)
+      }
+      // auth + initial + 2 retries
+      expect(mockFetch).toHaveBeenCalledTimes(4)
+    })
+
+    it("does not wait longer than maxDelayMs — gives up immediately", async () => {
+      const client2 = retrying({ maxRetries: 5, maxDelayMs: 1000 })
+      mockAuth()
+      res429("9999") // 9999s required wait >> 1s cap
+
+      const result = await client2.getSubredditInfo("programming")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) expect(result.value._tag).toBe("HttpError")
+      // auth + single 429, no retry attempted
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it("falls back to exponential backoff when no Retry-After header is present", async () => {
+      const client2 = retrying({ maxRetries: 1, baseDelayMs: 0 })
+      mockAuth()
+      res429NoHeader() // no Retry-After -> backoff (baseDelayMs 0)
+      okSubreddit()
+
+      const result = await client2.getSubredditInfo("programming")
+
+      expect(result.isRight()).toBe(true)
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
+    it("does not retry non-429 errors (404)", async () => {
+      const client2 = retrying({ maxRetries: 3 })
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+
+      const result = await client2.getSubredditInfo("programming")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("HttpError")
+        if (result.value._tag === "HttpError") expect(result.value.status).toBe(404)
+      }
+      // auth + single 404, no retry
+      expect(mockFetch).toHaveBeenCalledTimes(2)
     })
   })
 

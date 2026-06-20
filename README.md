@@ -107,6 +107,7 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 | `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)        |
 | `REDDIT_CACHE`          | No       | `on`           | In-memory caching of read requests: `on`, `off`           |
 | `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)           |
+| `REDDIT_MAX_RETRIES`    | No       | `3`            | Retries on HTTP 429 with Retry-After backoff (`0` to disable) |
 
 \*Required only if using `authenticated` mode.
 
