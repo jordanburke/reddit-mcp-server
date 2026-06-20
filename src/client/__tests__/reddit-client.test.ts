@@ -439,7 +439,7 @@ describe("RedditClient", () => {
       expect(lastCallUrl).toContain("limit=10")
 
       expect(result.isRight()).toBe(true)
-      const posts = result.orThrow()
+      const posts = result.orThrow().items
       expect(posts).toHaveLength(1)
       expect(posts[0].id).toBe("post1")
       expect(posts[0].title).toBe("Test Post 1")
@@ -524,7 +524,7 @@ describe("RedditClient", () => {
       expect(lastCallUrl).not.toMatch(/[?&]t=/)
 
       expect(result.isRight()).toBe(true)
-      expect(result.orThrow()[0].id).toBe("post1")
+      expect(result.orThrow().items[0].id).toBe("post1")
     })
 
     it("should include the time filter for top sort", async () => {
@@ -591,8 +591,8 @@ describe("RedditClient", () => {
       const first = await cachedClient.browseSubreddit("x", "hot", "week", 10)
       const second = await cachedClient.browseSubreddit("x", "hot", "week", 10)
 
-      expect(first.orThrow()[0].id).toBe("cached1")
-      expect(second.orThrow()[0].id).toBe("cached1")
+      expect(first.orThrow().items[0].id).toBe("cached1")
+      expect(second.orThrow().items[0].id).toBe("cached1")
       // auth (1) + single data fetch (1) = 2; the second browse is served from cache
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
@@ -1795,6 +1795,90 @@ describe("RedditClient", () => {
         expect(result.value.message).toBe("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
         expect(result.value._tag).toBe("NotAuthenticatedError")
       }
+    })
+  })
+
+  describe("pagination (after cursors)", () => {
+    const mockAuth = () =>
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+    const postChild = (id: string) => ({
+      kind: "t3",
+      data: {
+        id,
+        title: `Post ${id}`,
+        author: "a",
+        subreddit: "s",
+        selftext: "",
+        url: "https://reddit.com",
+        score: 1,
+        upvote_ratio: 1,
+        num_comments: 0,
+        created_utc: 1,
+        over_18: false,
+        spoiler: false,
+        edited: false,
+        is_self: true,
+        link_flair_text: null,
+        permalink: "/r/s/comments/x/",
+      },
+    })
+
+    it("returns a Page with items and the after cursor", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { children: [postChild("p1")], after: "t3_next", before: null } }),
+      })
+
+      const result = await client.searchReddit("cats", {})
+      expect(result.isRight()).toBe(true)
+      const page = result.orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].id).toBe("p1")
+      expect(page.after).toBe("t3_next")
+      expect(page.before).toBeUndefined()
+    })
+
+    it("omits the after cursor when Reddit returns null (last page)", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { children: [postChild("p1")], after: null, before: null } }),
+      })
+
+      const page = (await client.searchReddit("cats", {})).orThrow()
+      expect(page.after).toBeUndefined()
+    })
+
+    it("forwards the after cursor to the request URL", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { children: [], after: null } }),
+      })
+
+      await client.searchReddit("cats", { after: "t3_prev" })
+
+      const lastUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastUrl).toContain("after=t3_prev")
+    })
+
+    it("getTopPosts returns a page and forwards the positional after cursor", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { children: [postChild("p1")], after: "t3_more", before: null } }),
+      })
+
+      const page = (await client.getTopPosts("programming", "week", 10, "t3_prev")).orThrow()
+      expect(page.items[0].id).toBe("p1")
+      expect(page.after).toBe("t3_more")
+
+      const lastUrl = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]
+      expect(lastUrl).toContain("after=t3_prev")
     })
   })
 })

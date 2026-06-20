@@ -101,6 +101,16 @@ export type RedditSubreddit = {
   readonly url: string
 }
 
+/**
+ * A page of listing results plus Reddit's pagination cursors. `after` is the fullname to pass
+ * back to fetch the next page; absent when there are no further results. `before` pages backward.
+ */
+export type Page<T> = {
+  readonly items: readonly T[]
+  readonly after?: string
+  readonly before?: string
+}
+
 export type FormattedUserInfo = {
   readonly username: string
   readonly karma: {

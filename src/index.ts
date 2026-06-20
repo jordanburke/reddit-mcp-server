@@ -81,6 +81,14 @@ function unwrapClient() {
   return getRedditClient().orThrow(new Error("Reddit client not initialized"))
 }
 
+// Footer appended to paginated listings when more results are available.
+function nextPageHint(after?: string): string {
+  return Option(after).fold(
+    () => "",
+    (cursor) => `\n\n---\nMore results available — call again with after="${cursor}" for the next page.`,
+  )
+}
+
 // Initialize Reddit client
 async function setupRedditClient() {
   const clientId = process.env.REDDIT_CLIENT_ID
@@ -339,6 +347,10 @@ server.addTool({
       .default("all")
       .describe("Time filter for top posts"),
     limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+    after: z
+      .string()
+      .optional()
+      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -347,6 +359,7 @@ server.addTool({
       sort: args.sort,
       timeFilter: args.time_filter,
       limit: args.limit,
+      after: args.after,
     })
 
     return result.fold(
@@ -354,7 +367,8 @@ server.addTool({
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get user posts: ${err.message}`)
       },
-      (posts) => {
+      (page) => {
+        const posts = page.items
         if (posts.length === 0) {
           return `No posts found for u/${args.username} with the specified filters.`
         }
@@ -374,7 +388,7 @@ server.addTool({
 
         return `# Posts by u/${args.username} (${args.sort} - ${args.time_filter})
 
-${postSummaries}`
+${postSummaries}${nextPageHint(page.after)}`
       },
     )
   },
@@ -391,6 +405,10 @@ server.addTool({
       .default("all")
       .describe("Time filter for top comments"),
     limit: z.number().min(1).max(100).default(10).describe("Number of comments to retrieve"),
+    after: z
+      .string()
+      .optional()
+      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -399,6 +417,7 @@ server.addTool({
       sort: args.sort,
       timeFilter: args.time_filter,
       limit: args.limit,
+      after: args.after,
     })
 
     return result.fold(
@@ -406,7 +425,8 @@ server.addTool({
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get user comments: ${err.message}`)
       },
-      (comments) => {
+      (page) => {
+        const comments = page.items
         if (comments.length === 0) {
           return `No comments found for u/${args.username} with the specified filters.`
         }
@@ -430,7 +450,7 @@ In r/${comment.subreddit} on "${comment.submissionTitle}"
 
         return `# Comments by u/${args.username} (${args.sort} - ${args.time_filter})
 
-${commentSummaries}`
+${commentSummaries}${nextPageHint(page.after)}`
       },
     )
   },
@@ -501,17 +521,22 @@ server.addTool({
       .default("week")
       .describe("Time period for top posts"),
     limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+    after: z
+      .string()
+      .optional()
+      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
 
-    const result = await client.getTopPosts(args.subreddit ?? "", args.time_filter, args.limit)
+    const result = await client.getTopPosts(args.subreddit ?? "", args.time_filter, args.limit, args.after)
     return result.fold(
       (err) => {
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get top posts: ${err.message}`)
       },
-      (posts) => {
+      (page) => {
+        const posts = page.items
         if (posts.length === 0) {
           const location = Option(args.subreddit).fold(
             () => "home feed",
@@ -538,7 +563,7 @@ server.addTool({
         )
         return `# Top Posts from ${location} (${args.time_filter})
 
-${postSummaries}`
+${postSummaries}${nextPageHint(page.after)}`
       },
     )
   },
@@ -557,17 +582,28 @@ server.addTool({
       .default("week")
       .describe("Time period (only applies to top and controversial sorts)"),
     limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+    after: z
+      .string()
+      .optional()
+      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
 
-    const result = await client.browseSubreddit(args.subreddit ?? "", args.sort, args.time_filter, args.limit)
+    const result = await client.browseSubreddit(
+      args.subreddit ?? "",
+      args.sort,
+      args.time_filter,
+      args.limit,
+      args.after,
+    )
     return result.fold(
       (err) => {
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to browse subreddit: ${err.message}`)
       },
-      (posts) => {
+      (page) => {
+        const posts = page.items
         const location = Option(args.subreddit).fold(
           () => "home feed",
           (sr) => `r/${sr}`,
@@ -592,7 +628,7 @@ server.addTool({
         const heading = location === "home feed" ? "Home Feed" : location
         return `# ${args.sort} posts from ${heading} (${args.sort}${timeSuffix})
 
-${postSummaries}`
+${postSummaries}${nextPageHint(page.after)}`
       },
     )
   },
@@ -684,6 +720,10 @@ server.addTool({
     time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all").describe("Time filter"),
     limit: z.number().min(1).max(100).default(10).describe("Number of results"),
     type: z.enum(["link", "sr", "user"]).default("link").describe("Type of content to search"),
+    after: z
+      .string()
+      .optional()
+      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -699,6 +739,7 @@ server.addTool({
       timeFilter: args.time_filter,
       limit: args.limit,
       type: args.type,
+      after: args.after,
     })
 
     return result.fold(
@@ -706,7 +747,8 @@ server.addTool({
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to search: ${err.message}`)
       },
-      (posts) => {
+      (page) => {
+        const posts = page.items
         if (posts.length === 0) {
           const searchLocation = Option(args.subreddit).fold(
             () => "",
@@ -737,7 +779,7 @@ server.addTool({
 
 Sorted by: ${args.sort} | Time: ${args.time_filter} | Type: ${args.type}
 
-${searchResults}`
+${searchResults}${nextPageHint(page.after)}`
       },
     )
   },
