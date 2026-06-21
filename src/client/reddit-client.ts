@@ -21,6 +21,7 @@ import type {
   RedditApiInfoResponse,
   RedditApiLinkFlairResponse,
   RedditApiListingResponse,
+  RedditApiMeResponse,
   RedditApiMoreChildrenResponse,
   RedditApiPopularSubredditsResponse,
   RedditApiPostCommentsResponse,
@@ -39,6 +40,7 @@ import type {
   RedditUser,
   RetryConfig,
   SafeModeConfig,
+  UserContent,
 } from "../types"
 import type { RedditError } from "./errors"
 import {
@@ -410,6 +412,98 @@ export class RedditClient {
       const json = (await response.json()) as RedditApiUserResponse
       const { data } = json
 
+      return {
+        name: data.name,
+        id: data.id,
+        commentKarma: data.comment_karma,
+        linkKarma: data.link_karma,
+        totalKarma: data.total_karma ?? data.comment_karma + data.link_karma,
+        isMod: data.is_mod,
+        isGold: data.is_gold,
+        isEmployee: data.is_employee,
+        createdUtc: data.created_utc,
+        profileUrl: `https://reddit.com/user/${data.name}`,
+      }
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  // Fetch + split a mixed user listing (saved/overview) into posts (t3) and comments (t1).
+  private async getUserContent(path: string, context: string): Promise<Either<RedditError, UserContent>> {
+    const attempt = await Try.async(async (): Promise<UserContent> => {
+      const response = (await this.makeRequest(path)).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData | RedditApiCommentTreeData>
+      const posts = json.data.children
+        .filter((child) => child.kind === "t3")
+        .map((child) => parsePostData(child.data as RedditApiPostData))
+      const comments = json.data.children
+        .filter((child) => child.kind === "t1")
+        .map((child) => {
+          const comment = child.data as RedditApiCommentTreeData
+          return {
+            id: comment.id,
+            author: comment.author,
+            body: comment.body ?? "",
+            score: comment.score,
+            controversiality: comment.controversiality,
+            subreddit: comment.subreddit,
+            submissionTitle: comment.link_title ?? "",
+            createdUtc: comment.created_utc,
+            edited: Boolean(comment.edited),
+            isSubmitter: comment.is_submitter,
+            permalink: comment.permalink,
+            parentId: comment.parent_id,
+          }
+        })
+      return { posts, comments, ...listingCursor(json.data) }
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error, context))
+  }
+
+  async getMyOverview(
+    options: { readonly limit?: number; readonly after?: string } = {},
+  ): Promise<Either<RedditError, UserContent>> {
+    if (this.username === undefined) {
+      return Left(new NotAuthenticatedError("Fetching your overview requires REDDIT_USERNAME"))
+    }
+    const { limit = 25, after } = options
+    const params = new URLSearchParams({ limit: limit.toString() })
+    if (after !== undefined) {
+      params.set("after", after)
+    }
+    return this.getUserContent(`/user/${this.username}/overview.json?${params}`, "Failed to get your overview")
+  }
+
+  async getMySaved(
+    options: { readonly limit?: number; readonly after?: string } = {},
+  ): Promise<Either<RedditError, UserContent>> {
+    if (this.username === undefined) {
+      return Left(new NotAuthenticatedError("Fetching saved content requires REDDIT_USERNAME"))
+    }
+    const { limit = 25, after } = options
+    const params = new URLSearchParams({ limit: limit.toString() })
+    if (after !== undefined) {
+      params.set("after", after)
+    }
+    return this.getUserContent(`/user/${this.username}/saved.json?${params}`, "Failed to get saved content")
+  }
+
+  // The authenticated user's own account (requires user credentials — /api/v1/me needs identity).
+  async getMe(): Promise<Either<RedditError, RedditUser>> {
+    const context = "Failed to get authenticated user info"
+    const attempt = await Try.async(async (): Promise<RedditUser> => {
+      const response = (await this.makeRequest("/api/v1/me")).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
+      }
+
+      const data = (await response.json()) as RedditApiMeResponse
       return {
         name: data.name,
         id: data.id,
