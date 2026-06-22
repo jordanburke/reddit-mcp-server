@@ -496,6 +496,9 @@ export class RedditClient {
 
   // The authenticated user's own account (requires user credentials — /api/v1/me needs identity).
   async getMe(): Promise<Either<RedditError, RedditUser>> {
+    if (this.username === undefined) {
+      return Left(new NotAuthenticatedError("Fetching your account requires REDDIT_USERNAME"))
+    }
     const context = "Failed to get authenticated user info"
     const attempt = await Try.async(async (): Promise<RedditUser> => {
       const response = (await this.makeRequest("/api/v1/me")).orThrow()
