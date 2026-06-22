@@ -7,6 +7,9 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - "ts-builds"
   - "functype"
+  - eslint-config-functype@2.104.4
+  - eslint-plugin-functype@2.104.4
+  - functype-os@1.4.4
 
 publicHoistPattern:
   - "*eslint*"

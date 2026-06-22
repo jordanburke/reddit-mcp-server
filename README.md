@@ -94,19 +94,19 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 
 ### Environment Variables
 
-| Variable                | Required | Default        | Description                                               |
-| ----------------------- | -------- | -------------- | --------------------------------------------------------- |
-| `REDDIT_CLIENT_ID`      | No\*     | -              | Reddit app client ID                                      |
-| `REDDIT_CLIENT_SECRET`  | No\*     | -              | Reddit app client secret                                  |
-| `REDDIT_USERNAME`       | No       | -              | Reddit username (for write operations)                    |
-| `REDDIT_PASSWORD`       | No       | -              | Reddit password (for write operations)                    |
-| `REDDIT_USER_AGENT`     | No       | Auto-generated | Custom User-Agent string                                  |
-| `REDDIT_AUTH_MODE`      | No       | `auto`         | Authentication mode: `auto`, `authenticated`, `anonymous` |
-| `REDDIT_SAFE_MODE`      | No       | `standard`     | Write safeguards: `off`, `standard`, `strict`             |
-| `REDDIT_BOT_DISCLOSURE` | No       | `off`          | Bot disclosure footer: `auto`, `off`                      |
-| `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)        |
-| `REDDIT_CACHE`          | No       | `on`           | In-memory caching of read requests: `on`, `off`           |
-| `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)           |
+| Variable                | Required | Default        | Description                                                   |
+| ----------------------- | -------- | -------------- | ------------------------------------------------------------- |
+| `REDDIT_CLIENT_ID`      | No\*     | -              | Reddit app client ID                                          |
+| `REDDIT_CLIENT_SECRET`  | No\*     | -              | Reddit app client secret                                      |
+| `REDDIT_USERNAME`       | No       | -              | Reddit username (for write operations)                        |
+| `REDDIT_PASSWORD`       | No       | -              | Reddit password (for write operations)                        |
+| `REDDIT_USER_AGENT`     | No       | Auto-generated | Custom User-Agent string                                      |
+| `REDDIT_AUTH_MODE`      | No       | `auto`         | Authentication mode: `auto`, `authenticated`, `anonymous`     |
+| `REDDIT_SAFE_MODE`      | No       | `standard`     | Write safeguards: `off`, `standard`, `strict`                 |
+| `REDDIT_BOT_DISCLOSURE` | No       | `off`          | Bot disclosure footer: `auto`, `off`                          |
+| `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)            |
+| `REDDIT_CACHE`          | No       | `on`           | In-memory caching of read requests: `on`, `off`               |
+| `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)               |
 | `REDDIT_MAX_RETRIES`    | No       | `3`            | Retries on HTTP 429 with Retry-After backoff (`0` to disable) |
 
 \*Required only if using `authenticated` mode.
