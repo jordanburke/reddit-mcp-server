@@ -1930,6 +1930,24 @@ describe("RedditClient", () => {
         expect(result.value._tag).toBe("HttpError")
       }
     })
+
+    it("returns NotAuthenticatedError (no request) when no username is configured", async () => {
+      // Read-only mode: /api/v1/me app-only returns no karma fields, which previously crashed
+      // the formatter. get_me must short-circuit like the other authenticated-user tools.
+      const readOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      const result = await readOnly.getMe()
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("NotAuthenticatedError")
+        expect(result.value.message).toBe("Fetching your account requires REDDIT_USERNAME")
+      }
+    })
   })
 
   describe("getMyOverview / getMySaved", () => {
