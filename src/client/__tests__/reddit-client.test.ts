@@ -33,6 +33,68 @@ describe("RedditClient", () => {
     vi.restoreAllMocks()
   })
 
+  describe("anonymous 403 handling", () => {
+    const anonConfig: RedditClientConfig = {
+      clientId: "",
+      clientSecret: "",
+      userAgent: "TestApp/1.0.0",
+      authMode: "anonymous",
+      retry: { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 60000 },
+    }
+
+    it("reports an IP-level block when Reddit 403s with a non-JSON body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers({ "content-type": "text/html; charset=utf-8" }),
+      })
+
+      const result = await new RedditClient(anonConfig).getSubredditInfo("science")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("NetworkBlockedError")
+        expect(result.value.message).toContain("REDDIT_CLIENT_ID")
+      }
+    })
+
+    it("leaves a JSON 403 as a plain HttpError — that is a private subreddit, not a block", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers({ "content-type": "application/json; charset=utf-8" }),
+      })
+
+      const result = await new RedditClient(anonConfig).getSubredditInfo("science")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+
+    it("does not reinterpret a 403 when authenticated", async () => {
+      // auth, then a non-JSON 403 — with credentials in play this is Reddit refusing the
+      // resource, not the network, so it must stay an HttpError.
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers({ "content-type": "text/html" }),
+      })
+
+      const result = await client.getSubredditInfo("science")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
   describe("authenticate", () => {
     it("should authenticate with user credentials", async () => {
       const mockTokenResponse = {
@@ -186,6 +248,17 @@ describe("RedditClient", () => {
         createdUtc: 1234567890,
         profileUrl: "https://reddit.com/user/testuser",
       })
+    })
+
+    it("rejects a traversal identifier before any request is made", async () => {
+      const result = await client.getUser("../../api/v1/me")
+
+      // No fetch at all — not even the auth call — so the bearer token cannot be steered.
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("ValidationError")
+      }
     })
 
     it("should return Left when user fetch fails", async () => {
@@ -591,8 +664,8 @@ describe("RedditClient", () => {
         text: async () => postsBody,
       })
 
-      const first = await cachedClient.browseSubreddit("x", "hot", "week", 10)
-      const second = await cachedClient.browseSubreddit("x", "hot", "week", 10)
+      const first = await cachedClient.browseSubreddit("cachetest", "hot", "week", 10)
+      const second = await cachedClient.browseSubreddit("cachetest", "hot", "week", 10)
 
       expect(first.orThrow().items[0].id).toBe("cached1")
       expect(second.orThrow().items[0].id).toBe("cached1")
@@ -615,8 +688,8 @@ describe("RedditClient", () => {
         json: async () => JSON.parse(postsBody),
       })
 
-      await client.browseSubreddit("x", "hot", "week", 10)
-      await client.browseSubreddit("x", "hot", "week", 10)
+      await client.browseSubreddit("cachetest", "hot", "week", 10)
+      await client.browseSubreddit("cachetest", "hot", "week", 10)
 
       // auth (1) + two data fetches = 3
       expect(mockFetch).toHaveBeenCalledTimes(3)
@@ -2180,7 +2253,7 @@ describe("RedditClient", () => {
       const result = await client.getMoreComments("p1", ["c1"])
       expect(result.isLeft()).toBe(true)
       if (result.isLeft()) {
-        expect(result.value.message).toBe("Failed to expand comments for t3_p1: HTTP 400")
+        expect(result.value.message).toBe("Failed to expand comments for p1: HTTP 400")
         expect(result.value._tag).toBe("HttpError")
       }
     })

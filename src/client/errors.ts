@@ -62,6 +62,22 @@ export class NotFoundError extends RedditErrorBase {
   }
 }
 
+/**
+ * Reddit refused the request at the network level rather than for this specific resource.
+ *
+ * Reddit 403s the unauthenticated JSON API from many IP ranges (datacenters, VPNs, flagged
+ * addresses), answering with an HTML block page instead of JSON. A bare `HttpError(403)` reads
+ * as "this subreddit is private", which sends people looking in the wrong place — the fix is to
+ * supply OAuth credentials, which also raises the rate limit from ~10 to 60+ req/min.
+ */
+export class NetworkBlockedError extends RedditErrorBase {
+  readonly _tag = "NetworkBlockedError" as const
+  constructor(message: string) {
+    super(message)
+    this.name = "NetworkBlockedError"
+  }
+}
+
 /** Client-side input or safety-policy rejection (invalid sort, duplicate-content guard). */
 export class ValidationError extends RedditErrorBase {
   readonly _tag = "ValidationError" as const
@@ -83,7 +99,8 @@ export class UnknownError extends RedditErrorBase {
   }
 }
 
-export type RedditError = HttpError | NotAuthenticatedError | ApiError | NotFoundError | ValidationError | UnknownError
+export type RedditError =
+  HttpError | NotAuthenticatedError | ApiError | NotFoundError | NetworkBlockedError | ValidationError | UnknownError
 
 export function isRedditError(error: unknown): error is RedditError {
   return error instanceof RedditErrorBase

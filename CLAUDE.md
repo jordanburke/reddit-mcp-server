@@ -155,6 +155,25 @@ Read-only GET requests are cached in-memory to reduce pressure on Reddit's tight
 - **Scope**: only successful `GET` responses are cached, keyed by full URL. Write operations and auth requests are never cached. The cache layer lives in `RedditClient.makeRequest`, which re-wraps cached bodies in a fresh `Response` (a fetch body can only be consumed once).
 - Only active when enabled; when disabled the client behaves exactly as before (raw `Response` passthrough).
 
+### Identifier Validation (Path Injection)
+
+Every subreddit, username, and thing ID is model-supplied, so `src/utils/reddit-identifiers.ts` normalizes and validates each one before it reaches a URL. Interpolating them raw was a path-injection hole: URL parsing resolves dot segments, so a `subreddit` of `../../api/v1/me` escapes `/r/{sub}/about.json` and steers the OAuth bearer token to a different endpoint, and an embedded `?`/`&` injects query parameters.
+
+- **`normalizeSubreddit`** — strips `r/`, `/r/`, trailing slashes; allows `+`-joined multireddits and `u_` profile subreddits; `""` still means the home feed.
+- **`normalizeUsername`** — strips `u/`, `/u/`, `/user/`.
+- **`normalizeThingId` / `normalizeFullname`** — bare base36 id, or a `t1_`/`t3_` fullname with the explicit kind preserved over the supplied default.
+- Every returned value matches `[A-Za-z0-9_+-]+`, which is already URL-path-safe. No `encodeURIComponent` is applied, because encoding the `+` in `r/science+space` would break it. The one exception is `this.username` from the environment (used by `get_my_overview`/`get_my_saved`), which is encoded rather than validated — a bad env value should not throw out of an `Either`-returning method.
+- Validators throw `ValidationError` from inside the `Try` bodies in `reddit-client.ts`, so failures surface as a `Left` before any request is made — including before the auth call.
+- Write helpers are `deleteThing(thingId, defaultKind)` / `editThing(thingId, newText, defaultKind)`; `deletePost`/`deleteComment` and `editPost`/`editComment` are thin wrappers that pick `t3` or `t1`.
+
+### Anonymous IP Block (403)
+
+Reddit network-blocks the unauthenticated JSON API from many IP ranges (datacenters, VPNs, flagged addresses) and answers with an HTML block page. `makeRequest` detects this and throws `NetworkBlockedError` (`src/client/errors.ts`) instead of letting a bare `HttpError(403)` surface — a plain 403 reads as "this subreddit is private" and sends people looking in the wrong place.
+
+- **Discriminator**: only when the request is unauthenticated **and** the 403 body is not JSON. A private or quarantined subreddit also 403s, but with a JSON body, so it stays an `HttpError`.
+- **Message** points at `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, which is the actual fix and also raises the limit from ~10 to 60+ req/min.
+- Applies to every tool, not just listings — the check lives in the shared request path.
+
 ### Rate-Limit Retry (429)
 
 `RedditClient.makeRequest` transparently retries HTTP 429 responses. Configured via `REDDIT_MAX_RETRIES` (default `3`, set `0` to disable).
