@@ -10,6 +10,7 @@ minimumReleaseAgeExclude:
   - eslint-config-functype@2.104.4
   - eslint-plugin-functype@2.104.4
   - functype-os@1.4.4
+  - fastmcp@4.13.0
 
 publicHoistPattern:
   - "*eslint*"
