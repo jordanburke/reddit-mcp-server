@@ -213,6 +213,16 @@ export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
 }
 ```
 
+**Anonymous mode does not work on every network.** Reddit blocks unauthenticated requests from many IP ranges — datacenters, cloud hosts, VPNs, and addresses it has flagged — and answers with an HTTP 403 block page. If you hit this, tools fail with:
+
+```
+Reddit is blocking unauthenticated requests from this network (HTTP 403 with a
+block page). Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to authenticate with
+OAuth, which also raises the rate limit from ~10 to 60+ requests/min.
+```
+
+The fix is OAuth credentials — see the next section. This is a property of your network, not of your Reddit account or the subreddit you asked for, so it affects every tool at once. A 403 on a single subreddit while others work is a different thing: that subreddit is private or quarantined.
+
 ### Authenticated Mode (Higher Rate Limits)
 
 1. Create a Reddit app at https://www.reddit.com/prefs/apps (select "script" type)
