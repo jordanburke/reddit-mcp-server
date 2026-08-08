@@ -359,13 +359,29 @@ pnpm check:versions
 pnpm validate
 git add package.json server.json manifest.json pnpm-lock.yaml
 git commit -m "x.y.z"
-git tag "v$(node -p "require('./package.json').version")"
+# -a matters: --follow-tags pushes ANNOTATED tags only (see below)
+git tag -a "v$(node -p "require('./package.json').version")" -m "v$(node -p "require('./package.json').version")"
 git push --follow-tags
+
+# 5. Confirm the tag actually landed — the publish workflow triggers on the tag, not on main
+git ls-remote --tags origin | grep "v$(node -p "require('./package.json').version")"
 ```
+
+**GOTCHA: a lightweight tag is silently not pushed.** `git push --follow-tags` pushes only _annotated_ tags, so a bare `git tag v1.5.2` stays local. The commit goes up, `git push` reports success, and the publish workflow never fires — no error anywhere. This bit v1.5.2. Either tag with `-a` as above, or push the tag explicitly:
+
+```bash
+git push origin "v$(node -p "require('./package.json').version")"
+```
+
+If you find a released commit on `main` with no npm publish, this is the first thing to check.
+
+If you edit these JSON files with a script, run `pnpm format` afterwards — `JSON.stringify(j, null, 2)` expands Prettier's collapsed arrays and produces a noisy diff.
 
 ### Or: use the `vbctp` skill, but stage the JSON files first
 
 The `vbctp` skill runs `pnpm validate` → `npm version patch` → `git push --follow-tags`. `pnpm validate` does NOT include `pnpm check:versions` — only `prepublishOnly` does, which means the mismatch is only caught in CI. **Before invoking vbctp, bump server.json + manifest.json by hand and stage them**; `npm version` will then refuse to run (dirty tree), so commit those changes first, then run vbctp.
+
+`npm version` creates an annotated tag, so vbctp's `--follow-tags` does push it. The lightweight-tag trap above applies only when you tag by hand.
 
 ### Long-term fix (not yet implemented)
 
