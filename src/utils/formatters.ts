@@ -181,7 +181,7 @@ export function formatUserInfo(user: RedditUser): FormattedUserInfo {
 
 export function formatPostInfo(post: RedditPost): FormattedPostInfo {
   const contentType = post.isSelf ? "Text Post" : "Link Post"
-  const content = post.isSelf ? (post.selftext ?? "") : (post.url ?? "")
+  const content = post.selftext || post.url || ""
 
   const flags: readonly string[] = [
     ...(post.over18 ? ["NSFW"] : []),
@@ -192,7 +192,7 @@ export function formatPostInfo(post: RedditPost): FormattedPostInfo {
   return {
     title: post.title,
     type: contentType,
-    content: content.length > 300 ? `${content.substring(0, 297)}...` : content,
+    content: content.length > 10000 ? `${content.substring(0, 9997)}...` : content,
     author: post.author,
     subreddit: post.subreddit,
     stats: {
@@ -258,7 +258,7 @@ export function formatCommentInfo(comment: RedditComment): FormattedCommentInfo 
 
   return {
     author: comment.author,
-    content: comment.body.length > 300 ? `${comment.body.substring(0, 297)}...` : comment.body,
+    content: comment.body.length > 5000 ? `${comment.body.substring(0, 4997)}...` : comment.body,
     stats: {
       score: comment.score,
       controversiality: comment.controversiality,
