@@ -1,5 +1,7 @@
 # Reddit MCP Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.jordanburke%2Freddit-mcp-server.svg)](https://mcptoplist.com/server/io.github.jordanburke%2Freddit-mcp-server)
+
 A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts, comments, user info, and **create content**.
 
 [![npm version](https://img.shields.io/npm/v/reddit-mcp-server.svg)](https://www.npmjs.com/package/reddit-mcp-server)
