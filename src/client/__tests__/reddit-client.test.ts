@@ -2465,6 +2465,95 @@ describe("RedditClient", () => {
       expect(page.after).toBeUndefined()
     })
 
+    it("maps t5 children from type=sr searches instead of dropping them", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            children: [
+              {
+                kind: "t5",
+                data: {
+                  id: "2qh0y",
+                  display_name: "Python",
+                  title: "Python",
+                  public_description: "News about the programming language Python.",
+                  subscribers: 1500000,
+                  active_user_count: 2000,
+                  created_utc: 1201242956,
+                  over18: false,
+                  subreddit_type: "public",
+                  url: "/r/Python/",
+                },
+              },
+            ],
+            after: "t5_next",
+            before: null,
+          },
+        }),
+      })
+
+      const page = (await client.searchReddit("python", { type: "sr" })).orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].title).toContain("r/Python")
+      expect(page.items[0].subreddit).toBe("Python")
+      expect(page.items[0].score).toBe(1500000)
+      expect(page.items[0].over18).toBe(false)
+      expect(page.items[0].url).toBe("https://reddit.com/r/Python/")
+      expect(page.after).toBe("t5_next")
+    })
+
+    it("maps t2 children from type=user searches instead of dropping them", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            children: [
+              {
+                kind: "t2",
+                data: {
+                  id: "abc123",
+                  name: "spez",
+                  link_karma: 100,
+                  comment_karma: 900,
+                  total_karma: 1000,
+                  is_mod: true,
+                  is_gold: true,
+                  is_employee: true,
+                  created_utc: 1118030400,
+                },
+              },
+            ],
+            after: null,
+            before: null,
+          },
+        }),
+      })
+
+      const page = (await client.searchReddit("spez", { type: "user" })).orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].title).toContain("u/spez")
+      expect(page.items[0].author).toBe("spez")
+      expect(page.items[0].score).toBe(1000)
+      expect(page.items[0].url).toBe("https://reddit.com/user/spez")
+    })
+
+    it("still drops listing children of unknown kind", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { children: [{ kind: "t1", data: { id: "c1" } }, postChild("p1")], after: null, before: null },
+        }),
+      })
+
+      const page = (await client.searchReddit("cats", {})).orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].id).toBe("p1")
+    })
+
     it("forwards the after cursor to the request URL", async () => {
       mockAuth()
       mockFetch.mockResolvedValueOnce({
