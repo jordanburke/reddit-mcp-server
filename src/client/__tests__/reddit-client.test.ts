@@ -1775,6 +1775,134 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("saveContent", () => {
+    it("should save a post", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock save request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.saveContent("post123")
+
+      const saveCall = mockFetch.mock.calls[1]
+      expect(saveCall[0]).toBe("https://oauth.reddit.com/api/save")
+      expect(saveCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(saveCall[1].body as string)
+      expect(body.get("id")).toBe("t3_post123")
+      expect(body.has("category")).toBe(false)
+
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
+    })
+
+    it("should save a comment and include an optional category", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock save request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.saveContent("t1_comment123", "read-later")
+      expect(result.isRight()).toBe(true)
+
+      const saveCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(saveCall[1].body as string)
+      expect(body.get("id")).toBe("t1_comment123")
+      expect(body.get("category")).toBe("read-later")
+    })
+
+    it("should return Left when user is not authenticated for write", async () => {
+      const clientReadOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      const result = await clientReadOnly.saveContent("post123")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
+    })
+  })
+
+  describe("unsaveContent", () => {
+    it("should unsave a post", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock unsave request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.unsaveContent("post123")
+
+      const unsaveCall = mockFetch.mock.calls[1]
+      expect(unsaveCall[0]).toBe("https://oauth.reddit.com/api/unsave")
+      expect(unsaveCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(unsaveCall[1].body as string)
+      expect(body.get("id")).toBe("t3_post123")
+
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
+    })
+
+    it("should handle a comment ID with t1_ prefix", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock unsave request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.unsaveContent("t1_comment123")
+      expect(result.isRight()).toBe(true)
+
+      const unsaveCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(unsaveCall[1].body as string)
+      expect(body.get("id")).toBe("t1_comment123")
+    })
+
+    it("should return Left when user is not authenticated for write", async () => {
+      const clientReadOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      const result = await clientReadOnly.unsaveContent("post123")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
+    })
+  })
+
   // Rollout coverage: locks the exact error-message text (behavior preservation) AND the new
   // typed `_tag` channel for every migrated method. Special attention to the ASYMMETRIC-message
   // methods — getTopPosts/browseSubreddit/searchReddit/getPostComments — where the non-ok HTTP
