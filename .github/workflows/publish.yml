@@ -39,7 +39,16 @@ jobs:
           npm pack --dry-run
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npm publish --provenance --access public 2>&1 || {
+            if npm view "reddit-mcp-server@${VERSION}" version > /dev/null 2>&1; then
+              echo "Version ${VERSION} already published on npm — continuing"
+            else
+              echo "npm publish failed and version ${VERSION} is not on the registry"
+              exit 1
+            fi
+          }
 
       - name: Build Claude Desktop Extension (.mcpb)
         run: |
