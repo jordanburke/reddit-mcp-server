@@ -8,6 +8,7 @@ import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
 import type {
   BotDisclosureConfig,
   CacheConfig,
+  FormattedPostInfo,
   RedditAuthMode,
   RedditSafeMode,
   RetryConfig,
@@ -93,6 +94,24 @@ function rssDisclaimer(source?: string): string {
   return source === "rss"
     ? "\n\n> **RSS mode** — scores, comment counts, and upvote ratios are unavailable. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full data."
     : ""
+}
+
+function formatPostSummary(post: FormattedPostInfo, index: number, source?: string): string {
+  const statsLines =
+    source === "rss"
+      ? []
+      : [
+          `- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)`,
+          `- Comments: ${post.stats.comments.toLocaleString()}`,
+        ]
+
+  return [
+    `### ${index + 1}. ${post.title}`,
+    `- Author: u/${post.author}`,
+    ...statsLines,
+    `- Posted: ${post.metadata.posted}`,
+    `- Link: ${post.links.shortLink}`,
+  ].join("\n")
 }
 
 // Footer appended to paginated listings when more results are available.
@@ -757,16 +776,9 @@ server.addTool({
           return `No posts found in ${location} for the specified time period.`
         }
 
-        const formattedPosts = posts.map(formatPostInfo)
-        const postSummaries = formattedPosts
-          .map(
-            (post, index) => `### ${index + 1}. ${post.title}
-- Author: u/${post.author}
-- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
-- Comments: ${post.stats.comments.toLocaleString()}
-- Posted: ${post.metadata.posted}
-- Link: ${post.links.shortLink}`,
-          )
+        const postSummaries = posts
+          .map(formatPostInfo)
+          .map((post, index) => formatPostSummary(post, index, page.source))
           .join("\n\n")
 
         const location = Option(args.subreddit).fold(
@@ -838,16 +850,9 @@ server.addTool({
           return `No posts found in ${location}.`
         }
 
-        const formattedPosts = posts.map(formatPostInfo)
-        const postSummaries = formattedPosts
-          .map(
-            (post, index) => `### ${index + 1}. ${post.title}
-- Author: u/${post.author}
-- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
-- Comments: ${post.stats.comments.toLocaleString()}
-- Posted: ${post.metadata.posted}
-- Link: ${post.links.shortLink}`,
-          )
+        const postSummaries = posts
+          .map(formatPostInfo)
+          .map((post, index) => formatPostSummary(post, index, page.source))
           .join("\n\n")
 
         const timeSuffix = args.sort === "top" || args.sort === "controversial" ? `, ${args.time_filter}` : ""

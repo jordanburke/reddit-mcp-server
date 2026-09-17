@@ -99,6 +99,26 @@ describe("atomEntryToRedditPost", () => {
     expect(post.author).toBe("soap94")
     expect(post.author).not.toContain("/u/")
   })
+
+  it("decodes HTML entities in external link URLs", () => {
+    const xml = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <author><name>/u/testuser</name></author>
+        <category term="programming" label="r/programming"/>
+        <content type="html">submitted by /u/testuser &lt;a href="https://example.com/watch?v=abc&amp;amp;t=10s"&gt;[link]&lt;/a&gt;</content>
+        <id>t3_entity</id>
+        <link href="https://www.reddit.com/r/programming/comments/entity/test/"/>
+        <published>2026-09-17T00:00:00+00:00</published>
+        <title>Entity test</title>
+      </entry>
+    </feed>`
+    const entries = parseAtomFeed(xml)
+    const post = atomEntryToRedditPost(entries[0]!)
+
+    expect(post.isSelf).toBe(false)
+    expect(post.url).toBe("https://example.com/watch?v=abc&t=10s")
+    expect(post.url).not.toContain("&amp;")
+  })
 })
 
 describe("RssClient", () => {
@@ -133,7 +153,30 @@ describe("RssClient", () => {
       expect(result.value.items[0]!.title).toBe("Shopify is moving from React Native back to Swift and Kotlin")
     }
 
-    expect(mockFetch).toHaveBeenCalledWith("https://www.reddit.com/r/programming/top/.rss?t=week", expect.any(Object))
+    const calledUrl = mockFetch.mock.calls[0]![0] as string
+    expect(calledUrl).toContain("https://www.reddit.com/r/programming/top/.rss")
+    expect(calledUrl).toContain("t=week")
+  })
+
+  it("respects limit param and sets after cursor when more items exist", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => fixtureXml,
+    })
+
+    const client = new RssClient("TestAgent/1.0")
+    const result = await client.fetchSubredditPosts("programming", "top", "week", 10)
+
+    expect(result.isRight()).toBe(true)
+    if (result.isRight()) {
+      expect(result.value.items).toHaveLength(10)
+      expect(result.value.after).toBeDefined()
+      expect(result.value.after).toMatch(/^t3_/)
+    }
+
+    const calledUrl = mockFetch.mock.calls[0]![0] as string
+    expect(calledUrl).toContain("limit=10")
   })
 
   it("builds correct URL for hot sort (no sort path)", async () => {
@@ -192,6 +235,48 @@ describe("RssClient", () => {
     if (result.isLeft()) {
       expect(result.value.message).toContain("503")
     }
+  })
+
+  it("caches successful results and does not refetch within TTL", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => fixtureXml,
+    })
+
+    const client = new RssClient("TestAgent/1.0")
+    await client.fetchSubredditPosts("programming", "hot")
+    await client.fetchSubredditPosts("programming", "hot")
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not cache error responses", async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 503, statusText: "Service Unavailable" })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => fixtureXml })
+
+    const client = new RssClient("TestAgent/1.0")
+    const first = await client.fetchSubredditPosts("programming", "hot")
+    const second = await client.fetchSubredditPosts("programming", "hot")
+
+    expect(first.isLeft()).toBe(true)
+    expect(second.isRight()).toBe(true)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it("uses normalized URL as cache key so r/programming and programming share a cache entry", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => fixtureXml,
+    })
+
+    const client = new RssClient("TestAgent/1.0")
+    await client.fetchSubredditPosts("programming", "hot")
+    await client.fetchSubredditPosts("r/programming", "hot")
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -255,10 +340,13 @@ describe("RedditClient RSS mode", () => {
     if (result.isRight()) {
       expect(result.value.source).toBe("rss")
       expect(result.value.items).toHaveLength(10)
+      expect(result.value.after).toBeDefined()
     }
 
     expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(mockFetch.mock.calls[0]![0]).toContain(".rss")
+    const calledUrl = mockFetch.mock.calls[0]![0] as string
+    expect(calledUrl).toContain(".rss")
+    expect(calledUrl).toContain("limit=10")
   })
 
   it("getTopPosts delegates to RSS in anonymous mode", async () => {

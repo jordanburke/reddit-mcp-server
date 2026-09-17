@@ -629,8 +629,7 @@ export class RedditClient {
     after?: string,
   ): Promise<Either<RedditError, Page<RedditPost>>> {
     if (this.usesRss) {
-      const result = await this.rssClient.fetchSubredditPosts(subreddit, "top", timeFilter)
-      return result.map((page) => ({ ...page, items: page.items.slice(0, limit) }))
+      return this.rssClient.fetchSubredditPosts(subreddit, "top", timeFilter, limit, after)
     }
 
     const params = new URLSearchParams({
@@ -671,8 +670,7 @@ export class RedditClient {
     }
 
     if (this.usesRss) {
-      const result = await this.rssClient.fetchSubredditPosts(subreddit, sort, timeFilter)
-      return result.map((page) => ({ ...page, items: page.items.slice(0, limit) }))
+      return this.rssClient.fetchSubredditPosts(subreddit, sort, timeFilter, limit, after)
     }
 
     const params = new URLSearchParams({ limit: limit.toString() })

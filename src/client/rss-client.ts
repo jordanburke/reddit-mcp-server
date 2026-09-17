@@ -47,23 +47,25 @@ export function parseAtomFeed(xml: string): readonly AtomEntry[] {
   return (Array.isArray(entries) ? entries : [entries]) as readonly AtomEntry[]
 }
 
-function extractLinkUrl(contentHtml: string): string | undefined {
-  const match = contentHtml.match(/href="([^"]+)">\[link\]/)
-  return match?.[1]
-}
-
-function extractSelfText(contentHtml: string): string {
-  const match = contentHtml.match(/<!-- SC_OFF -->(.*?)<!-- SC_ON -->/s)
-  if (!match) return ""
-  return match[1]
-    .replace(/<[^>]+>/g, "")
+function decodeHtmlEntities(text: string): string {
+  return text
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&#32;/g, " ")
     .replace(/&amp;/g, "&")
-    .trim()
+}
+
+function extractLinkUrl(contentHtml: string): string | undefined {
+  const match = contentHtml.match(/href="([^"]+)">\[link\]/)
+  return match?.[1] ? decodeHtmlEntities(match[1]) : undefined
+}
+
+function extractSelfText(contentHtml: string): string {
+  const match = contentHtml.match(/<!-- SC_OFF -->(.*?)<!-- SC_ON -->/s)
+  if (!match) return ""
+  return decodeHtmlEntities(match[1].replace(/<[^>]+>/g, "")).trim()
 }
 
 export function atomEntryToRedditPost(entry: AtomEntry): RedditPost {
@@ -94,7 +96,7 @@ export function atomEntryToRedditPost(entry: AtomEntry): RedditPost {
   }
 }
 
-type CacheEntry = { readonly result: Either<RedditError, Page<RedditPost>>; readonly expiresAt: number }
+type CacheEntry = { readonly page: Page<RedditPost>; readonly expiresAt: number }
 
 const RSS_CACHE_TTL_MS = 60_000
 
@@ -110,19 +112,30 @@ export class RssClient {
     subreddit: string,
     sort: string,
     timeFilter?: string,
+    limit?: number,
+    after?: string,
   ): Promise<Either<RedditError, Page<RedditPost>>> {
-    const key = `${subreddit}|${sort}|${timeFilter ?? ""}`
-    const cached = this.cache.get(key)
-    if (cached && Date.now() < cached.expiresAt) {
-      return cached.result
-    }
-
     const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const sub = normalizeSubreddit(subreddit)
       const basePath = sub === "" ? "" : `/r/${sub}`
       const sortPath = sort === "hot" ? "" : `/${sort}`
-      const query = timeFilter && (sort === "top" || sort === "controversial") ? `?t=${timeFilter}` : ""
-      const url = `https://www.reddit.com${basePath}${sortPath}/.rss${query}`
+      const params = new URLSearchParams()
+      if (timeFilter && (sort === "top" || sort === "controversial")) {
+        params.set("t", timeFilter)
+      }
+      if (limit !== undefined) {
+        params.set("limit", String(limit))
+      }
+      if (after !== undefined) {
+        params.set("after", after)
+      }
+      const qs = params.size > 0 ? `?${params}` : ""
+      const url = `https://www.reddit.com${basePath}${sortPath}/.rss${qs}`
+
+      const cached = this.cache.get(url)
+      if (cached && Date.now() < cached.expiresAt) {
+        return cached.page
+      }
 
       const response = await fetch(url, {
         headers: { "User-Agent": this.userAgent },
@@ -138,13 +151,17 @@ export class RssClient {
 
       const xml = await response.text()
       const entries = parseAtomFeed(xml)
-      const items = entries.map(atomEntryToRedditPost)
+      const allItems = entries.map(atomEntryToRedditPost)
+      const cap = limit ?? 25
+      const items = allItems.length > cap ? allItems.slice(0, cap) : allItems
+      const hasMore = allItems.length > items.length
+      const afterCursor = hasMore ? `t3_${items[items.length - 1]!.id}` : undefined
+      const page: Page<RedditPost> = { items, source: "rss" as const, ...(afterCursor ? { after: afterCursor } : {}) }
 
-      return { items, source: "rss" as const }
+      this.cache.set(url, { page, expiresAt: Date.now() + RSS_CACHE_TTL_MS })
+      return page
     })
 
-    const result = attempt.toEither((error) => classifyRedditError(error, "RSS fetch"))
-    this.cache.set(key, { result, expiresAt: Date.now() + RSS_CACHE_TTL_MS })
-    return result
+    return attempt.toEither((error) => classifyRedditError(error, "RSS fetch"))
   }
 }
