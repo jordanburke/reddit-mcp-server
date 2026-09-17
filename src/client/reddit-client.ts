@@ -49,12 +49,12 @@ import {
   classifyRedditError,
   HttpError,
   isRedditError,
-  NetworkBlockedError,
   NotAuthenticatedError,
   NotFoundError,
   ValidationError,
 } from "./errors"
 import { ResponseCache } from "./response-cache"
+import { RssClient } from "./rss-client"
 
 // Extract Reddit's pagination cursors from a listing's `data`. Reddit returns `after`/`before`
 // as a fullname string or null; we surface only present string cursors (no undefined keys, so
@@ -63,14 +63,6 @@ function listingCursor(data: { readonly [key: string]: unknown }): Pick<Page<unk
   const after = typeof data.after === "string" ? { after: data.after } : {}
   const before = typeof data.before === "string" ? { before: data.before } : {}
   return { ...after, ...before }
-}
-
-// Read a response header defensively. Real fetch Responses always carry `headers`, but the
-// client is also driven by partial mocks in tests, so treat a missing bag as "no header".
-function headerValue(response: Response, name: string): string {
-  // eslint-disable-next-line functype/prefer-option -- narrowing a lie in the DOM type, not modelling absence
-  const headers = response.headers as Headers | undefined
-  return headers?.get(name) ?? ""
 }
 
 function parsePostData(post: RedditApiPostData): RedditPost {
@@ -107,6 +99,8 @@ export class RedditClient {
   private readonly botDisclosure: BotDisclosureConfig
   private readonly cache?: ResponseCache
   private readonly retry: RetryConfig
+  private readonly rssClient: RssClient
+  readonly usesRss: boolean
 
   // Mutable state — inherent to a stateful HTTP client with token refresh
 
@@ -143,6 +137,8 @@ export class RedditClient {
     this.cache = config.cache?.enabled === true ? new ResponseCache({ maxBytes: config.cache.maxBytes }) : undefined
 
     this.retry = config.retry ?? { maxRetries: 3, baseDelayMs: 1000, maxDelayMs: 60000 }
+    this.usesRss = this.authMode === "anonymous" || (this.authMode === "auto" && !this.hasCredentials)
+    this.rssClient = new RssClient(this.userAgent)
   }
 
   private determineBaseUrl(): string {
@@ -195,18 +191,6 @@ export class RedditClient {
         first.status === 401 && this.authenticated
           ? await this.fetchWithRetry(url, options, { ...headers, Authorization: await this.reauthorize() }, path, 0)
           : first
-
-      // Reddit network-blocks the unauthenticated JSON API from many IP ranges and answers with
-      // an HTML block page. A private/quarantined subreddit also 403s, but does so with a JSON
-      // body — so the content type is what separates "this network is blocked" from "this
-      // resource is closed", and only the former is worth redirecting the user to OAuth.
-      if (!requiresAuth && response.status === 403 && !headerValue(response, "content-type").includes("json")) {
-        throw new NetworkBlockedError(
-          "Reddit is blocking unauthenticated requests from this network (HTTP 403 with a block page). " +
-            "Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to authenticate with OAuth, which also raises " +
-            "the rate limit from ~10 to 60+ requests/min. See https://www.reddit.com/prefs/apps to create an app.",
-        )
-      }
 
       // Cache successful read responses and return a fresh, readable Response.
       // (A fetch Response body can only be consumed once, so we re-wrap the text.)
@@ -291,13 +275,13 @@ export class RedditClient {
   }
 
   private validateWriteAccess(): void {
+    if (this.usesRss) {
+      throw new NotAuthenticatedError(
+        "Write operations require OAuth credentials (REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET) " +
+          "in addition to REDDIT_USERNAME and REDDIT_PASSWORD.",
+      )
+    }
     if (this.username === undefined || this.password === undefined) {
-      if (this.authMode === "anonymous") {
-        throw new NotAuthenticatedError(
-          "Write operations not available in anonymous mode. " +
-            "Set REDDIT_USERNAME, REDDIT_PASSWORD and use 'auto' or 'authenticated' mode.",
-        )
-      }
       throw new NotAuthenticatedError("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
     }
   }
@@ -423,7 +407,17 @@ export class RedditClient {
     return `${content}${this.botDisclosure.footer}`
   }
 
+  private requiresOAuthError(tool: string): Either<RedditError, never> {
+    return Left(
+      new NotAuthenticatedError(
+        `${tool} requires OAuth credentials (REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET). ` +
+          "RSS fallback only supports browse_subreddit and get_top_posts.",
+      ),
+    )
+  }
+
   async getUser(username: string): Promise<Either<RedditError, RedditUser>> {
+    if (this.usesRss) return this.requiresOAuthError("get_user_info")
     const context = `Failed to get user info for ${username}`
     const attempt = await Try.async(async (): Promise<RedditUser> => {
       const response = (await this.makeRequest(`/user/${normalizeUsername(username)}/about.json`)).orThrow()
@@ -491,6 +485,7 @@ export class RedditClient {
   async getMyOverview(
     options: { readonly limit?: number; readonly after?: string } = {},
   ): Promise<Either<RedditError, UserContent>> {
+    if (this.usesRss) return this.requiresOAuthError("get_my_overview")
     if (this.username === undefined) {
       return Left(new NotAuthenticatedError("Fetching your overview requires REDDIT_USERNAME"))
     }
@@ -508,6 +503,7 @@ export class RedditClient {
   async getMySaved(
     options: { readonly limit?: number; readonly after?: string } = {},
   ): Promise<Either<RedditError, UserContent>> {
+    if (this.usesRss) return this.requiresOAuthError("get_my_saved")
     if (this.username === undefined) {
       return Left(new NotAuthenticatedError("Fetching saved content requires REDDIT_USERNAME"))
     }
@@ -524,6 +520,7 @@ export class RedditClient {
 
   // The authenticated user's own account (requires user credentials — /api/v1/me needs identity).
   async getMe(): Promise<Either<RedditError, RedditUser>> {
+    if (this.usesRss) return this.requiresOAuthError("get_me")
     if (this.username === undefined) {
       return Left(new NotAuthenticatedError("Fetching your account requires REDDIT_USERNAME"))
     }
@@ -553,6 +550,7 @@ export class RedditClient {
   }
 
   async getSubredditInfo(subredditName: string): Promise<Either<RedditError, RedditSubreddit>> {
+    if (this.usesRss) return this.requiresOAuthError("get_subreddit_info")
     const context = `Failed to get subreddit info for ${subredditName}`
     const attempt = await Try.async(async (): Promise<RedditSubreddit> => {
       const response = (await this.makeRequest(`/r/${normalizeSubreddit(subredditName)}/about.json`)).orThrow()
@@ -581,6 +579,7 @@ export class RedditClient {
   }
 
   async getSubredditRules(subreddit: string): Promise<Either<RedditError, readonly RedditRule[]>> {
+    if (this.usesRss) return this.requiresOAuthError("get_subreddit_rules")
     const context = `Failed to get rules for r/${subreddit}`
     const attempt = await Try.async(async (): Promise<readonly RedditRule[]> => {
       const response = (await this.makeRequest(`/r/${normalizeSubreddit(subreddit)}/about/rules.json`)).orThrow()
@@ -603,6 +602,7 @@ export class RedditClient {
   }
 
   async getPostFlairs(subreddit: string): Promise<Either<RedditError, readonly RedditFlair[]>> {
+    if (this.usesRss) return this.requiresOAuthError("get_post_flairs")
     const context = `Failed to get post flairs for r/${subreddit}`
     const attempt = await Try.async(async (): Promise<readonly RedditFlair[]> => {
       const response = (await this.makeRequest(`/r/${normalizeSubreddit(subreddit)}/api/link_flair_v2.json`)).orThrow()
@@ -628,6 +628,11 @@ export class RedditClient {
     limit: number = 10,
     after?: string,
   ): Promise<Either<RedditError, Page<RedditPost>>> {
+    if (this.usesRss) {
+      const result = await this.rssClient.fetchSubredditPosts(subreddit, "top", timeFilter)
+      return result.map((page) => ({ ...page, items: page.items.slice(0, limit) }))
+    }
+
     const params = new URLSearchParams({
       t: timeFilter,
       limit: limit.toString(),
@@ -665,6 +670,11 @@ export class RedditClient {
       return Left(new ValidationError(`Invalid sort "${sort}". Valid options are: ${validSorts.join(", ")}`))
     }
 
+    if (this.usesRss) {
+      const result = await this.rssClient.fetchSubredditPosts(subreddit, sort, timeFilter)
+      return result.map((page) => ({ ...page, items: page.items.slice(0, limit) }))
+    }
+
     const params = new URLSearchParams({ limit: limit.toString() })
     // The time filter only applies to top/controversial listings.
     if (sort === "top" || sort === "controversial") {
@@ -693,6 +703,7 @@ export class RedditClient {
   }
 
   async getPost(postId: string, subreddit?: string): Promise<Either<RedditError, RedditPost>> {
+    if (this.usesRss) return this.requiresOAuthError("get_reddit_post")
     const context = `Failed to get post with ID ${postId}`
 
     const attempt = await Try.async(async (): Promise<RedditPost> => {
@@ -722,6 +733,7 @@ export class RedditClient {
   }
 
   async getTrendingSubreddits(limit: number = 5): Promise<Either<RedditError, readonly string[]>> {
+    if (this.usesRss) return this.requiresOAuthError("get_trending_subreddits")
     const params = new URLSearchParams({ limit: limit.toString() })
     const context = `Failed to get trending subreddits`
 
@@ -992,6 +1004,7 @@ export class RedditClient {
       readonly before?: string
     } = {},
   ): Promise<Either<RedditError, Page<RedditPost>>> {
+    if (this.usesRss) return this.requiresOAuthError("search_reddit")
     const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link", after, before } = options
     const params = new URLSearchParams({
       q: query,
@@ -1035,6 +1048,7 @@ export class RedditClient {
       readonly limit?: number
     } = {},
   ): Promise<Either<RedditError, { readonly post: RedditPost; readonly comments: readonly RedditComment[] }>> {
+    if (this.usesRss) return this.requiresOAuthError("get_post_comments")
     const { sort = "best", limit = 100 } = options
     const params = new URLSearchParams({
       sort,
@@ -1105,6 +1119,7 @@ export class RedditClient {
     linkId: string,
     commentIds: readonly string[],
   ): Promise<Either<RedditError, readonly RedditComment[]>> {
+    if (this.usesRss) return this.requiresOAuthError("get_more_comments")
     const context = `Failed to expand comments for ${linkId}`
 
     const attempt = await Try.async(async (): Promise<readonly RedditComment[]> => {
@@ -1153,6 +1168,7 @@ export class RedditClient {
       readonly after?: string
     } = {},
   ): Promise<Either<RedditError, Page<RedditPost>>> {
+    if (this.usesRss) return this.requiresOAuthError("get_user_posts")
     const { sort = "new", timeFilter = "all", limit = 25, after } = options
     const params = new URLSearchParams({
       sort,
@@ -1190,6 +1206,7 @@ export class RedditClient {
       readonly after?: string
     } = {},
   ): Promise<Either<RedditError, Page<RedditComment>>> {
+    if (this.usesRss) return this.requiresOAuthError("get_user_comments")
     const { sort = "new", timeFilter = "all", limit = 25, after } = options
     const params = new URLSearchParams({
       sort,

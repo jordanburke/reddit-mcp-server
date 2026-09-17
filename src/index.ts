@@ -89,6 +89,12 @@ function unwrapClient() {
   return getRedditClient().orThrow(new Error("Reddit client not initialized"))
 }
 
+function rssDisclaimer(source?: string): string {
+  return source === "rss"
+    ? "\n\n> **RSS mode** — scores, comment counts, and upvote ratios are unavailable. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full data."
+    : ""
+}
+
 // Footer appended to paginated listings when more results are available.
 function nextPageHint(after?: string): string {
   return Option(after).fold(
@@ -206,15 +212,15 @@ async function setupRedditClient() {
 
   if (authMode === "anonymous") {
     console.error(
-      "[Warning] Anonymous mode is deprecated — Reddit now blocks unauthenticated API requests from all networks.",
+      "[Warning] REDDIT_AUTH_MODE=anonymous is deprecated; it is now an alias for auto without credentials.",
     )
-    console.error("[Warning] Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for OAuth access (100 req/min).")
-    console.error("[Warning] See: https://www.reddit.com/wiki/api")
-  } else if (!hasCredentials) {
-    console.error("[Warning] No REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET detected.")
-    console.error("[Warning] Reddit now requires OAuth credentials for API access.")
-    console.error("[Warning] Anonymous fallback will likely fail with HTTP 403.")
-    console.error("[Warning] See: https://www.reddit.com/wiki/api")
+  }
+
+  if (authMode === "anonymous" || !hasCredentials) {
+    console.error("[Setup] RSS fallback mode — no OAuth credentials detected.")
+    console.error("[Setup] Only browse_subreddit and get_top_posts are available (~1 req/min, no engagement metrics).")
+    console.error("[Setup] Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full API access (100 req/min).")
+    console.error("[Setup] See: https://www.reddit.com/wiki/api")
   } else {
     console.error("[Setup] Testing Reddit API connection...")
     const isConnected = await client.checkAuthentication()
@@ -709,7 +715,7 @@ ${formattedPost.bestTimeToEngage}`
 server.addTool({
   name: "get_top_posts",
   description:
-    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; requires OAuth credentials. Returns a page of posts (title, author, score, upvote ratio, comments, link) plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
+    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; works without credentials via RSS fallback (titles and links only, no scores or comment counts). Returns a page of posts plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
   annotations: {
     title: "Get Top Posts",
     readOnlyHint: true,
@@ -769,7 +775,7 @@ server.addTool({
         )
         return `# Top Posts from ${location} (${args.time_filter})
 
-${postSummaries}${nextPageHint(page.after)}`
+${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
       },
     )
   },
@@ -778,7 +784,7 @@ ${postSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "browse_subreddit",
   description:
-    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; requires OAuth credentials. `time_filter` applies only to the top and controversial sorts. Returns a page of posts (title, author, score, upvote ratio, comments, link) plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
+    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; works without credentials via RSS fallback (titles and links only, no scores or comment counts). `time_filter` applies only to the top and controversial sorts. Returns a page of posts plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
   annotations: {
     title: "Browse Subreddit",
     readOnlyHint: true,
@@ -848,7 +854,7 @@ server.addTool({
         const heading = location === "home feed" ? "Home Feed" : location
         return `# ${args.sort} posts from ${heading} (${args.sort}${timeSuffix})
 
-${postSummaries}${nextPageHint(page.after)}`
+${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
       },
     )
   },

@@ -42,40 +42,18 @@ describe("RedditClient", () => {
       retry: { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 60000 },
     }
 
-    it("reports an IP-level block when Reddit 403s with a non-JSON body", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        headers: new Headers({ "content-type": "text/html; charset=utf-8" }),
-      })
-
+    it("short-circuits non-RSS tools with NotAuthenticatedError in anonymous mode", async () => {
       const result = await new RedditClient(anonConfig).getSubredditInfo("science")
 
       expect(result.isLeft()).toBe(true)
       if (result.isLeft()) {
-        expect(result.value._tag).toBe("NetworkBlockedError")
-        expect(result.value.message).toContain("REDDIT_CLIENT_ID")
+        expect(result.value._tag).toBe("NotAuthenticatedError")
+        expect(result.value.message).toContain("OAuth credentials")
       }
-    })
-
-    it("leaves a JSON 403 as a plain HttpError — that is a private subreddit, not a block", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        headers: new Headers({ "content-type": "application/json; charset=utf-8" }),
-      })
-
-      const result = await new RedditClient(anonConfig).getSubredditInfo("science")
-
-      expect(result.isLeft()).toBe(true)
-      if (result.isLeft()) {
-        expect(result.value._tag).toBe("HttpError")
-      }
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it("does not reinterpret a 403 when authenticated", async () => {
-      // auth, then a non-JSON 403 — with credentials in play this is Reddit refusing the
-      // resource, not the network, so it must stay an HttpError.
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ access_token: "test-token", expires_in: 3600 }),

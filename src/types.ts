@@ -115,10 +115,13 @@ export type RedditSubreddit = {
  * A page of listing results plus Reddit's pagination cursors. `after` is the fullname to pass
  * back to fetch the next page; absent when there are no further results. `before` pages backward.
  */
+export type PageSource = "api" | "rss"
+
 export type Page<T> = {
   readonly items: readonly T[]
   readonly after?: string
   readonly before?: string
+  readonly source?: PageSource
 }
 
 /**

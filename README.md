@@ -27,6 +27,7 @@ A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts,
 | User Analysis                   | :white_check_mark: | :white_check_mark: |
 | Post Comments                   | :white_check_mark: | :white_check_mark: |
 | OAuth Auth (60-100 rpm)         | :white_check_mark: | :white_check_mark: |
+| **RSS Fallback (zero-setup)**   | :white_check_mark: |        :x:         |
 
 ## Quick Start
 
@@ -209,11 +210,27 @@ Additionally, Reddit closed self-service OAuth app creation in November 2025. Ne
 
 ### Mode Comparison
 
-| Mode             | Rate Limit     | Setup Required    | Best For        |
-| ---------------- | -------------- | ----------------- | --------------- |
-| `auto` (default) | 60-100 req/min | OAuth credentials | Most users      |
-| `authenticated`  | 60-100 req/min | OAuth credentials | Explicit mode   |
-| `anonymous`      | ❌ Deprecated  | N/A               | No longer works |
+| Mode              | Rate Limit     | Setup Required    | Tools Available                                | Best For      |
+| ----------------- | -------------- | ----------------- | ---------------------------------------------- | ------------- |
+| `auto` (default)  | 60-100 req/min | OAuth credentials | All tools                                      | Most users    |
+| `authenticated`   | 60-100 req/min | OAuth credentials | All tools                                      | Explicit mode |
+| `auto` (no creds) | ~1 req/min     | None              | `browse_subreddit`, `get_top_posts` only (RSS) | Quick testing |
+| `anonymous`       | ~1 req/min     | None              | `browse_subreddit`, `get_top_posts` only (RSS) | Legacy alias  |
+
+### RSS Fallback Mode
+
+When no OAuth credentials are provided, the server automatically falls back to Reddit's public RSS feeds. This gives you zero-setup access to browse subreddits and get top posts.
+
+**What works:** `browse_subreddit` and `get_top_posts` — returns up to 25 posts per request.
+
+**What's missing compared to OAuth:**
+
+- No engagement metrics (score, comments, upvote ratio are all 0)
+- No pagination (single page of ~25 results)
+- No search, user info, comments, or write operations
+- Lower rate limit (~1 req/min vs 60-100 with OAuth)
+
+RSS results include a disclaimer noting the data source. All other tools return a clear error directing you to set up OAuth credentials.
 
 ### Read-Only Access (OAuth)
 

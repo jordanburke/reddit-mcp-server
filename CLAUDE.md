@@ -8,11 +8,11 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 
 ## Available Tools
 
-### Read-only Tools (OAuth Credentials Required)
+### Read-only Tools
 
-- `get_reddit_post` - Get a specific Reddit post with engagement analysis
-- `get_top_posts` - Get top posts from a subreddit or home feed
-- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial
+- `get_top_posts` - Get top posts from a subreddit or home feed (**works via RSS without credentials**)
+- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial (**works via RSS without credentials**)
+- `get_reddit_post` - Get a specific Reddit post with engagement analysis (OAuth required)
 - `get_user_info` - Get detailed information about a Reddit user
 - `get_me` - Get the authenticated user's own account info (requires user credentials)
 - `get_my_overview` - Get your own recent posts and comments (requires user credentials)
@@ -90,16 +90,24 @@ pnpm lint:fix
    - OAuth2 authentication (client credentials and password flow)
    - Automatic token refresh via axios interceptors
    - Rate limiting and error handling
+   - RSS fallback routing when no OAuth credentials are available
    - Both read-only and authenticated operations
 
-2. **Tool Modules** (`src/tools/`): Modular organization by functionality:
+2. **RSS Client** (`src/client/rss-client.ts`): Zero-credential fallback that parses Reddit's Atom feeds:
+   - Parses Atom 1.0 XML via `fast-xml-parser` (attributes preserved with `@_` prefix)
+   - Maps Atom entries to `RedditPost` (score/numComments/upvoteRatio are 0 — RSS has no metrics)
+   - Handles `fast-xml-parser`'s dual content shape (string vs `{#text, @_type}` object)
+   - Returns `Page<RedditPost>` with `source: "rss"` for downstream disclaimer rendering
+   - Returns typed `RedditError` (`HttpError` / `UnknownError`), not bare `Error`
+
+3. **Tool Modules** (`src/tools/`): Modular organization by functionality:
    - `post-tools.ts`: Post creation, retrieval, and management
    - `comment-tools.ts`: Comment retrieval and threading
    - `subreddit-tools.ts`: Subreddit info, statistics, trending
    - `user-tools.ts`: User information and engagement insights
    - `search-tools.ts`: Reddit search functionality
 
-3. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
+4. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
 
 ### Authentication Flow
 
@@ -107,20 +115,19 @@ pnpm lint:fix
 
 The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
 
-1. **auto (default)**: Uses OAuth when credentials are provided
-   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for any API access
-   - Without credentials, warns at startup and requests will fail with 403
-   - 60-100 req/min with OAuth
+1. **auto (default)**: Uses OAuth when credentials are provided, RSS fallback otherwise
+   - With REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET: full API access at 60-100 req/min
+   - Without credentials: falls back to RSS feeds for `browse_subreddit` and `get_top_posts` only (~1 req/min, no metrics)
+   - All other tools return `NotAuthenticatedError` directing the user to set up OAuth
 
 2. **authenticated**: Explicitly requires OAuth credentials
    - Server fails to start if credentials are missing
    - 60-100 req/min
    - Use for production environments
 
-3. **anonymous** (deprecated): Formerly used public JSON API without authentication
-   - No longer functional — Reddit blocks all unauthenticated API requests
+3. **anonymous** (deprecated): Alias for the RSS fallback path
+   - Behaves identically to `auto` without credentials (RSS only)
    - Emits deprecation warning at startup
-   - Kept for backwards compatibility but will be removed in a future version
 
 **Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
 
@@ -165,15 +172,6 @@ Every subreddit, username, and thing ID is model-supplied, so `src/utils/reddit-
 - Every returned value matches `[A-Za-z0-9_+-]+`, which is already URL-path-safe. No `encodeURIComponent` is applied, because encoding the `+` in `r/science+space` would break it. The one exception is `this.username` from the environment (used by `get_my_overview`/`get_my_saved`), which is encoded rather than validated — a bad env value should not throw out of an `Either`-returning method.
 - Validators throw `ValidationError` from inside the `Try` bodies in `reddit-client.ts`, so failures surface as a `Left` before any request is made — including before the auth call.
 - Write helpers are `deleteThing(thingId, defaultKind)` / `editThing(thingId, newText, defaultKind)`; `deletePost`/`deleteComment` and `editPost`/`editComment` are thin wrappers that pick `t3` or `t1`.
-
-### Anonymous IP Block / API Shutdown (403)
-
-As of mid-2026, Reddit blocks **all** unauthenticated JSON API requests (not just datacenter IPs). `makeRequest` detects this and throws `NetworkBlockedError` (`src/client/errors.ts`) instead of letting a bare `HttpError(403)` surface — a plain 403 reads as "this subreddit is private" and sends people looking in the wrong place.
-
-- **Discriminator**: only when the request is unauthenticated **and** the 403 body is not JSON. A private or quarantined subreddit also 403s, but with a JSON body, so it stays an `HttpError`.
-- **Message** points at `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, which is the only fix — OAuth credentials are now required for any Reddit API access.
-- Applies to every tool, not just listings — the check lives in the shared request path.
-- Anonymous mode is deprecated; the startup code emits a warning when `REDDIT_AUTH_MODE=anonymous` or when no credentials are detected.
 
 ### Rate-Limit Retry (429)
 
@@ -231,7 +229,13 @@ OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not 
 
 ### Quick Start Examples
 
-**Read-only (OAuth credentials required):**
+**Zero-setup (RSS fallback, browse/top only):**
+
+```bash
+npx reddit-mcp-server
+```
+
+**Full access (OAuth):**
 
 ```bash
 export REDDIT_CLIENT_ID=your_client_id
