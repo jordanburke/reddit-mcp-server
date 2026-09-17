@@ -204,9 +204,17 @@ async function setupRedditClient() {
   console.error("[Setup] Reddit client initialized")
   console.error(`[Setup] Authentication mode: ${authMode}`)
 
-  if (authMode === "anonymous" || !hasCredentials) {
-    console.error("[Setup] Using anonymous Reddit API (~10 req/min)")
-    console.error("[Setup] No authentication required - ready to use!")
+  if (authMode === "anonymous") {
+    console.error(
+      "[Warning] Anonymous mode is deprecated — Reddit now blocks unauthenticated API requests from all networks.",
+    )
+    console.error("[Warning] Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for OAuth access (100 req/min).")
+    console.error("[Warning] See: https://www.reddit.com/wiki/api")
+  } else if (!hasCredentials) {
+    console.error("[Warning] No REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET detected.")
+    console.error("[Warning] Reddit now requires OAuth credentials for API access.")
+    console.error("[Warning] Anonymous fallback will likely fail with HTTP 403.")
+    console.error("[Warning] See: https://www.reddit.com/wiki/api")
   } else {
     console.error("[Setup] Testing Reddit API connection...")
     const isConnected = await client.checkAuthentication()
@@ -349,7 +357,7 @@ Ready to handle Reddit API requests!`)
 server.addTool({
   name: "get_user_info",
   description:
-    "Get a public profile for any Reddit user: comment/post/total karma, account age and status flags, plus a short activity analysis and engagement tips. Read-only; works in anonymous mode. Returns profile stats only — use get_user_posts / get_user_comments for their actual content. Use get_me instead for your own authenticated account; do NOT expect private fields here, as only public data is returned.",
+    "Get a public profile for any Reddit user: comment/post/total karma, account age and status flags, plus a short activity analysis and engagement tips. Read-only; requires OAuth credentials. Returns profile stats only — use get_user_posts / get_user_comments for their actual content. Use get_me instead for your own authenticated account; do NOT expect private fields here, as only public data is returned.",
   annotations: {
     title: "Get User Info",
     readOnlyHint: true,
@@ -397,7 +405,7 @@ server.addTool({
 server.addTool({
   name: "get_me",
   description:
-    "Get the authenticated user's own profile (karma, account age, status flags). Read-only, but requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD) and fails in anonymous mode. Use this instead of get_user_info when you need the current account rather than an arbitrary user. Do NOT use it to look up other users — it always returns the logged-in account.",
+    "Get the authenticated user's own profile (karma, account age, status flags). Read-only, but requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD) and fails without user credentials. Use this instead of get_user_info when you need the current account rather than an arbitrary user. Do NOT use it to look up other users — it always returns the logged-in account.",
   annotations: {
     title: "Get My Account",
     readOnlyHint: true,
@@ -495,7 +503,7 @@ server.addTool({
 server.addTool({
   name: "get_user_posts",
   description:
-    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; works anonymously. Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
+    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; requires OAuth credentials. Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
   annotations: {
     title: "Get User Posts",
     readOnlyHint: true,
@@ -564,7 +572,7 @@ ${postSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "get_user_comments",
   description:
-    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; works anonymously. Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
+    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; requires OAuth credentials. Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
   annotations: {
     title: "Get User Comments",
     readOnlyHint: true,
@@ -638,7 +646,7 @@ ${commentSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "get_reddit_post",
   description:
-    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; works anonymously. Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
+    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; requires OAuth credentials. Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
   annotations: {
     title: "Get Reddit Post",
     readOnlyHint: true,
@@ -701,7 +709,7 @@ ${formattedPost.bestTimeToEngage}`
 server.addTool({
   name: "get_top_posts",
   description:
-    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; works anonymously. Returns a page of posts (title, author, score, upvote ratio, comments, link) plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
+    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; requires OAuth credentials. Returns a page of posts (title, author, score, upvote ratio, comments, link) plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
   annotations: {
     title: "Get Top Posts",
     readOnlyHint: true,
@@ -770,7 +778,7 @@ ${postSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "browse_subreddit",
   description:
-    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; works anonymously. `time_filter` applies only to the top and controversial sorts. Returns a page of posts (title, author, score, upvote ratio, comments, link) plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
+    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; requires OAuth credentials. `time_filter` applies only to the top and controversial sorts. Returns a page of posts (title, author, score, upvote ratio, comments, link) plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
   annotations: {
     title: "Browse Subreddit",
     readOnlyHint: true,
@@ -850,7 +858,7 @@ ${postSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "get_subreddit_info",
   description:
-    "Get a subreddit's profile: title, description, subscriber and active-user counts, creation date, flags, wiki/link URLs, plus a community analysis and posting tips. Read-only; works anonymously. Returns metadata about the community itself — use browse_subreddit / get_top_posts for its posts, or get_subreddit_rules for its posting rules. Do NOT use this to find subreddits by topic — use search_reddit with type='sr'.",
+    "Get a subreddit's profile: title, description, subscriber and active-user counts, creation date, flags, wiki/link URLs, plus a community analysis and posting tips. Read-only; requires OAuth credentials. Returns metadata about the community itself — use browse_subreddit / get_top_posts for its posts, or get_subreddit_rules for its posting rules. Do NOT use this to find subreddits by topic — use search_reddit with type='sr'.",
   annotations: {
     title: "Get Subreddit Info",
     readOnlyHint: true,
@@ -910,7 +918,7 @@ ${formattedSubreddit.description.full}
 server.addTool({
   name: "get_subreddit_rules",
   description:
-    "Get a subreddit's posting rules (each rule's name, what it applies to, and its description). Read-only; works anonymously. Returns the rules list, or a note when the subreddit lists none. Call this before create_post to check requirements and avoid auto-removal. For available post flairs use get_post_flairs instead.",
+    "Get a subreddit's posting rules (each rule's name, what it applies to, and its description). Read-only; requires OAuth credentials. Returns the rules list, or a note when the subreddit lists none. Call this before create_post to check requirements and avoid auto-removal. For available post flairs use get_post_flairs instead.",
   annotations: {
     title: "Get Subreddit Rules",
     readOnlyHint: true,
@@ -952,7 +960,7 @@ ${ruleList}`
 server.addTool({
   name: "get_post_flairs",
   description:
-    "List a subreddit's selectable link flairs (flair text + flair_id) for use with create_post. Read-only, but requires user credentials; many subreddits expose flairs only to members, so this can 403 or return empty anonymously. Pass a returned flair_id (and flair_text for text-editable flairs) to create_post. For the subreddit's posting rules use get_subreddit_rules instead.",
+    "List a subreddit's selectable link flairs (flair text + flair_id) for use with create_post. Read-only, but requires user credentials; many subreddits expose flairs only to members, so this can 403 or return empty without credentials. Pass a returned flair_id (and flair_text for text-editable flairs) to create_post. For the subreddit's posting rules use get_subreddit_rules instead.",
   annotations: {
     title: "Get Post Flairs",
     readOnlyHint: true,
@@ -995,7 +1003,7 @@ Pass the desired \`flair_id\` to \`create_post\`.`
 server.addTool({
   name: "get_trending_subreddits",
   description:
-    "Get the subreddits Reddit is currently featuring as trending/popular. Read-only, no parameters; works anonymously. Returns a list of subreddit names that changes through the day (cached briefly server-side). To find subreddits by keyword instead of by trend, use search_reddit with type='sr'.",
+    "Get the subreddits Reddit is currently featuring as trending/popular. Read-only, no parameters; requires OAuth credentials. Returns a list of subreddit names that changes through the day (cached briefly server-side). To find subreddits by keyword instead of by trend, use search_reddit with type='sr'.",
   annotations: {
     title: "Get Trending Subreddits",
     readOnlyHint: true,
@@ -1022,7 +1030,7 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
 server.addTool({
   name: "search_reddit",
   description:
-    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only; works anonymously. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
+    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only; requires OAuth credentials. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
   annotations: {
     title: "Search Reddit",
     readOnlyHint: true,
@@ -1430,7 +1438,7 @@ The comment ${args.thing_id} has been updated with your new content.
 server.addTool({
   name: "get_post_comments",
   description:
-    "Get the comment thread for a post (by post id + subreddit), sorted best/top/new/controversial/old/qa. Read-only; works anonymously. Returns the post header plus threaded comments (author, OP/edited badges, score, body, nesting depth) up to `limit`. Long threads are truncated with 'load more' stubs — expand those with get_more_comments. Use get_reddit_post for just the post body, not the thread.",
+    "Get the comment thread for a post (by post id + subreddit), sorted best/top/new/controversial/old/qa. Read-only; requires OAuth credentials. Returns the post header plus threaded comments (author, OP/edited badges, score, body, nesting depth) up to `limit`. Long threads are truncated with 'load more' stubs — expand those with get_more_comments. Use get_reddit_post for just the post body, not the thread.",
   annotations: {
     title: "Get Post Comments",
     readOnlyHint: true,
@@ -1512,7 +1520,7 @@ ${comment.body}
 server.addTool({
   name: "get_more_comments",
   description:
-    "Expand truncated 'load more comments' stubs in a thread. Read-only; works anonymously. Pass the post's link id and the comment ids from a 'more' node (surfaced by get_post_comments) to fetch those hidden comments; returns the expanded comments (author, body excerpt, score, link). Call get_post_comments first to obtain the thread and its 'more' node ids — do NOT invent ids.",
+    "Expand truncated 'load more comments' stubs in a thread. Read-only; requires OAuth credentials. Pass the post's link id and the comment ids from a 'more' node (surfaced by get_post_comments) to fetch those hidden comments; returns the expanded comments (author, body excerpt, score, link). Call get_post_comments first to obtain the thread and its 'more' node ids — do NOT invent ids.",
   annotations: {
     title: "Get More Comments",
     readOnlyHint: true,

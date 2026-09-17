@@ -8,7 +8,7 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 
 ## Available Tools
 
-### Read-only Tools (Client Credentials Only)
+### Read-only Tools (OAuth Credentials Required)
 
 - `get_reddit_post` - Get a specific Reddit post with engagement analysis
 - `get_top_posts` - Get top posts from a subreddit or home feed
@@ -25,7 +25,7 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren
 - `get_user_posts` - Get posts submitted by a specific user
 - `get_user_comments` - Get comments made by a specific user
-- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 anonymously)
+- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 without credentials)
 
 ### Write Tools (User Credentials Required)
 
@@ -103,24 +103,24 @@ pnpm lint:fix
 
 ### Authentication Flow
 
+**Reddit now requires OAuth credentials for all API access** (mid-2026). Anonymous/unauthenticated requests are blocked with HTTP 403 across all networks. Self-service app creation at `/prefs/apps` was closed in November 2025 — new developers must request access through Reddit Developer Support.
+
 The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
 
-1. **auto (default)**: Automatically chooses the best authentication method
-   - If REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are provided: Uses OAuth (60-100 req/min)
-   - Otherwise: Falls back to anonymous mode (~10 req/min)
-   - Gracefully degrades without failing
+1. **auto (default)**: Uses OAuth when credentials are provided
+   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for any API access
+   - Without credentials, warns at startup and requests will fail with 403
+   - 60-100 req/min with OAuth
 
-2. **authenticated**: Requires OAuth credentials
-   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
+2. **authenticated**: Explicitly requires OAuth credentials
    - Server fails to start if credentials are missing
-   - Provides higher rate limits (60-100 req/min)
-   - Use for production environments with guaranteed credentials
+   - 60-100 req/min
+   - Use for production environments
 
-3. **anonymous**: Uses public JSON API without authentication
-   - No credentials required - zero-setup experience
-   - Lower rate limit (~10 req/min)
-   - Perfect for testing and development
-   - Read-only operations work without any Reddit app setup
+3. **anonymous** (deprecated): Formerly used public JSON API without authentication
+   - No longer functional — Reddit blocks all unauthenticated API requests
+   - Emits deprecation warning at startup
+   - Kept for backwards compatibility but will be removed in a future version
 
 **Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
 
@@ -166,13 +166,14 @@ Every subreddit, username, and thing ID is model-supplied, so `src/utils/reddit-
 - Validators throw `ValidationError` from inside the `Try` bodies in `reddit-client.ts`, so failures surface as a `Left` before any request is made — including before the auth call.
 - Write helpers are `deleteThing(thingId, defaultKind)` / `editThing(thingId, newText, defaultKind)`; `deletePost`/`deleteComment` and `editPost`/`editComment` are thin wrappers that pick `t3` or `t1`.
 
-### Anonymous IP Block (403)
+### Anonymous IP Block / API Shutdown (403)
 
-Reddit network-blocks the unauthenticated JSON API from many IP ranges (datacenters, VPNs, flagged addresses) and answers with an HTML block page. `makeRequest` detects this and throws `NetworkBlockedError` (`src/client/errors.ts`) instead of letting a bare `HttpError(403)` surface — a plain 403 reads as "this subreddit is private" and sends people looking in the wrong place.
+As of mid-2026, Reddit blocks **all** unauthenticated JSON API requests (not just datacenter IPs). `makeRequest` detects this and throws `NetworkBlockedError` (`src/client/errors.ts`) instead of letting a bare `HttpError(403)` surface — a plain 403 reads as "this subreddit is private" and sends people looking in the wrong place.
 
 - **Discriminator**: only when the request is unauthenticated **and** the 403 body is not JSON. A private or quarantined subreddit also 403s, but with a JSON body, so it stays an `HttpError`.
-- **Message** points at `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, which is the actual fix and also raises the limit from ~10 to 60+ req/min.
+- **Message** points at `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, which is the only fix — OAuth credentials are now required for any Reddit API access.
 - Applies to every tool, not just listings — the check lives in the shared request path.
+- Anonymous mode is deprecated; the startup code emits a warning when `REDDIT_AUTH_MODE=anonymous` or when no credentials are detected.
 
 ### Rate-Limit Retry (429)
 
@@ -197,7 +198,7 @@ Listing tools (`get_top_posts`, `browse_subreddit`, `search_reddit`, `get_user_p
 Environment variables:
 
 ```bash
-# Reddit API Credentials (optional unless using authenticated mode)
+# Reddit API Credentials (required — Reddit blocks unauthenticated requests since mid-2026)
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
@@ -206,7 +207,7 @@ REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
 REDDIT_USERNAME=your_username
 REDDIT_PASSWORD=your_password
 
-# Authentication Mode (optional, defaults to 'auto')
+# Authentication Mode (optional, defaults to 'auto'; 'anonymous' is deprecated)
 REDDIT_AUTH_MODE=auto            # Options: auto, authenticated, anonymous
 
 # Safe Mode (optional, defaults to 'off')
@@ -230,17 +231,9 @@ OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not 
 
 ### Quick Start Examples
 
-**Try without any setup:**
+**Read-only (OAuth credentials required):**
 
 ```bash
-export REDDIT_AUTH_MODE=anonymous
-npx reddit-mcp-server
-```
-
-**With OAuth for higher rate limits:**
-
-```bash
-export REDDIT_AUTH_MODE=auto
 export REDDIT_CLIENT_ID=your_client_id
 export REDDIT_CLIENT_SECRET=your_client_secret
 npx reddit-mcp-server
@@ -249,6 +242,8 @@ npx reddit-mcp-server
 **With Safe Mode for write operations:**
 
 ```bash
+export REDDIT_CLIENT_ID=your_client_id
+export REDDIT_CLIENT_SECRET=your_client_secret
 export REDDIT_USERNAME=your_username
 export REDDIT_PASSWORD=your_password
 export REDDIT_SAFE_MODE=standard

@@ -26,8 +26,7 @@ A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts,
 | Search Reddit                   | :white_check_mark: | :white_check_mark: |
 | User Analysis                   | :white_check_mark: | :white_check_mark: |
 | Post Comments                   | :white_check_mark: | :white_check_mark: |
-| Zero-Setup Anonymous Mode       | :white_check_mark: | :white_check_mark: |
-| Three-Tier Auth (10/60/100 rpm) | :white_check_mark: | :white_check_mark: |
+| OAuth Auth (60-100 rpm)         | :white_check_mark: | :white_check_mark: |
 
 ## Quick Start
 
@@ -39,18 +38,18 @@ Download and open the extension file - Claude Desktop will install it automatica
 
 ### Option 2: NPX (No install required)
 
-```bash
-npx reddit-mcp-server
-```
-
-Or add to your MCP config (Claude Desktop, Cursor, etc.):
+Add to your MCP config (Claude Desktop, Cursor, etc.) with Reddit OAuth credentials:
 
 ```json
 {
   "mcpServers": {
     "reddit": {
       "command": "npx",
-      "args": ["reddit-mcp-server"]
+      "args": ["reddit-mcp-server"],
+      "env": {
+        "REDDIT_CLIENT_ID": "your_client_id",
+        "REDDIT_CLIENT_SECRET": "your_client_secret"
+      }
     }
   }
 }
@@ -59,7 +58,8 @@ Or add to your MCP config (Claude Desktop, Cursor, etc.):
 ### Option 3: Claude Code
 
 ```bash
-claude mcp add --transport stdio reddit -- npx reddit-mcp-server
+REDDIT_CLIENT_ID=your_client_id REDDIT_CLIENT_SECRET=your_client_secret \
+  claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 ```
 
 ## Features
@@ -94,22 +94,22 @@ claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 
 ### Environment Variables
 
-| Variable                | Required | Default        | Description                                                   |
-| ----------------------- | -------- | -------------- | ------------------------------------------------------------- |
-| `REDDIT_CLIENT_ID`      | No\*     | -              | Reddit app client ID                                          |
-| `REDDIT_CLIENT_SECRET`  | No\*     | -              | Reddit app client secret                                      |
-| `REDDIT_USERNAME`       | No       | -              | Reddit username (for write operations)                        |
-| `REDDIT_PASSWORD`       | No       | -              | Reddit password (for write operations)                        |
-| `REDDIT_USER_AGENT`     | No       | Auto-generated | Custom User-Agent string                                      |
-| `REDDIT_AUTH_MODE`      | No       | `auto`         | Authentication mode: `auto`, `authenticated`, `anonymous`     |
-| `REDDIT_SAFE_MODE`      | No       | `standard`     | Write safeguards: `off`, `standard`, `strict`                 |
-| `REDDIT_BOT_DISCLOSURE` | No       | `off`          | Bot disclosure footer: `auto`, `off`                          |
-| `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)            |
-| `REDDIT_CACHE`          | No       | `on`           | In-memory caching of read requests: `on`, `off`               |
-| `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)               |
-| `REDDIT_MAX_RETRIES`    | No       | `3`            | Retries on HTTP 429 with Retry-After backoff (`0` to disable) |
+| Variable                | Required | Default        | Description                                                           |
+| ----------------------- | -------- | -------------- | --------------------------------------------------------------------- |
+| `REDDIT_CLIENT_ID`      | Yes      | -              | Reddit app client ID (OAuth required since mid-2026)                  |
+| `REDDIT_CLIENT_SECRET`  | Yes      | -              | Reddit app client secret                                              |
+| `REDDIT_USERNAME`       | No       | -              | Reddit username (for write operations)                                |
+| `REDDIT_PASSWORD`       | No       | -              | Reddit password (for write operations)                                |
+| `REDDIT_USER_AGENT`     | No       | Auto-generated | Custom User-Agent string                                              |
+| `REDDIT_AUTH_MODE`      | No       | `auto`         | Authentication mode: `auto`, `authenticated` (`anonymous` deprecated) |
+| `REDDIT_SAFE_MODE`      | No       | `standard`     | Write safeguards: `off`, `standard`, `strict`                         |
+| `REDDIT_BOT_DISCLOSURE` | No       | `off`          | Bot disclosure footer: `auto`, `off`                                  |
+| `REDDIT_BOT_FOOTER`     | No       | Built-in       | Custom bot footer text (when disclosure is `auto`)                    |
+| `REDDIT_CACHE`          | No       | `on`           | In-memory caching of read requests: `on`, `off`                       |
+| `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)                       |
+| `REDDIT_MAX_RETRIES`    | No       | `3`            | Retries on HTTP 429 with Retry-After backoff (`0` to disable)         |
 
-\*Required only if using `authenticated` mode.
+Reddit closed self-service app creation in November 2025. See [Authentication](#authentication) for how to get credentials.
 
 ### Full MCP Config Example
 
@@ -193,59 +193,48 @@ export REDDIT_BOT_DISCLOSURE=auto
 export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
 ```
 
-## Authentication Modes
+## Authentication
+
+### ⚠️ Reddit API Changes (2026)
+
+**Anonymous mode no longer works.** As of mid-2026, Reddit blocks all unauthenticated API requests with HTTP 403. OAuth credentials are now required for any API access.
+
+Additionally, Reddit closed self-service OAuth app creation in November 2025. New developers must request access through [Reddit's Developer Support](https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164). Existing OAuth credentials (obtained before November 2025) continue to work.
+
+### Getting Credentials
+
+**If you already have a Reddit app** (created at `/prefs/apps` before November 2025): use your existing client ID and secret — they still work at 60-100 req/min.
+
+**If you need new credentials**: submit a request through Reddit's Developer Support describing your use case. Approval is required and may take time.
 
 ### Mode Comparison
 
-| Mode             | Rate Limit     | Setup Required | Best For                 |
-| ---------------- | -------------- | -------------- | ------------------------ |
-| `anonymous`      | ~10 req/min    | None           | Quick testing, read-only |
-| `auto` (default) | 10-100 req/min | Optional       | Flexible usage           |
-| `authenticated`  | 60-100 req/min | Required       | Production use           |
+| Mode             | Rate Limit     | Setup Required    | Best For        |
+| ---------------- | -------------- | ----------------- | --------------- |
+| `auto` (default) | 60-100 req/min | OAuth credentials | Most users      |
+| `authenticated`  | 60-100 req/min | OAuth credentials | Explicit mode   |
+| `anonymous`      | ❌ Deprecated  | N/A               | No longer works |
 
-### Anonymous Mode (Zero Setup)
-
-```json
-{
-  "env": {
-    "REDDIT_AUTH_MODE": "anonymous"
-  }
-}
-```
-
-**Anonymous mode does not work on every network.** Reddit blocks unauthenticated requests from many IP ranges — datacenters, cloud hosts, VPNs, and addresses it has flagged — and answers with an HTTP 403 block page. If you hit this, tools fail with:
-
-```
-Reddit is blocking unauthenticated requests from this network (HTTP 403 with a
-block page). Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to authenticate with
-OAuth, which also raises the rate limit from ~10 to 60+ requests/min.
-```
-
-The fix is OAuth credentials — see the next section. This is a property of your network, not of your Reddit account or the subreddit you asked for, so it affects every tool at once. A 403 on a single subreddit while others work is a different thing: that subreddit is private or quarantined.
-
-### Authenticated Mode (Higher Rate Limits)
-
-1. Create a Reddit app at https://www.reddit.com/prefs/apps (select "script" type)
-2. Copy the client ID and secret
-3. Configure:
+### Read-Only Access (OAuth)
 
 ```json
 {
   "env": {
-    "REDDIT_AUTH_MODE": "authenticated",
     "REDDIT_CLIENT_ID": "your_client_id",
     "REDDIT_CLIENT_SECRET": "your_client_secret"
   }
 }
 ```
 
-### Write Operations
+### Write Operations (OAuth + User Credentials)
 
-To create posts, reply, edit, or delete content, you need user credentials:
+To create posts, reply, edit, or delete content, add your Reddit username and password:
 
 ```json
 {
   "env": {
+    "REDDIT_CLIENT_ID": "your_client_id",
+    "REDDIT_CLIENT_SECRET": "your_client_secret",
     "REDDIT_USERNAME": "your_username",
     "REDDIT_PASSWORD": "your_password",
     "REDDIT_SAFE_MODE": "standard"
