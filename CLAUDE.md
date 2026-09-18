@@ -20,7 +20,7 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `get_subreddit_info` - Get subreddit details, stats, and community insights
 - `get_subreddit_rules` - Get a subreddit's posting rules (check before posting to avoid auto-removal)
 - `get_trending_subreddits` - Get currently trending/popular subreddits
-- `search_reddit` - Search for posts across Reddit with filters
+- `search_reddit` - Search for posts, subreddits (`type=sr`), or users (`type=user`) across Reddit with filters
 - `get_post_comments` - Get comments from a specific post with threading
 - `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren
 - `get_user_posts` - Get posts submitted by a specific user
