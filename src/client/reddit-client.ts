@@ -86,6 +86,47 @@ function parsePostData(post: RedditApiPostData): RedditPost {
   }
 }
 
+// /search.json?type=sr and type=user return t5 (subreddit) and t2 (account) children rather than
+// t3 posts. Surface them through the RedditPost shape searchReddit already returns, so the search
+// formatter renders them without a breaking change; score carries subscribers/karma respectively.
+function parseSubredditSearchData(sub: RedditApiSubredditResponse["data"]): RedditPost {
+  return {
+    id: String(sub.id ?? sub.display_name),
+    title: `r/${sub.display_name} (${sub.subscribers.toLocaleString("en-US")} subscribers)${sub.title ? ` — ${sub.title}` : ""}`,
+    author: "",
+    subreddit: sub.display_name,
+    selftext: sub.public_description,
+    url: `https://reddit.com${sub.url}`,
+    score: sub.subscribers,
+    upvoteRatio: 1,
+    numComments: 0,
+    createdUtc: sub.created_utc,
+    over18: sub.over18,
+    edited: false,
+    isSelf: false,
+    permalink: sub.url,
+  }
+}
+
+function parseUserSearchData(user: RedditApiUserResponse["data"]): RedditPost {
+  const karma = user.total_karma ?? user.link_karma + user.comment_karma
+  return {
+    id: user.id,
+    title: `u/${user.name} (${karma.toLocaleString("en-US")} karma)`,
+    author: user.name,
+    subreddit: "",
+    url: `https://reddit.com/user/${user.name}`,
+    score: karma,
+    upvoteRatio: 1,
+    numComments: 0,
+    createdUtc: user.created_utc,
+    over18: false,
+    edited: false,
+    isSelf: false,
+    permalink: `/user/${user.name}`,
+  }
+}
+
 export class RedditClient {
   private readonly clientId: string
   private readonly clientSecret: string
@@ -1072,9 +1113,14 @@ export class RedditClient {
         throw new HttpError(response.status, `Failed to search Reddit: HTTP ${response.status}`)
       }
 
-      const json = (await response.json()) as RedditApiListingResponse<RedditApiPostData>
+      const json = (await response.json()) as RedditApiListingResponse<Record<string, unknown>>
 
-      const items = json.data.children.filter((child) => child.kind === "t3").map((child) => parsePostData(child.data))
+      const items = json.data.children.flatMap((child): readonly RedditPost[] => {
+        if (child.kind === "t3") return [parsePostData(child.data as RedditApiPostData)]
+        if (child.kind === "t5") return [parseSubredditSearchData(child.data as RedditApiSubredditResponse["data"])]
+        if (child.kind === "t2") return [parseUserSearchData(child.data as RedditApiUserResponse["data"])]
+        return []
+      })
       return { items, ...listingCursor(json.data) }
     })
 
