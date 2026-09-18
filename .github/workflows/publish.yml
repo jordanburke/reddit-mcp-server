@@ -72,5 +72,20 @@ jobs:
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc
 
+      - name: Wait for npm propagation
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Waiting for reddit-mcp-server@${VERSION} to appear on npm..."
+          for i in $(seq 1 12); do
+            if npm view "reddit-mcp-server@${VERSION}" version > /dev/null 2>&1; then
+              echo "Version ${VERSION} is live on npm"
+              exit 0
+            fi
+            echo "Attempt ${i}/12 — not yet, waiting 10s..."
+            sleep 10
+          done
+          echo "Version ${VERSION} not found on npm after 2 minutes"
+          exit 1
+
       - name: Publish to MCP Registry
         run: ./mcp-publisher publish
