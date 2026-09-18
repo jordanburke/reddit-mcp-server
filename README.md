@@ -82,14 +82,16 @@ REDDIT_CLIENT_ID=your_client_id REDDIT_CLIENT_SECRET=your_client_secret \
 
 ### Write Tools (Require User Credentials)
 
-| Tool             | Description                                 |
-| ---------------- | ------------------------------------------- |
-| `create_post`    | Create a new post in a subreddit            |
-| `reply_to_post`  | Post a reply to an existing post or comment |
-| `edit_post`      | Edit your own Reddit post (self-text only)  |
-| `edit_comment`   | Edit your own Reddit comment                |
-| `delete_post`    | Permanently delete your own post            |
-| `delete_comment` | Permanently delete your own comment         |
+| Tool             | Description                                    |
+| ---------------- | ---------------------------------------------- |
+| `create_post`    | Create a new post in a subreddit               |
+| `reply_to_post`  | Post a reply to an existing post or comment    |
+| `edit_post`      | Edit your own Reddit post (self-text only)     |
+| `edit_comment`   | Edit your own Reddit comment                   |
+| `save_content`   | Save a post or comment to your account         |
+| `unsave_content` | Remove a post or comment from your saved items |
+| `delete_post`    | Permanently delete your own post               |
+| `delete_comment` | Permanently delete your own comment            |
 
 ## Configuration
 

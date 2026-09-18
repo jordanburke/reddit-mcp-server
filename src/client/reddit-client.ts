@@ -990,6 +990,49 @@ export class RedditClient {
     return this.editThing(thingId, newText, "t1")
   }
 
+  // Toggle a post's or comment's saved state via /api/save or /api/unsave. Both endpoints take
+  // the same fullname id regardless of thing kind, so save/unsave share one helper (unlike
+  // delete/edit, which need separate t1/t3 defaults per tool).
+  private async setSaved(thingId: string, saved: boolean, category?: string): Promise<Either<RedditError, boolean>> {
+    const attempt = await Try.async(async (): Promise<boolean> => {
+      this.validateWriteAccess()
+
+      const fullThingId = normalizeFullname(thingId, "t3")
+
+      const params = new URLSearchParams()
+      params.append("id", fullThingId)
+      if (saved && category !== undefined) {
+        params.append("category", category)
+      }
+
+      const response = (
+        await this.makeRequest(saved ? "/api/save" : "/api/unsave", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+        })
+      ).orThrow()
+
+      if (!response.ok) {
+        throw new HttpError(response.status, `Failed to ${saved ? "save" : "unsave"}: HTTP ${response.status}`)
+      }
+
+      return true
+    })
+
+    return attempt.toEither((error) => classifyRedditError(error))
+  }
+
+  async saveContent(thingId: string, category?: string): Promise<Either<RedditError, boolean>> {
+    return this.setSaved(thingId, true, category)
+  }
+
+  async unsaveContent(thingId: string): Promise<Either<RedditError, boolean>> {
+    return this.setSaved(thingId, false)
+  }
+
   async searchReddit(
     query: string,
     options: {

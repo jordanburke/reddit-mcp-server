@@ -35,6 +35,8 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `reply_to_post` - Post a reply to an existing Reddit post or comment
 - `edit_post` - Edit your own Reddit post (self-text posts only, titles cannot be edited)
 - `edit_comment` - Edit your own Reddit comment
+- `save_content` - Save a post or comment to your account (works on any visible post/comment, not just your own)
+- `unsave_content` - Remove a post or comment from your saved items
 - `delete_post` - **PERMANENTLY** delete your own Reddit post (cannot be undone!)
 - `delete_comment` - **PERMANENTLY** delete your own Reddit comment (cannot be undone!)
 
@@ -129,7 +131,7 @@ The server supports three authentication modes configured via `REDDIT_AUTH_MODE`
    - Behaves identically to `auto` without credentials (RSS only)
    - Emits deprecation warning at startup
 
-**Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
+**Write operations** (create_post, reply_to_post, edit_post, edit_comment, save_content, unsave_content, delete_post, delete_comment):
 
 - Require REDDIT_USERNAME and REDDIT_PASSWORD in **any** mode
 - Will fail gracefully with a clear error message if credentials are missing

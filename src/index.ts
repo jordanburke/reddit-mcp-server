@@ -300,6 +300,7 @@ Available capabilities:
 - Search Reddit content across posts and subreddits
 - Create posts and reply to posts/comments (with authentication)
 - Edit your own posts and comments (with authentication)
+- Save or unsave posts and comments (with authentication)
 - Delete your own posts and comments (with authentication)
 - Analyze engagement metrics and community insights
 
@@ -1441,6 +1442,92 @@ server.addTool({
 The comment ${args.thing_id} has been updated with your new content.
 
 **Note**: An "edited" marker will appear on your comment to show it has been modified.`,
+    )
+  },
+})
+
+server.addTool({
+  name: "save_content",
+  description:
+    "Save a post or comment to your account (a private bookmark, listed by get_my_saved). Mutating but idempotent — saving an already-saved item is a no-op. Requires REDDIT_USERNAME and REDDIT_PASSWORD; works on any post/comment you can see, not just your own. Accepts a full thing id (t3_ for a post, t1_ for a comment) — a bare id is treated as a post. Use unsave_content to undo.",
+  annotations: {
+    title: "Save Post or Comment",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The post or comment to save: a full thing id 't3_<id>' (post) or 't1_<id>' (comment). A bare id is treated as a post.",
+      ),
+    category: z
+      .string()
+      .optional()
+      .describe("Optional save category to file this under (Reddit Premium feature; ignored on other accounts)."),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    const result = await client.saveContent(args.thing_id, args.category)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to save content: ${err.message}`)
+      },
+      () => `# Content Saved Successfully
+
+${args.thing_id} has been saved to your account. Use get_my_saved to view your saved items.`,
+    )
+  },
+})
+
+server.addTool({
+  name: "unsave_content",
+  description:
+    "Remove a post or comment from your saved items (undoes save_content). Mutating but idempotent — unsaving an item that isn't saved is a no-op. Requires REDDIT_USERNAME and REDDIT_PASSWORD. Accepts a full thing id (t3_ for a post, t1_ for a comment) — a bare id is treated as a post.",
+  annotations: {
+    title: "Unsave Post or Comment",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The post or comment to unsave: a full thing id 't3_<id>' (post) or 't1_<id>' (comment). A bare id is treated as a post.",
+      ),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    const result = await client.unsaveContent(args.thing_id)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to unsave content: ${err.message}`)
+      },
+      () => `# Content Unsaved Successfully
+
+${args.thing_id} has been removed from your saved items.`,
     )
   },
 })
