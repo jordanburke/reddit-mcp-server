@@ -179,9 +179,24 @@ export function formatUserInfo(user: RedditUser): FormattedUserInfo {
   }
 }
 
+const POST_CONTENT_MAX_LENGTH = 10000
+const COMMENT_CONTENT_MAX_LENGTH = 5000
+
+// Cut text to at most maxLength characters, ending in "..." when cut.
+export function truncateText(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.substring(0, maxLength - 3)}...` : text
+}
+
+// Link posts can carry body text too (e.g. an image post with a description), so show both.
+// The URL goes last and is never truncated.
+function postContent(post: RedditPost): string {
+  const body = truncateText(post.selftext ?? "", POST_CONTENT_MAX_LENGTH)
+  if (post.isSelf) return body
+  return [body, post.url ?? ""].filter((part) => part.length > 0).join("\n\n")
+}
+
 export function formatPostInfo(post: RedditPost): FormattedPostInfo {
   const contentType = post.isSelf ? "Text Post" : "Link Post"
-  const content = post.isSelf ? (post.selftext ?? "") : (post.url ?? "")
 
   const flags: readonly string[] = [
     ...(post.over18 ? ["NSFW"] : []),
@@ -192,7 +207,7 @@ export function formatPostInfo(post: RedditPost): FormattedPostInfo {
   return {
     title: post.title,
     type: contentType,
-    content: content.length > 300 ? `${content.substring(0, 297)}...` : content,
+    content: postContent(post),
     author: post.author,
     subreddit: post.subreddit,
     stats: {
@@ -253,12 +268,15 @@ export function formatSubredditInfo(subreddit: RedditSubreddit): FormattedSubred
   }
 }
 
-export function formatCommentInfo(comment: RedditComment): FormattedCommentInfo {
+export function formatCommentInfo(
+  comment: RedditComment,
+  maxLength: number = COMMENT_CONTENT_MAX_LENGTH,
+): FormattedCommentInfo {
   const flags: readonly string[] = [...(comment.edited ? ["Edited"] : []), ...(comment.isSubmitter ? ["OP"] : [])]
 
   return {
     author: comment.author,
-    content: comment.body.length > 300 ? `${comment.body.substring(0, 297)}...` : comment.body,
+    content: truncateText(comment.body, maxLength),
     stats: {
       score: comment.score,
       controversiality: comment.controversiality,

@@ -15,7 +15,7 @@ import type {
   SafeModeConfig,
   UserContent,
 } from "./types"
-import { formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
+import { formatCommentInfo, formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
 
 // Load environment variables
 dotenv.config({ quiet: true })
@@ -139,8 +139,8 @@ function formatUserContent(heading: string, content: UserContent): string {
       ? ""
       : `## Comments (${content.comments.length})\n${content.comments
           .map((comment, index) => {
-            const body = comment.body.length > 200 ? `${comment.body.substring(0, 200)}...` : comment.body
-            return `${index + 1}. in r/${comment.subreddit}: ${body} — https://reddit.com${comment.permalink}`
+            const formatted = formatCommentInfo(comment, 200)
+            return `${index + 1}. in r/${comment.subreddit}: ${formatted.content} — ${formatted.link}`
           })
           .join("\n")}\n\n`
 
@@ -645,18 +645,18 @@ server.addTool({
 
         const commentSummaries = comments
           .map((comment, index) => {
-            const truncatedBody = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
+            const formatted = formatCommentInfo(comment, 300)
 
             const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
 
             return `### ${index + 1}. Comment ${flags.join(" ")}
 In r/${comment.subreddit} on "${comment.submissionTitle}"
 
-> ${truncatedBody}
+> ${formatted.content}
 
 - Score: ${comment.score.toLocaleString()}
 - Posted: ${new Date(comment.createdUtc * 1000).toLocaleString()}
-- Link: https://reddit.com${comment.permalink}`
+- Link: ${formatted.link}`
           })
           .join("\n\n")
 
@@ -1651,13 +1651,13 @@ server.addTool({
 
         const commentList = comments
           .map((comment, index) => {
-            const truncated = comment.body.length > 300 ? `${comment.body.substring(0, 300)}...` : comment.body
+            const formatted = formatCommentInfo(comment, 300)
             const flags = [...(comment.edited ? ["*(edited)*"] : []), ...(comment.isSubmitter ? ["**OP**"] : [])]
             return `### ${index + 1}. u/${comment.author} ${flags.join(" ")}
-> ${truncated}
+> ${formatted.content}
 
 - Score: ${comment.score.toLocaleString()}
-- Link: https://reddit.com${comment.permalink}`
+- Link: ${formatted.link}`
           })
           .join("\n\n")
 
