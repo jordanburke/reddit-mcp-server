@@ -102,14 +102,18 @@ pnpm lint:fix
    - Returns `Page<RedditPost>` with `source: "rss"` for downstream disclaimer rendering
    - Returns typed `RedditError` (`HttpError` / `UnknownError`), not bare `Error`
 
-3. **Tool Modules** (`src/tools/`): Modular organization by functionality:
-   - `post-tools.ts`: Post creation, retrieval, and management
-   - `comment-tools.ts`: Comment retrieval and threading
-   - `subreddit-tools.ts`: Subreddit info, statistics, trending
-   - `user-tools.ts`: User information and engagement insights
-   - `search-tools.ts`: Reddit search functionality
+3. **Server and Tools** (`src/index.ts`): There is no `src/tools/` directory — every MCP tool is registered here with `server.addTool`:
+   - Shared render helpers: `formatPostSummary`, `formatUserContent`, `nextPageHint`, `rssDisclaimer`
+   - Client setup (`setupRedditClient`) and transport startup (stdio or httpStream)
+   - `src/bin.ts` is the npx/CLI entry point: it forces stdio mode and handles `--help`/`--version`
 
-4. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
+4. **Formatters** (`src/utils/formatters.ts`): Turn client types into display shapes:
+   - `formatPostInfo`: a link post shows its body text and then its URL; only the body is truncated
+   - `formatCommentInfo(comment, maxLength = 5000)`: comment tools pass their own limit (200 for overview/saved, 300 for user comments and more-comments)
+   - `truncateText`: shared cut-to-length helper; the result includes the `...`
+   - Engagement and health analysis helpers
+
+5. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
 
 ### Authentication Flow
 
