@@ -1691,6 +1691,14 @@ async function main() {
     console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
   } else {
     console.error("[Setup] Starting in stdio mode")
+    if (process.stdin.isTTY) {
+      console.error(
+        "[Setup] ⚠ stdin is a terminal. This server speaks MCP JSON-RPC over stdio and expects an MCP client " +
+          "(Claude Desktop, Claude Code, MCP Inspector) on the other end — typed input will cause JSON parse errors.",
+      )
+      console.error("[Setup]   Test interactively: npx @modelcontextprotocol/inspector npx reddit-mcp-server")
+      console.error("[Setup]   Or run as HTTP:       TRANSPORT_TYPE=httpStream npx reddit-mcp-server")
+    }
     await server.start({
       transportType: "stdio",
     })
