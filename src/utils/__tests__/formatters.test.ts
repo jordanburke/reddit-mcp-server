@@ -1,14 +1,47 @@
 import { Option } from "functype"
 import { describe, expect, it } from "vitest"
 
+import type { RedditComment, RedditPost } from "../../types"
 import {
   analyzePostEngagement,
   analyzeSubredditHealth,
   analyzeUserActivity,
+  formatCommentInfo,
+  formatPostInfo,
   formatTimestamp,
   getBestEngagementTime,
   getUserRecommendations,
+  truncateText,
 } from "../formatters"
+
+const basePost: RedditPost = {
+  id: "abc123",
+  title: "Title",
+  author: "someone",
+  subreddit: "test",
+  score: 1,
+  upvoteRatio: 1,
+  numComments: 0,
+  createdUtc: 1700000000,
+  over18: false,
+  edited: false,
+  isSelf: true,
+  permalink: "/r/test/comments/abc123/title/",
+}
+
+const baseComment: RedditComment = {
+  id: "c1",
+  author: "someone",
+  body: "hello",
+  score: 1,
+  controversiality: 0,
+  subreddit: "test",
+  submissionTitle: "Title",
+  createdUtc: 1700000000,
+  edited: false,
+  isSubmitter: false,
+  permalink: "/r/test/comments/abc123/title/c1/",
+}
 
 describe("formatters", () => {
   describe("formatTimestamp", () => {
@@ -214,6 +247,86 @@ describe("formatters", () => {
 
       // Should contain timing-related words
       expect(result.toLowerCase()).toMatch(/time|hour|timing|active|engagement|post/)
+    })
+  })
+
+  describe("truncateText", () => {
+    it("should leave text at or under the limit unchanged", () => {
+      expect(truncateText("abcde", 5)).toBe("abcde")
+    })
+
+    it("should cut text over the limit to exactly the limit, ending in an ellipsis", () => {
+      const result = truncateText("abcdefghij", 8)
+
+      expect(result).toBe("abcde...")
+      expect(result).toHaveLength(8)
+    })
+  })
+
+  describe("formatPostInfo", () => {
+    it("should show self-text for text posts", () => {
+      const result = formatPostInfo({ ...basePost, selftext: "Body text", url: "https://reddit.com/r/test/x" })
+
+      expect(result.type).toBe("Text Post")
+      expect(result.content).toBe("Body text")
+    })
+
+    it("should show an empty body for a text post with no self-text", () => {
+      const result = formatPostInfo({ ...basePost, selftext: "", url: "https://reddit.com/r/test/x" })
+
+      expect(result.content).toBe("")
+    })
+
+    it("should show only the URL for a link post without body text", () => {
+      const result = formatPostInfo({ ...basePost, isSelf: false, selftext: "", url: "https://example.com/a" })
+
+      expect(result.type).toBe("Link Post")
+      expect(result.content).toBe("https://example.com/a")
+    })
+
+    it("should show both body text and URL for a link post with body text", () => {
+      const result = formatPostInfo({
+        ...basePost,
+        isSelf: false,
+        selftext: "OP's description",
+        url: "https://i.redd.it/image.png",
+      })
+
+      expect(result.content).toBe("OP's description\n\nhttps://i.redd.it/image.png")
+    })
+
+    it("should keep the URL intact when a link post's body text is truncated", () => {
+      const result = formatPostInfo({
+        ...basePost,
+        isSelf: false,
+        selftext: "x".repeat(20000),
+        url: "https://example.com/a",
+      })
+
+      expect(result.content.endsWith("...\n\nhttps://example.com/a")).toBe(true)
+    })
+
+    it("should keep long self-text up to 10,000 characters", () => {
+      expect(formatPostInfo({ ...basePost, selftext: "x".repeat(10000) }).content).toHaveLength(10000)
+      expect(formatPostInfo({ ...basePost, selftext: "x".repeat(10001) }).content).toHaveLength(10000)
+    })
+  })
+
+  describe("formatCommentInfo", () => {
+    it("should keep comments up to 5,000 characters by default", () => {
+      expect(formatCommentInfo({ ...baseComment, body: "x".repeat(5000) }).content).toHaveLength(5000)
+      expect(formatCommentInfo({ ...baseComment, body: "x".repeat(6000) }).content).toHaveLength(5000)
+    })
+
+    it("should honor a caller-supplied length limit", () => {
+      const result = formatCommentInfo({ ...baseComment, body: "x".repeat(500) }, 300)
+
+      expect(result.content).toHaveLength(300)
+      expect(result.content.endsWith("...")).toBe(true)
+    })
+
+    it("should build the full comment link from the permalink", () => {
+      expect(formatCommentInfo(baseComment).link).toBe("https://reddit.com/r/test/comments/abc123/title/c1/")
     })
   })
 })
