@@ -8,6 +8,7 @@ import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
 import type {
   BotDisclosureConfig,
   CacheConfig,
+  FormattedPostInfo,
   RedditAuthMode,
   RedditSafeMode,
   RetryConfig,
@@ -87,6 +88,30 @@ function buildSafeModeConfig(safeMode: RedditSafeMode): SafeModeConfig {
 
 function unwrapClient() {
   return getRedditClient().orThrow(new Error("Reddit client not initialized"))
+}
+
+function rssDisclaimer(source?: string): string {
+  return source === "rss"
+    ? "\n\n> **RSS mode** — scores, comment counts, and upvote ratios are unavailable. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full data."
+    : ""
+}
+
+function formatPostSummary(post: FormattedPostInfo, index: number, source?: string): string {
+  const statsLines =
+    source === "rss"
+      ? []
+      : [
+          `- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)`,
+          `- Comments: ${post.stats.comments.toLocaleString()}`,
+        ]
+
+  return [
+    `### ${index + 1}. ${post.title}`,
+    `- Author: u/${post.author}`,
+    ...statsLines,
+    `- Posted: ${post.metadata.posted}`,
+    `- Link: ${post.links.shortLink}`,
+  ].join("\n")
 }
 
 // Footer appended to paginated listings when more results are available.
@@ -204,9 +229,17 @@ async function setupRedditClient() {
   console.error("[Setup] Reddit client initialized")
   console.error(`[Setup] Authentication mode: ${authMode}`)
 
+  if (authMode === "anonymous") {
+    console.error(
+      "[Warning] REDDIT_AUTH_MODE=anonymous is deprecated; it is now an alias for auto without credentials.",
+    )
+  }
+
   if (authMode === "anonymous" || !hasCredentials) {
-    console.error("[Setup] Using anonymous Reddit API (~10 req/min)")
-    console.error("[Setup] No authentication required - ready to use!")
+    console.error("[Setup] RSS fallback mode — no OAuth credentials detected.")
+    console.error("[Setup] Only browse_subreddit and get_top_posts are available (~1 req/min, no engagement metrics).")
+    console.error("[Setup] Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full API access (100 req/min).")
+    console.error("[Setup] See: https://www.reddit.com/wiki/api")
   } else {
     console.error("[Setup] Testing Reddit API connection...")
     const isConnected = await client.checkAuthentication()
@@ -267,6 +300,7 @@ Available capabilities:
 - Search Reddit content across posts and subreddits
 - Create posts and reply to posts/comments (with authentication)
 - Edit your own posts and comments (with authentication)
+- Save or unsave posts and comments (with authentication)
 - Delete your own posts and comments (with authentication)
 - Analyze engagement metrics and community insights
 
@@ -315,7 +349,13 @@ For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Res
 // Test tool
 server.addTool({
   name: "test_reddit_mcp_server",
-  description: "Test the Reddit MCP Server connection and configuration",
+  description:
+    'Health check for the Reddit MCP server. Read-only and side-effect-free — inspects local configuration only and makes no Reddit API calls. Returns the server version, whether the Reddit client is initialized, whether OAuth credentials are present, and whether write access (REDDIT_USERNAME/REDDIT_PASSWORD) is configured. Use this first to diagnose setup/auth problems. Do NOT use it to check Reddit\'s own status or connectivity — it never contacts Reddit. A "✗ Write Access" result means the write tools (create_post, reply_to_post, edit_*, delete_*) will fail.',
+  annotations: {
+    title: "Test Reddit MCP Server",
+    readOnlyHint: true,
+    openWorldHint: false,
+  },
   parameters: z.object({}),
   execute: () => {
     const client = getRedditClient()
@@ -342,9 +382,17 @@ Ready to handle Reddit API requests!`)
 // User tools
 server.addTool({
   name: "get_user_info",
-  description: "Get detailed information about a Reddit user including karma, account status, and activity analysis",
+  description:
+    "Get a public profile for any Reddit user: comment/post/total karma, account age and status flags, plus a short activity analysis and engagement tips. Read-only; requires OAuth credentials. Returns profile stats only — use get_user_posts / get_user_comments for their actual content. Use get_me instead for your own authenticated account; do NOT expect private fields here, as only public data is returned.",
+  annotations: {
+    title: "Get User Info",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    username: z.string().describe("The Reddit username (without u/ prefix)"),
+    username: z
+      .string()
+      .describe("The target user's Reddit username, without the u/ prefix (e.g. 'spez', not 'u/spez')."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -383,7 +431,12 @@ server.addTool({
 server.addTool({
   name: "get_me",
   description:
-    "Get the authenticated user's own account info (karma, account status). Requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD); fails in anonymous mode.",
+    "Get the authenticated user's own profile (karma, account age, status flags). Read-only, but requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD) and fails without user credentials. Use this instead of get_user_info when you need the current account rather than an arbitrary user. Do NOT use it to look up other users — it always returns the logged-in account.",
+  annotations: {
+    title: "Get My Account",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({}),
   execute: async () => {
     const client = unwrapClient()
@@ -416,10 +469,18 @@ server.addTool({
 server.addTool({
   name: "get_my_overview",
   description:
-    "Get your own recent activity (posts and comments combined). Requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD).",
+    "Get the authenticated user's own recent activity — posts and comments interleaved, newest first. Read-only but requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD). Returns up to `limit` items plus an `after` cursor for the next page. Use get_my_saved for saved items, or get_user_posts / get_user_comments for another user. Do NOT use this to fetch a specific post's thread — use get_post_comments.",
+  annotations: {
+    title: "Get My Overview",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    limit: z.number().min(1).max(100).default(25).describe("Number of items to retrieve"),
-    after: z.string().optional().describe("Pagination cursor: pass the `after` value from a previous page"),
+    limit: z.number().min(1).max(100).default(25).describe("How many activity items to return, 1–100 (default 25)."),
+    after: z
+      .string()
+      .optional()
+      .describe("Forward pagination cursor: the `after` value returned by a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -438,10 +499,18 @@ server.addTool({
 server.addTool({
   name: "get_my_saved",
   description:
-    "Get your saved posts and comments. Requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD); saved content is private.",
+    "Get the authenticated user's saved posts and comments (private to the account). Read-only but requires user credentials (REDDIT_USERNAME/REDDIT_PASSWORD). Returns up to `limit` items plus an `after` pagination cursor. Use get_my_overview for your authored activity. Do NOT use this for another user — saved items are private and have no cross-user equivalent.",
+  annotations: {
+    title: "Get My Saved",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    limit: z.number().min(1).max(100).default(25).describe("Number of items to retrieve"),
-    after: z.string().optional().describe("Pagination cursor: pass the `after` value from a previous page"),
+    limit: z.number().min(1).max(100).default(25).describe("How many saved items to return, 1–100 (default 25)."),
+    after: z
+      .string()
+      .optional()
+      .describe("Forward pagination cursor: the `after` value returned by a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -459,19 +528,30 @@ server.addTool({
 
 server.addTool({
   name: "get_user_posts",
-  description: "Get recent posts by a Reddit user with sorting and filtering options",
+  description:
+    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; requires OAuth credentials. Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
+  annotations: {
+    title: "Get User Posts",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    username: z.string().describe("The Reddit username (without u/ prefix)"),
-    sort: z.enum(["new", "hot", "top"]).default("new").describe("Sort order for posts"),
+    username: z.string().describe("The author's Reddit username, without the u/ prefix (e.g. 'spez')."),
+    sort: z
+      .enum(["new", "hot", "top"])
+      .default("new")
+      .describe(
+        "Ordering: 'new' (most recent), 'hot' (currently active), or 'top' (highest score within `time_filter`). Default 'new'.",
+      ),
     time_filter: z
       .enum(["hour", "day", "week", "month", "year", "all"])
       .default("all")
-      .describe("Time filter for top posts"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+      .describe("Time window for scoring; only applies when sort='top'. Ignored for 'new'/'hot'. Default 'all'."),
+    limit: z.number().min(1).max(100).default(10).describe("How many posts to return, 1–100 (default 10)."),
     after: z
       .string()
       .optional()
-      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
+      .describe("Forward pagination cursor: the `after` value from a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -517,19 +597,30 @@ ${postSummaries}${nextPageHint(page.after)}`
 
 server.addTool({
   name: "get_user_comments",
-  description: "Get recent comments by a Reddit user with sorting and filtering options",
+  description:
+    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; requires OAuth credentials. Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
+  annotations: {
+    title: "Get User Comments",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    username: z.string().describe("The Reddit username (without u/ prefix)"),
-    sort: z.enum(["new", "hot", "top"]).default("new").describe("Sort order for comments"),
+    username: z.string().describe("The author's Reddit username, without the u/ prefix (e.g. 'spez')."),
+    sort: z
+      .enum(["new", "hot", "top"])
+      .default("new")
+      .describe(
+        "Ordering: 'new' (most recent), 'hot' (currently active), or 'top' (highest score within `time_filter`). Default 'new'.",
+      ),
     time_filter: z
       .enum(["hour", "day", "week", "month", "year", "all"])
       .default("all")
-      .describe("Time filter for top comments"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of comments to retrieve"),
+      .describe("Time window for scoring; only applies when sort='top'. Ignored for 'new'/'hot'. Default 'all'."),
+    limit: z.number().min(1).max(100).default(10).describe("How many comments to return, 1–100 (default 10)."),
     after: z
       .string()
       .optional()
-      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
+      .describe("Forward pagination cursor: the `after` value from a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -581,10 +672,19 @@ ${commentSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "get_reddit_post",
   description:
-    "Get detailed information about a specific Reddit post including content, stats, and engagement analysis",
+    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; requires OAuth credentials. Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
+  annotations: {
+    title: "Get Reddit Post",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
-    post_id: z.string().describe("The Reddit post ID"),
+    subreddit: z.string().describe("The subreddit the post lives in, without the r/ prefix (e.g. 'programming')."),
+    post_id: z
+      .string()
+      .describe(
+        "Base36 post id — the segment after /comments/ in a permalink like reddit.com/r/<sub>/comments/<post_id>/... (e.g. '1abc23'). With or without a t3_ prefix.",
+      ),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -634,18 +734,29 @@ ${formattedPost.bestTimeToEngage}`
 
 server.addTool({
   name: "get_top_posts",
-  description: "Get top posts from a subreddit or from the Reddit home feed",
+  description:
+    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; works without credentials via RSS fallback (titles and links only, no scores or comment counts). Returns a page of posts plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
+  annotations: {
+    title: "Get Top Posts",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit: z.string().optional().describe("The subreddit name (without r/ prefix). Leave empty for home feed"),
+    subreddit: z
+      .string()
+      .optional()
+      .describe(
+        "Subreddit to read, without the r/ prefix (e.g. 'science'). Omit to use the authenticated home feed (requires credentials).",
+      ),
     time_filter: z
       .enum(["hour", "day", "week", "month", "year", "all"])
       .default("week")
-      .describe("Time period for top posts"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+      .describe("Time window the 'top' ranking is computed over (e.g. 'day' = top today). Default 'week'."),
+    limit: z.number().min(1).max(100).default(10).describe("How many posts to return, 1–100 (default 10)."),
     after: z
       .string()
       .optional()
-      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
+      .describe("Forward pagination cursor: the `after` value from a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -666,16 +777,9 @@ server.addTool({
           return `No posts found in ${location} for the specified time period.`
         }
 
-        const formattedPosts = posts.map(formatPostInfo)
-        const postSummaries = formattedPosts
-          .map(
-            (post, index) => `### ${index + 1}. ${post.title}
-- Author: u/${post.author}
-- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
-- Comments: ${post.stats.comments.toLocaleString()}
-- Posted: ${post.metadata.posted}
-- Link: ${post.links.shortLink}`,
-          )
+        const postSummaries = posts
+          .map(formatPostInfo)
+          .map((post, index) => formatPostSummary(post, index, page.source))
           .join("\n\n")
 
         const location = Option(args.subreddit).fold(
@@ -684,7 +788,7 @@ server.addTool({
         )
         return `# Top Posts from ${location} (${args.time_filter})
 
-${postSummaries}${nextPageHint(page.after)}`
+${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
       },
     )
   },
@@ -693,20 +797,34 @@ ${postSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "browse_subreddit",
   description:
-    "Browse posts from a subreddit or the Reddit home feed with a sort order (hot, new, top, rising, controversial). " +
-    "The time_filter only applies to top and controversial sorts.",
+    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; works without credentials via RSS fallback (titles and links only, no scores or comment counts). `time_filter` applies only to the top and controversial sorts. Returns a page of posts plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
+  annotations: {
+    title: "Browse Subreddit",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit: z.string().optional().describe("The subreddit name (without r/ prefix). Leave empty for home feed"),
-    sort: z.enum(["hot", "new", "top", "rising", "controversial"]).default("hot").describe("Sort order for posts"),
+    subreddit: z
+      .string()
+      .optional()
+      .describe(
+        "Subreddit to browse, without the r/ prefix (e.g. 'news'). Omit to use the authenticated home feed (requires credentials).",
+      ),
+    sort: z
+      .enum(["hot", "new", "top", "rising", "controversial"])
+      .default("hot")
+      .describe(
+        "Feed ordering: 'hot' (default), 'new', 'rising', 'top', or 'controversial'. 'top'/'controversial' honor `time_filter`.",
+      ),
     time_filter: z
       .enum(["hour", "day", "week", "month", "year", "all"])
       .default("week")
-      .describe("Time period (only applies to top and controversial sorts)"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of posts to retrieve"),
+      .describe("Time window; only applies to sort='top' or 'controversial'. Ignored otherwise. Default 'week'."),
+    limit: z.number().min(1).max(100).default(10).describe("How many posts to return, 1–100 (default 10)."),
     after: z
       .string()
       .optional()
-      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
+      .describe("Forward pagination cursor: the `after` value from a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -733,23 +851,16 @@ server.addTool({
           return `No posts found in ${location}.`
         }
 
-        const formattedPosts = posts.map(formatPostInfo)
-        const postSummaries = formattedPosts
-          .map(
-            (post, index) => `### ${index + 1}. ${post.title}
-- Author: u/${post.author}
-- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)
-- Comments: ${post.stats.comments.toLocaleString()}
-- Posted: ${post.metadata.posted}
-- Link: ${post.links.shortLink}`,
-          )
+        const postSummaries = posts
+          .map(formatPostInfo)
+          .map((post, index) => formatPostSummary(post, index, page.source))
           .join("\n\n")
 
         const timeSuffix = args.sort === "top" || args.sort === "controversial" ? `, ${args.time_filter}` : ""
         const heading = location === "home feed" ? "Home Feed" : location
         return `# ${args.sort} posts from ${heading} (${args.sort}${timeSuffix})
 
-${postSummaries}${nextPageHint(page.after)}`
+${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
       },
     )
   },
@@ -758,9 +869,15 @@ ${postSummaries}${nextPageHint(page.after)}`
 // Subreddit tools
 server.addTool({
   name: "get_subreddit_info",
-  description: "Get detailed information about a subreddit including description, stats, and community analysis",
+  description:
+    "Get a subreddit's profile: title, description, subscriber and active-user counts, creation date, flags, wiki/link URLs, plus a community analysis and posting tips. Read-only; requires OAuth credentials. Returns metadata about the community itself — use browse_subreddit / get_top_posts for its posts, or get_subreddit_rules for its posting rules. Do NOT use this to find subreddits by topic — use search_reddit with type='sr'.",
+  annotations: {
+    title: "Get Subreddit Info",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+    subreddit_name: z.string().describe("The subreddit name, without the r/ prefix (e.g. 'askscience')."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -813,9 +930,14 @@ ${formattedSubreddit.description.full}
 server.addTool({
   name: "get_subreddit_rules",
   description:
-    "Get a subreddit's posting rules. Useful to check requirements before creating a post to avoid auto-removal.",
+    "Get a subreddit's posting rules (each rule's name, what it applies to, and its description). Read-only; requires OAuth credentials. Returns the rules list, or a note when the subreddit lists none. Call this before create_post to check requirements and avoid auto-removal. For available post flairs use get_post_flairs instead.",
+  annotations: {
+    title: "Get Subreddit Rules",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+    subreddit_name: z.string().describe("The subreddit name, without the r/ prefix (e.g. 'AskReddit')."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -850,9 +972,14 @@ ${ruleList}`
 server.addTool({
   name: "get_post_flairs",
   description:
-    "List the available link flairs for a subreddit (use a flair_id with create_post). Requires user credentials; many subreddits only expose flairs to members, so this may fail in anonymous mode.",
+    "List a subreddit's selectable link flairs (flair text + flair_id) for use with create_post. Read-only, but requires user credentials; many subreddits expose flairs only to members, so this can 403 or return empty without credentials. Pass a returned flair_id (and flair_text for text-editable flairs) to create_post. For the subreddit's posting rules use get_subreddit_rules instead.",
+  annotations: {
+    title: "Get Post Flairs",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit_name: z.string().describe("The subreddit name (without r/ prefix)"),
+    subreddit_name: z.string().describe("The subreddit name, without the r/ prefix (e.g. 'gadgets')."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -887,7 +1014,13 @@ Pass the desired \`flair_id\` to \`create_post\`.`
 
 server.addTool({
   name: "get_trending_subreddits",
-  description: "Get a list of currently trending subreddits",
+  description:
+    "Get the subreddits Reddit is currently featuring as trending/popular. Read-only, no parameters; requires OAuth credentials. Returns a list of subreddit names that changes through the day (cached briefly server-side). To find subreddits by keyword instead of by trend, use search_reddit with type='sr'.",
+  annotations: {
+    title: "Get Trending Subreddits",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({}),
   execute: async () => {
     const client = unwrapClient()
@@ -908,23 +1041,44 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
 // Search tools
 server.addTool({
   name: "search_reddit",
-  description: "Search Reddit for posts and content across subreddits",
+  description:
+    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only; requires OAuth credentials. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
+  annotations: {
+    title: "Search Reddit",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    query: z.string().describe("Search query"),
-    subreddit: z.string().optional().describe("Limit search to specific subreddit (without r/ prefix)"),
+    query: z
+      .string()
+      .describe(
+        "Search terms; supports Reddit operators (quotes for exact phrases, author:name, self:yes). Must be non-empty.",
+      ),
+    subreddit: z
+      .string()
+      .optional()
+      .describe(
+        "Restrict results to this subreddit, without the r/ prefix (e.g. 'python'). Omit to search all of Reddit.",
+      ),
     sort: z
       .enum(["relevance", "hot", "top", "new", "comments"])
       .default("relevance")
       .describe(
         "Sort order. Prefer 'relevance' (default) for finding posts about a topic. Use 'top'/'hot' only for what's currently popular and 'new' for the latest — these rank by karma/recency and, especially combined with a narrow time_filter, can surface loosely-matching posts over the best topical results.",
       ),
-    time_filter: z.enum(["hour", "day", "week", "month", "year", "all"]).default("all").describe("Time filter"),
-    limit: z.number().min(1).max(100).default(10).describe("Number of results"),
-    type: z.enum(["link", "sr", "user"]).default("link").describe("Type of content to search"),
+    time_filter: z
+      .enum(["hour", "day", "week", "month", "year", "all"])
+      .default("all")
+      .describe("Restrict to results from this recent window (e.g. 'week'). Default 'all' (no time limit)."),
+    limit: z.number().min(1).max(100).default(10).describe("How many results to return, 1–100 (default 10)."),
+    type: z
+      .enum(["link", "sr", "user"])
+      .default("link")
+      .describe("What to search for: 'link' = posts (default), 'sr' = subreddits, 'user' = users."),
     after: z
       .string()
       .optional()
-      .describe("Pagination cursor: pass the `after` value from a previous page to fetch the next page"),
+      .describe("Forward pagination cursor: the `after` value from a previous call. Omit for the first page."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -990,19 +1144,38 @@ ${searchResults}${nextPageHint(page.after)}`
 server.addTool({
   name: "create_post",
   description:
-    "Create a new post in a subreddit (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
-    "WARNING: Rapid posting or duplicate content may trigger Reddit's spam detection and result in account bans. " +
-    "Consider enabling REDDIT_SAFE_MODE=standard for protection.",
+    "Create a new text or link post in a subreddit. Mutating and NOT idempotent — each call publishes a separate post. Requires REDDIT_USERNAME and REDDIT_PASSWORD; fails without them. Returns the new post's id and URL. Check get_subreddit_rules and get_post_flairs first, since many subreddits require a flair or reject certain content. WARNING: rapid posting or duplicate content may trigger Reddit's spam detection and account bans — enable REDDIT_SAFE_MODE=standard for rate limiting and duplicate detection.",
+  annotations: {
+    title: "Create Post",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
-    title: z.string().describe("The post title"),
-    content: z.string().describe("The post content (text for self posts, URL for link posts)"),
-    is_self: z.boolean().default(true).describe("Whether this is a self post (text) or link post"),
+    subreddit: z.string().describe("Target subreddit, without the r/ prefix (e.g. 'test')."),
+    title: z.string().describe("Post title (cannot be edited after creation)."),
+    content: z
+      .string()
+      .describe(
+        "For a self post (is_self=true): the body text, Reddit markdown supported. For a link post (is_self=false): the destination URL.",
+      ),
+    is_self: z
+      .boolean()
+      .default(true)
+      .describe(
+        "true = text/self post using `content` as the body (default); false = link post using `content` as the URL.",
+      ),
     flair_id: z
       .string()
       .optional()
-      .describe("Link flair template id (from get_post_flairs); many subreddits require a flair"),
-    flair_text: z.string().optional().describe("Custom flair text, only for flairs whose template is text-editable"),
+      .describe(
+        "Link flair template id from get_post_flairs; many subreddits require one or the post is auto-removed.",
+      ),
+    flair_text: z
+      .string()
+      .optional()
+      .describe("Custom flair text, allowed only for flairs whose template is text-editable."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -1047,12 +1220,21 @@ Your post has been successfully submitted to r/${formattedPost.subreddit}.`
 server.addTool({
   name: "reply_to_post",
   description:
-    "Post a reply to an existing Reddit post or comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
-    "WARNING: Rapid commenting or duplicate content may trigger Reddit's spam detection. " +
-    "Enable REDDIT_SAFE_MODE=standard for rate limiting and duplicate detection.",
+    "Post a reply to an existing post or comment. Mutating and NOT idempotent — each call adds a new comment. Requires REDDIT_USERNAME and REDDIT_PASSWORD. The parent is identified by its thing id — t3_ for a post, t1_ for a comment — so this creates both top-level and nested replies. Returns the new comment's id. Use edit_comment to change a reply you already posted. WARNING: rapid or duplicate replies may trigger Reddit's spam detection; enable REDDIT_SAFE_MODE=standard for rate limiting and duplicate detection.",
+  annotations: {
+    title: "Reply to Post or Comment",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    post_id: z.string().describe("The Reddit post ID (thing_id, e.g., t3_xxxxx for posts, t1_xxxxx for comments)"),
-    content: z.string().describe("The reply content"),
+    post_id: z
+      .string()
+      .describe(
+        "Parent thing id to reply under: t3_<id> for a post (creates a top-level comment) or t1_<id> for a comment (creates a nested reply).",
+      ),
+    content: z.string().describe("Reply body text; Reddit markdown supported."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -1085,12 +1267,19 @@ Your reply has been successfully posted.`,
 server.addTool({
   name: "delete_post",
   description:
-    "Delete your own Reddit post (requires REDDIT_USERNAME and REDDIT_PASSWORD). WARNING: This action is permanent and cannot be undone!",
+    "Permanently delete one of your own posts. Mutating and destructive but idempotent — deleting an already-deleted post is a no-op. Requires REDDIT_USERNAME and REDDIT_PASSWORD, and only works on posts authored by the authenticated account. Only affects the post you name; use delete_comment for comments. WARNING: this cannot be undone — the content is removed, though the post id remains.",
+  annotations: {
+    title: "Delete Post",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
     thing_id: z
       .string()
       .describe(
-        "The full Reddit thing ID (e.g., 't3_abc123' for posts) or just the post ID (e.g., 'abc123'). The 't3_' prefix will be added automatically if missing.",
+        "The post to delete: a full thing id 't3_<id>' or just the base36 post id '<id>' (the 't3_' prefix is added automatically). Must be a post you authored.",
       ),
   }),
   execute: async (args) => {
@@ -1121,12 +1310,19 @@ The post ${args.thing_id} has been permanently deleted from Reddit.
 server.addTool({
   name: "delete_comment",
   description:
-    "Delete your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). WARNING: This action is permanent and cannot be undone!",
+    "Permanently delete one of your own comments. Mutating and destructive but idempotent — deleting an already-deleted comment is a no-op. Requires REDDIT_USERNAME and REDDIT_PASSWORD, and only works on comments authored by the authenticated account. Only affects the comment you name; use delete_post for posts. WARNING: this cannot be undone — the content is removed, though the comment id remains.",
+  annotations: {
+    title: "Delete Comment",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
     thing_id: z
       .string()
       .describe(
-        "The full Reddit thing ID (e.g., 't1_abc123' for comments) or just the comment ID (e.g., 'abc123'). The 't1_' prefix will be added automatically if missing.",
+        "The comment to delete: a full thing id 't1_<id>' or just the base36 comment id '<id>' (the 't1_' prefix is added automatically). Must be a comment you authored.",
       ),
   }),
   execute: async (args) => {
@@ -1157,16 +1353,23 @@ The comment ${args.thing_id} has been permanently deleted from Reddit.
 server.addTool({
   name: "edit_post",
   description:
-    "Edit your own Reddit post (self-text posts only, requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
-    "You can only edit the text content of self posts, not titles or link posts. " +
-    "WARNING: Rapid edits may trigger spam detection. Enable REDDIT_SAFE_MODE for protection.",
+    'Replace the body text of one of your own self-text posts. Mutating and idempotent (same text → same result); it overwrites the previous body. Requires REDDIT_USERNAME and REDDIT_PASSWORD, and works only on self posts you authored — titles and link posts cannot be edited. Adds an "edited" marker. Use create_post to make a new post, or edit_comment for comments. WARNING: rapid edits may trigger spam detection; enable REDDIT_SAFE_MODE for protection.',
+  annotations: {
+    title: "Edit Post",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
     thing_id: z
       .string()
       .describe(
-        "The full Reddit thing ID (e.g., 't3_abc123' for posts) or just the post ID (e.g., 'abc123'). The 't3_' prefix will be added automatically if missing.",
+        "The post to edit: a full thing id 't3_<id>' or just the base36 post id '<id>' (the 't3_' prefix is added automatically). Must be a self-text post you authored.",
       ),
-    new_text: z.string().describe("The new text content for the post. Supports Reddit markdown formatting."),
+    new_text: z
+      .string()
+      .describe("Replacement body text; fully overwrites the current body. Reddit markdown supported."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -1200,16 +1403,23 @@ The post ${args.thing_id} has been updated with your new content.
 server.addTool({
   name: "edit_comment",
   description:
-    "Edit your own Reddit comment (requires REDDIT_USERNAME and REDDIT_PASSWORD). " +
-    "Update the text content of a comment you previously posted. " +
-    "WARNING: Rapid edits may trigger spam detection. Enable REDDIT_SAFE_MODE for protection.",
+    'Replace the text of one of your own comments. Mutating and idempotent (same text → same result); it overwrites the previous content. Requires REDDIT_USERNAME and REDDIT_PASSWORD, and works only on comments you authored. Adds an "edited" marker. Use reply_to_post to add a new comment, or edit_post for posts. WARNING: rapid edits may trigger spam detection; enable REDDIT_SAFE_MODE for protection.',
+  annotations: {
+    title: "Edit Comment",
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
     thing_id: z
       .string()
       .describe(
-        "The full Reddit thing ID (e.g., 't1_abc123' for comments) or just the comment ID (e.g., 'abc123'). The 't1_' prefix will be added automatically if missing.",
+        "The comment to edit: a full thing id 't1_<id>' or just the base36 comment id '<id>' (the 't1_' prefix is added automatically). Must be a comment you authored.",
       ),
-    new_text: z.string().describe("The new text content for the comment. Supports Reddit markdown formatting."),
+    new_text: z
+      .string()
+      .describe("Replacement comment text; fully overwrites the current content. Reddit markdown supported."),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -1236,15 +1446,121 @@ The comment ${args.thing_id} has been updated with your new content.
   },
 })
 
+server.addTool({
+  name: "save_content",
+  description:
+    "Save a post or comment to your account (a private bookmark, listed by get_my_saved). Mutating but idempotent — saving an already-saved item is a no-op. Requires REDDIT_USERNAME and REDDIT_PASSWORD; works on any post/comment you can see, not just your own. Accepts a full thing id (t3_ for a post, t1_ for a comment) — a bare id is treated as a post. Use unsave_content to undo.",
+  annotations: {
+    title: "Save Post or Comment",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The post or comment to save: a full thing id 't3_<id>' (post) or 't1_<id>' (comment). A bare id is treated as a post.",
+      ),
+    category: z
+      .string()
+      .optional()
+      .describe("Optional save category to file this under (Reddit Premium feature; ignored on other accounts)."),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    const result = await client.saveContent(args.thing_id, args.category)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to save content: ${err.message}`)
+      },
+      () => `# Content Saved Successfully
+
+${args.thing_id} has been saved to your account. Use get_my_saved to view your saved items.`,
+    )
+  },
+})
+
+server.addTool({
+  name: "unsave_content",
+  description:
+    "Remove a post or comment from your saved items (undoes save_content). Mutating but idempotent — unsaving an item that isn't saved is a no-op. Requires REDDIT_USERNAME and REDDIT_PASSWORD. Accepts a full thing id (t3_ for a post, t1_ for a comment) — a bare id is treated as a post.",
+  annotations: {
+    title: "Unsave Post or Comment",
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  parameters: z.object({
+    thing_id: z
+      .string()
+      .describe(
+        "The post or comment to unsave: a full thing id 't3_<id>' (post) or 't1_<id>' (comment). A bare id is treated as a post.",
+      ),
+  }),
+  execute: async (args) => {
+    const client = unwrapClient()
+
+    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+      // eslint-disable-next-line functype/prefer-either
+      throw new Error(
+        "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
+      )
+    }
+
+    const result = await client.unsaveContent(args.thing_id)
+    return result.fold(
+      (err) => {
+        // eslint-disable-next-line functype/prefer-either
+        throw new Error(`Failed to unsave content: ${err.message}`)
+      },
+      () => `# Content Unsaved Successfully
+
+${args.thing_id} has been removed from your saved items.`,
+    )
+  },
+})
+
 // Comment tools
 server.addTool({
   name: "get_post_comments",
-  description: "Get comments from a specific Reddit post",
+  description:
+    "Get the comment thread for a post (by post id + subreddit), sorted best/top/new/controversial/old/qa. Read-only; requires OAuth credentials. Returns the post header plus threaded comments (author, OP/edited badges, score, body, nesting depth) up to `limit`. Long threads are truncated with 'load more' stubs — expand those with get_more_comments. Use get_reddit_post for just the post body, not the thread.",
+  annotations: {
+    title: "Get Post Comments",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    post_id: z.string().describe("The Reddit post ID"),
-    subreddit: z.string().describe("The subreddit name (without r/ prefix)"),
-    sort: z.enum(["best", "top", "new", "controversial", "old", "qa"]).default("best").describe("Comment sort order"),
-    limit: z.number().min(1).max(500).default(100).describe("Maximum number of comments to retrieve"),
+    post_id: z
+      .string()
+      .describe(
+        "Base36 post id — the segment after /comments/ in a permalink (e.g. '1abc23'). With or without a t3_ prefix.",
+      ),
+    subreddit: z.string().describe("The subreddit the post lives in, without the r/ prefix (e.g. 'movies')."),
+    sort: z
+      .enum(["best", "top", "new", "controversial", "old", "qa"])
+      .default("best")
+      .describe("Comment ordering: 'best' (default), 'top', 'new', 'controversial', 'old', or 'qa' (Q&A)."),
+    limit: z
+      .number()
+      .min(1)
+      .max(500)
+      .default(100)
+      .describe(
+        "Maximum comments to return, 1–500 (default 100). Deeply nested replies may still be truncated as 'load more' stubs.",
+      ),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -1302,10 +1618,22 @@ ${comment.body}
 server.addTool({
   name: "get_more_comments",
   description:
-    "Expand truncated 'load more comments' stubs in a thread. Pass the post's link id and the comment ids from a 'more' node (returned by get_post_comments) to fetch those comments.",
+    "Expand truncated 'load more comments' stubs in a thread. Read-only; requires OAuth credentials. Pass the post's link id and the comment ids from a 'more' node (surfaced by get_post_comments) to fetch those hidden comments; returns the expanded comments (author, body excerpt, score, link). Call get_post_comments first to obtain the thread and its 'more' node ids — do NOT invent ids.",
+  annotations: {
+    title: "Get More Comments",
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   parameters: z.object({
-    link_id: z.string().describe("The post (link) id, with or without the t3_ prefix"),
-    comment_ids: z.array(z.string()).min(1).describe("Comment ids to expand (from a 'more' node)"),
+    link_id: z
+      .string()
+      .describe("The parent post's link id (base36, with or without the t3_ prefix) that the stub belongs to."),
+    comment_ids: z
+      .array(z.string())
+      .min(1)
+      .describe(
+        "Base36 comment ids to expand, taken from a 'more' node returned by get_post_comments (not arbitrary ids).",
+      ),
   }),
   execute: async (args) => {
     const client = unwrapClient()
@@ -1363,6 +1691,14 @@ async function main() {
     console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
   } else {
     console.error("[Setup] Starting in stdio mode")
+    if (process.stdin.isTTY) {
+      console.error(
+        "[Setup] ⚠ stdin is a terminal. This server speaks MCP JSON-RPC over stdio and expects an MCP client " +
+          "(Claude Desktop, Claude Code, MCP Inspector) on the other end — typed input will cause JSON parse errors.",
+      )
+      console.error("[Setup]   Test interactively: npx @modelcontextprotocol/inspector npx reddit-mcp-server")
+      console.error("[Setup]   Or run as HTTP:       TRANSPORT_TYPE=httpStream npx reddit-mcp-server")
+    }
     await server.start({
       transportType: "stdio",
     })

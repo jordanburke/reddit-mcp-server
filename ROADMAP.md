@@ -9,6 +9,8 @@
 - Get user information
 - Create posts (text/link)
 - Reply to posts
+- Save/unsave posts and comments
+- Delete/edit own posts and comments
 
 ## High Priority Features 🔴
 
@@ -42,14 +44,7 @@
 - **Parameters**: id, direction (1, 0, -1)
 - **Use Case**: Engaging with content
 
-### 5. Save/Unsave Content
-
-- **Endpoints**: `/api/save`, `/api/unsave`
-- **Tool Names**: `save_content`, `unsave_content`
-- **Parameters**: id
-- **Use Case**: Bookmarking for later
-
-### 6. Delete Own Content
+### 5. Delete Own Content
 
 - **Endpoint**: `/api/del`
 - **Tool Name**: `delete_content`
@@ -58,21 +53,14 @@
 
 ## Low Priority Features 🟢
 
-### 7. Edit Posts/Comments
+### 6. Edit Posts/Comments
 
 - **Endpoint**: `/api/editusertext`
 - **Tool Name**: `edit_content`
 - **Parameters**: thing_id, text
 - **Use Case**: Fixing typos, updating content
 
-### 8. Get Saved Content
-
-- **Endpoint**: `/user/{username}/saved`
-- **Tool Name**: `get_saved_content`
-- **Parameters**: username, type, limit
-- **Use Case**: Retrieving bookmarked content
-
-### 9. Subscribe/Unsubscribe
+### 7. Subscribe/Unsubscribe
 
 - **Endpoints**: `/api/subscribe`
 - **Tool Name**: `manage_subscription`

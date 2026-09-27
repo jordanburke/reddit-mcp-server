@@ -8,11 +8,11 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 
 ## Available Tools
 
-### Read-only Tools (Client Credentials Only)
+### Read-only Tools
 
-- `get_reddit_post` - Get a specific Reddit post with engagement analysis
-- `get_top_posts` - Get top posts from a subreddit or home feed
-- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial
+- `get_top_posts` - Get top posts from a subreddit or home feed (**works via RSS without credentials**)
+- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial (**works via RSS without credentials**)
+- `get_reddit_post` - Get a specific Reddit post with engagement analysis (OAuth required)
 - `get_user_info` - Get detailed information about a Reddit user
 - `get_me` - Get the authenticated user's own account info (requires user credentials)
 - `get_my_overview` - Get your own recent posts and comments (requires user credentials)
@@ -20,12 +20,12 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `get_subreddit_info` - Get subreddit details, stats, and community insights
 - `get_subreddit_rules` - Get a subreddit's posting rules (check before posting to avoid auto-removal)
 - `get_trending_subreddits` - Get currently trending/popular subreddits
-- `search_reddit` - Search for posts across Reddit with filters
+- `search_reddit` - Search for posts, subreddits (`type=sr`), or users (`type=user`) across Reddit with filters
 - `get_post_comments` - Get comments from a specific post with threading
 - `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren
 - `get_user_posts` - Get posts submitted by a specific user
 - `get_user_comments` - Get comments made by a specific user
-- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 anonymously)
+- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 without credentials)
 
 ### Write Tools (User Credentials Required)
 
@@ -35,6 +35,8 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 - `reply_to_post` - Post a reply to an existing Reddit post or comment
 - `edit_post` - Edit your own Reddit post (self-text posts only, titles cannot be edited)
 - `edit_comment` - Edit your own Reddit comment
+- `save_content` - Save a post or comment to your account (works on any visible post/comment, not just your own)
+- `unsave_content` - Remove a post or comment from your saved items
 - `delete_post` - **PERMANENTLY** delete your own Reddit post (cannot be undone!)
 - `delete_comment` - **PERMANENTLY** delete your own Reddit comment (cannot be undone!)
 
@@ -90,39 +92,46 @@ pnpm lint:fix
    - OAuth2 authentication (client credentials and password flow)
    - Automatic token refresh via axios interceptors
    - Rate limiting and error handling
+   - RSS fallback routing when no OAuth credentials are available
    - Both read-only and authenticated operations
 
-2. **Tool Modules** (`src/tools/`): Modular organization by functionality:
+2. **RSS Client** (`src/client/rss-client.ts`): Zero-credential fallback that parses Reddit's Atom feeds:
+   - Parses Atom 1.0 XML via `fast-xml-parser` (attributes preserved with `@_` prefix)
+   - Maps Atom entries to `RedditPost` (score/numComments/upvoteRatio are 0 — RSS has no metrics)
+   - Handles `fast-xml-parser`'s dual content shape (string vs `{#text, @_type}` object)
+   - Returns `Page<RedditPost>` with `source: "rss"` for downstream disclaimer rendering
+   - Returns typed `RedditError` (`HttpError` / `UnknownError`), not bare `Error`
+
+3. **Tool Modules** (`src/tools/`): Modular organization by functionality:
    - `post-tools.ts`: Post creation, retrieval, and management
    - `comment-tools.ts`: Comment retrieval and threading
    - `subreddit-tools.ts`: Subreddit info, statistics, trending
    - `user-tools.ts`: User information and engagement insights
    - `search-tools.ts`: Reddit search functionality
 
-3. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
+4. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
 
 ### Authentication Flow
 
+**Reddit now requires OAuth credentials for all API access** (mid-2026). Anonymous/unauthenticated requests are blocked with HTTP 403 across all networks. Self-service app creation at `/prefs/apps` was closed in November 2025 — new developers must request access through Reddit Developer Support.
+
 The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
 
-1. **auto (default)**: Automatically chooses the best authentication method
-   - If REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET are provided: Uses OAuth (60-100 req/min)
-   - Otherwise: Falls back to anonymous mode (~10 req/min)
-   - Gracefully degrades without failing
+1. **auto (default)**: Uses OAuth when credentials are provided, RSS fallback otherwise
+   - With REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET: full API access at 60-100 req/min
+   - Without credentials: falls back to RSS feeds for `browse_subreddit` and `get_top_posts` only (~1 req/min, no metrics)
+   - All other tools return `NotAuthenticatedError` directing the user to set up OAuth
 
-2. **authenticated**: Requires OAuth credentials
-   - Requires REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
+2. **authenticated**: Explicitly requires OAuth credentials
    - Server fails to start if credentials are missing
-   - Provides higher rate limits (60-100 req/min)
-   - Use for production environments with guaranteed credentials
+   - 60-100 req/min
+   - Use for production environments
 
-3. **anonymous**: Uses public JSON API without authentication
-   - No credentials required - zero-setup experience
-   - Lower rate limit (~10 req/min)
-   - Perfect for testing and development
-   - Read-only operations work without any Reddit app setup
+3. **anonymous** (deprecated): Alias for the RSS fallback path
+   - Behaves identically to `auto` without credentials (RSS only)
+   - Emits deprecation warning at startup
 
-**Write operations** (create_post, reply_to_post, edit_post, edit_comment, delete_post, delete_comment):
+**Write operations** (create_post, reply_to_post, edit_post, edit_comment, save_content, unsave_content, delete_post, delete_comment):
 
 - Require REDDIT_USERNAME and REDDIT_PASSWORD in **any** mode
 - Will fail gracefully with a clear error message if credentials are missing
@@ -155,6 +164,17 @@ Read-only GET requests are cached in-memory to reduce pressure on Reddit's tight
 - **Scope**: only successful `GET` responses are cached, keyed by full URL. Write operations and auth requests are never cached. The cache layer lives in `RedditClient.makeRequest`, which re-wraps cached bodies in a fresh `Response` (a fetch body can only be consumed once).
 - Only active when enabled; when disabled the client behaves exactly as before (raw `Response` passthrough).
 
+### Identifier Validation (Path Injection)
+
+Every subreddit, username, and thing ID is model-supplied, so `src/utils/reddit-identifiers.ts` normalizes and validates each one before it reaches a URL. Interpolating them raw was a path-injection hole: URL parsing resolves dot segments, so a `subreddit` of `../../api/v1/me` escapes `/r/{sub}/about.json` and steers the OAuth bearer token to a different endpoint, and an embedded `?`/`&` injects query parameters.
+
+- **`normalizeSubreddit`** — strips `r/`, `/r/`, trailing slashes; allows `+`-joined multireddits and `u_` profile subreddits; `""` still means the home feed.
+- **`normalizeUsername`** — strips `u/`, `/u/`, `/user/`.
+- **`normalizeThingId` / `normalizeFullname`** — bare base36 id, or a `t1_`/`t3_` fullname with the explicit kind preserved over the supplied default.
+- Every returned value matches `[A-Za-z0-9_+-]+`, which is already URL-path-safe. No `encodeURIComponent` is applied, because encoding the `+` in `r/science+space` would break it. The one exception is `this.username` from the environment (used by `get_my_overview`/`get_my_saved`), which is encoded rather than validated — a bad env value should not throw out of an `Either`-returning method.
+- Validators throw `ValidationError` from inside the `Try` bodies in `reddit-client.ts`, so failures surface as a `Left` before any request is made — including before the auth call.
+- Write helpers are `deleteThing(thingId, defaultKind)` / `editThing(thingId, newText, defaultKind)`; `deletePost`/`deleteComment` and `editPost`/`editComment` are thin wrappers that pick `t3` or `t1`.
+
 ### Rate-Limit Retry (429)
 
 `RedditClient.makeRequest` transparently retries HTTP 429 responses. Configured via `REDDIT_MAX_RETRIES` (default `3`, set `0` to disable).
@@ -178,7 +198,7 @@ Listing tools (`get_top_posts`, `browse_subreddit`, `search_reddit`, `get_user_p
 Environment variables:
 
 ```bash
-# Reddit API Credentials (optional unless using authenticated mode)
+# Reddit API Credentials (required — Reddit blocks unauthenticated requests since mid-2026)
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
@@ -187,7 +207,7 @@ REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
 REDDIT_USERNAME=your_username
 REDDIT_PASSWORD=your_password
 
-# Authentication Mode (optional, defaults to 'auto')
+# Authentication Mode (optional, defaults to 'auto'; 'anonymous' is deprecated)
 REDDIT_AUTH_MODE=auto            # Options: auto, authenticated, anonymous
 
 # Safe Mode (optional, defaults to 'off')
@@ -211,17 +231,15 @@ OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not 
 
 ### Quick Start Examples
 
-**Try without any setup:**
+**Zero-setup (RSS fallback, browse/top only):**
 
 ```bash
-export REDDIT_AUTH_MODE=anonymous
 npx reddit-mcp-server
 ```
 
-**With OAuth for higher rate limits:**
+**Full access (OAuth):**
 
 ```bash
-export REDDIT_AUTH_MODE=auto
 export REDDIT_CLIENT_ID=your_client_id
 export REDDIT_CLIENT_SECRET=your_client_secret
 npx reddit-mcp-server
@@ -230,6 +248,8 @@ npx reddit-mcp-server
 **With Safe Mode for write operations:**
 
 ```bash
+export REDDIT_CLIENT_ID=your_client_id
+export REDDIT_CLIENT_SECRET=your_client_secret
 export REDDIT_USERNAME=your_username
 export REDDIT_PASSWORD=your_password
 export REDDIT_SAFE_MODE=standard
@@ -340,13 +360,29 @@ pnpm check:versions
 pnpm validate
 git add package.json server.json manifest.json pnpm-lock.yaml
 git commit -m "x.y.z"
-git tag "v$(node -p "require('./package.json').version")"
+# -a matters: --follow-tags pushes ANNOTATED tags only (see below)
+git tag -a "v$(node -p "require('./package.json').version")" -m "v$(node -p "require('./package.json').version")"
 git push --follow-tags
+
+# 5. Confirm the tag actually landed — the publish workflow triggers on the tag, not on main
+git ls-remote --tags origin | grep "v$(node -p "require('./package.json').version")"
 ```
+
+**GOTCHA: a lightweight tag is silently not pushed.** `git push --follow-tags` pushes only _annotated_ tags, so a bare `git tag v1.5.2` stays local. The commit goes up, `git push` reports success, and the publish workflow never fires — no error anywhere. This bit v1.5.2. Either tag with `-a` as above, or push the tag explicitly:
+
+```bash
+git push origin "v$(node -p "require('./package.json').version")"
+```
+
+If you find a released commit on `main` with no npm publish, this is the first thing to check.
+
+If you edit these JSON files with a script, run `pnpm format` afterwards — `JSON.stringify(j, null, 2)` expands Prettier's collapsed arrays and produces a noisy diff.
 
 ### Or: use the `vbctp` skill, but stage the JSON files first
 
 The `vbctp` skill runs `pnpm validate` → `npm version patch` → `git push --follow-tags`. `pnpm validate` does NOT include `pnpm check:versions` — only `prepublishOnly` does, which means the mismatch is only caught in CI. **Before invoking vbctp, bump server.json + manifest.json by hand and stage them**; `npm version` will then refuse to run (dirty tree), so commit those changes first, then run vbctp.
+
+`npm version` creates an annotated tag, so vbctp's `--follow-tags` does push it. The lightweight-tag trap above applies only when you tag by hand.
 
 ### Long-term fix (not yet implemented)
 

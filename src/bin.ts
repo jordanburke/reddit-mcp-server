@@ -23,6 +23,11 @@ Options:
   -v, --version        Show version number
   -h, --help           Show help
 
+This is an MCP server, not an interactive CLI. In stdio mode (the default here) it
+expects an MCP client such as Claude Desktop or Claude Code on stdin/stdout.
+  Test interactively: npx @modelcontextprotocol/inspector npx reddit-mcp-server
+  Run as HTTP:        TRANSPORT_TYPE=httpStream npx reddit-mcp-server
+
 Environment Variables:
   REDDIT_CLIENT_ID      Reddit API client ID (optional, for OAuth)
   REDDIT_CLIENT_SECRET  Reddit API client secret (optional, for OAuth)

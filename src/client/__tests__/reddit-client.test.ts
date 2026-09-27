@@ -33,6 +33,46 @@ describe("RedditClient", () => {
     vi.restoreAllMocks()
   })
 
+  describe("anonymous 403 handling", () => {
+    const anonConfig: RedditClientConfig = {
+      clientId: "",
+      clientSecret: "",
+      userAgent: "TestApp/1.0.0",
+      authMode: "anonymous",
+      retry: { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 60000 },
+    }
+
+    it("short-circuits non-RSS tools with NotAuthenticatedError in anonymous mode", async () => {
+      const result = await new RedditClient(anonConfig).getSubredditInfo("science")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("NotAuthenticatedError")
+        expect(result.value.message).toContain("OAuth credentials")
+      }
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it("does not reinterpret a 403 when authenticated", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers({ "content-type": "text/html" }),
+      })
+
+      const result = await client.getSubredditInfo("science")
+
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("HttpError")
+      }
+    })
+  })
+
   describe("authenticate", () => {
     it("should authenticate with user credentials", async () => {
       const mockTokenResponse = {
@@ -186,6 +226,17 @@ describe("RedditClient", () => {
         createdUtc: 1234567890,
         profileUrl: "https://reddit.com/user/testuser",
       })
+    })
+
+    it("rejects a traversal identifier before any request is made", async () => {
+      const result = await client.getUser("../../api/v1/me")
+
+      // No fetch at all — not even the auth call — so the bearer token cannot be steered.
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value._tag).toBe("ValidationError")
+      }
     })
 
     it("should return Left when user fetch fails", async () => {
@@ -591,8 +642,8 @@ describe("RedditClient", () => {
         text: async () => postsBody,
       })
 
-      const first = await cachedClient.browseSubreddit("x", "hot", "week", 10)
-      const second = await cachedClient.browseSubreddit("x", "hot", "week", 10)
+      const first = await cachedClient.browseSubreddit("cachetest", "hot", "week", 10)
+      const second = await cachedClient.browseSubreddit("cachetest", "hot", "week", 10)
 
       expect(first.orThrow().items[0].id).toBe("cached1")
       expect(second.orThrow().items[0].id).toBe("cached1")
@@ -615,8 +666,8 @@ describe("RedditClient", () => {
         json: async () => JSON.parse(postsBody),
       })
 
-      await client.browseSubreddit("x", "hot", "week", 10)
-      await client.browseSubreddit("x", "hot", "week", 10)
+      await client.browseSubreddit("cachetest", "hot", "week", 10)
+      await client.browseSubreddit("cachetest", "hot", "week", 10)
 
       // auth (1) + two data fetches = 3
       expect(mockFetch).toHaveBeenCalledTimes(3)
@@ -1702,6 +1753,134 @@ describe("RedditClient", () => {
     })
   })
 
+  describe("saveContent", () => {
+    it("should save a post", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock save request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.saveContent("post123")
+
+      const saveCall = mockFetch.mock.calls[1]
+      expect(saveCall[0]).toBe("https://oauth.reddit.com/api/save")
+      expect(saveCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(saveCall[1].body as string)
+      expect(body.get("id")).toBe("t3_post123")
+      expect(body.has("category")).toBe(false)
+
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
+    })
+
+    it("should save a comment and include an optional category", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock save request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.saveContent("t1_comment123", "read-later")
+      expect(result.isRight()).toBe(true)
+
+      const saveCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(saveCall[1].body as string)
+      expect(body.get("id")).toBe("t1_comment123")
+      expect(body.get("category")).toBe("read-later")
+    })
+
+    it("should return Left when user is not authenticated for write", async () => {
+      const clientReadOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      const result = await clientReadOnly.saveContent("post123")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
+    })
+  })
+
+  describe("unsaveContent", () => {
+    it("should unsave a post", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock unsave request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.unsaveContent("post123")
+
+      const unsaveCall = mockFetch.mock.calls[1]
+      expect(unsaveCall[0]).toBe("https://oauth.reddit.com/api/unsave")
+      expect(unsaveCall[1].method).toBe("POST")
+
+      const body = new URLSearchParams(unsaveCall[1].body as string)
+      expect(body.get("id")).toBe("t3_post123")
+
+      expect(result.isRight()).toBe(true)
+      expect(result.orThrow()).toBe(true)
+    })
+
+    it("should handle a comment ID with t1_ prefix", async () => {
+      // Mock authentication
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "test-token", expires_in: 3600 }),
+      })
+
+      // Mock unsave request
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => "{}",
+      })
+
+      const result = await client.unsaveContent("t1_comment123")
+      expect(result.isRight()).toBe(true)
+
+      const unsaveCall = mockFetch.mock.calls[1]
+      const body = new URLSearchParams(unsaveCall[1].body as string)
+      expect(body.get("id")).toBe("t1_comment123")
+    })
+
+    it("should return Left when user is not authenticated for write", async () => {
+      const clientReadOnly = new RedditClient({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+        userAgent: "TestApp/1.0.0",
+      })
+
+      const result = await clientReadOnly.unsaveContent("post123")
+      expect(result.isLeft()).toBe(true)
+      if (result.isLeft()) {
+        expect(result.value.message).toContain("Write operations require REDDIT_USERNAME and REDDIT_PASSWORD")
+      }
+    })
+  })
+
   // Rollout coverage: locks the exact error-message text (behavior preservation) AND the new
   // typed `_tag` channel for every migrated method. Special attention to the ASYMMETRIC-message
   // methods — getTopPosts/browseSubreddit/searchReddit/getPostComments — where the non-ok HTTP
@@ -2180,7 +2359,7 @@ describe("RedditClient", () => {
       const result = await client.getMoreComments("p1", ["c1"])
       expect(result.isLeft()).toBe(true)
       if (result.isLeft()) {
-        expect(result.value.message).toBe("Failed to expand comments for t3_p1: HTTP 400")
+        expect(result.value.message).toBe("Failed to expand comments for p1: HTTP 400")
         expect(result.value._tag).toBe("HttpError")
       }
     })
@@ -2390,6 +2569,95 @@ describe("RedditClient", () => {
 
       const page = (await client.searchReddit("cats", {})).orThrow()
       expect(page.after).toBeUndefined()
+    })
+
+    it("maps t5 children from type=sr searches instead of dropping them", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            children: [
+              {
+                kind: "t5",
+                data: {
+                  id: "2qh0y",
+                  display_name: "Python",
+                  title: "Python",
+                  public_description: "News about the programming language Python.",
+                  subscribers: 1500000,
+                  active_user_count: 2000,
+                  created_utc: 1201242956,
+                  over18: false,
+                  subreddit_type: "public",
+                  url: "/r/Python/",
+                },
+              },
+            ],
+            after: "t5_next",
+            before: null,
+          },
+        }),
+      })
+
+      const page = (await client.searchReddit("python", { type: "sr" })).orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].title).toContain("r/Python")
+      expect(page.items[0].subreddit).toBe("Python")
+      expect(page.items[0].score).toBe(1500000)
+      expect(page.items[0].over18).toBe(false)
+      expect(page.items[0].url).toBe("https://reddit.com/r/Python/")
+      expect(page.after).toBe("t5_next")
+    })
+
+    it("maps t2 children from type=user searches instead of dropping them", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            children: [
+              {
+                kind: "t2",
+                data: {
+                  id: "abc123",
+                  name: "spez",
+                  link_karma: 100,
+                  comment_karma: 900,
+                  total_karma: 1000,
+                  is_mod: true,
+                  is_gold: true,
+                  is_employee: true,
+                  created_utc: 1118030400,
+                },
+              },
+            ],
+            after: null,
+            before: null,
+          },
+        }),
+      })
+
+      const page = (await client.searchReddit("spez", { type: "user" })).orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].title).toContain("u/spez")
+      expect(page.items[0].author).toBe("spez")
+      expect(page.items[0].score).toBe(1000)
+      expect(page.items[0].url).toBe("https://reddit.com/user/spez")
+    })
+
+    it("still drops listing children of unknown kind", async () => {
+      mockAuth()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { children: [{ kind: "t1", data: { id: "c1" } }, postChild("p1")], after: null, before: null },
+        }),
+      })
+
+      const page = (await client.searchReddit("cats", {})).orThrow()
+      expect(page.items).toHaveLength(1)
+      expect(page.items[0].id).toBe("p1")
     })
 
     it("forwards the after cursor to the request URL", async () => {
