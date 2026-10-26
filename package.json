@@ -76,7 +76,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^24.19.2",
     "ajv-cli": "^5.0.0",
     "cross-env": "^10.1.0",
     "msw": "^3.0.3",
