@@ -1,4 +1,4 @@
-/* eslint-disable functype/prefer-functype-map, functype/prefer-option, functype/no-imperative-loops --
+/* eslint-disable functype/prefer-option, functype/no-imperative-loops --
  * This module is a deliberately imperative performance primitive: a mutable, byte-bounded
  * LRU cache. A functype immutable Map cannot express LRU access-order reordering or running
  * byte accounting without rebuilding the whole structure on every operation, and the eviction

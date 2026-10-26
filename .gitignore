@@ -4,6 +4,8 @@ node_modules
 .env
 .env.*
 .pnpm-store/
+.ts-builds/
+.vitest/
 
 # MCP Registry tokens
 .mcpregistry_*

@@ -1094,11 +1094,8 @@ export class RedditClient {
       t: timeFilter,
       limit: limit.toString(),
       type,
-      // eslint-disable-next-line functype/prefer-fold -- conditional spread of native string | undefined into URLSearchParams init
       ...(subreddit !== undefined ? { restrict_sr: "true" } : {}),
-      // eslint-disable-next-line functype/prefer-fold -- conditional spread of cursors into URLSearchParams init
       ...(after !== undefined ? { after } : {}),
-      // eslint-disable-next-line functype/prefer-fold -- conditional spread of cursors into URLSearchParams init
       ...(before !== undefined ? { before } : {}),
     })
     const context = `Failed to search Reddit for: ${query}`

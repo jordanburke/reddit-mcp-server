@@ -1,4 +1,4 @@
-/* eslint-disable functype/prefer-either, functype/prefer-fold --
+/* eslint-disable functype/prefer-either --
  * These validators are called from inside the `Try` bodies in reddit-client.ts, which can only
  * signal failure by throwing; the throw is captured there and converted to
  * `Either<RedditError, T>` by `classifyRedditError`. Returning Either here would force every
