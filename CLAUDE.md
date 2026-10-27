@@ -10,21 +10,23 @@ This is a Reddit MCP (Model Context Protocol) server that provides tools for int
 
 ### Read-only Tools
 
-- `get_top_posts` - Get top posts from a subreddit or home feed (**works via RSS without credentials**)
-- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial (**works via RSS without credentials**)
-- `get_reddit_post` - Get a specific Reddit post with engagement analysis (OAuth required)
-- `get_user_info` - Get detailed information about a Reddit user
+Tools marked **keyless** work without OAuth credentials via RSS and/or the Arctic Shift archive (see Authentication Flow and the Arctic Shift Client below).
+
+- `get_top_posts` - Get top posts from a subreddit or home feed (**keyless**: RSS, archive fallback)
+- `browse_subreddit` - Browse a subreddit or home feed by sort order (hot, new, top, rising, controversial); `time_filter` applies only to top/controversial (**keyless**: `new` from the archive, other sorts RSS with archive fallback)
+- `get_reddit_post` - Get a specific Reddit post with engagement analysis (**keyless**)
+- `get_user_info` - Get detailed information about a Reddit user (**keyless**)
 - `get_me` - Get the authenticated user's own account info (requires user credentials)
 - `get_my_overview` - Get your own recent posts and comments (requires user credentials)
 - `get_my_saved` - Get your saved posts and comments (requires user credentials; private)
-- `get_subreddit_info` - Get subreddit details, stats, and community insights
-- `get_subreddit_rules` - Get a subreddit's posting rules (check before posting to avoid auto-removal)
+- `get_subreddit_info` - Get subreddit details, stats, and community insights (**keyless**)
+- `get_subreddit_rules` - Get a subreddit's posting rules (check before posting to avoid auto-removal) (**keyless**)
 - `get_trending_subreddits` - Get currently trending/popular subreddits
-- `search_reddit` - Search for posts, subreddits (`type=sr`), or users (`type=user`) across Reddit with filters
-- `get_post_comments` - Get comments from a specific post with threading
-- `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren
-- `get_user_posts` - Get posts submitted by a specific user
-- `get_user_comments` - Get comments made by a specific user
+- `search_reddit` - Search for posts, subreddits (`type=sr`), or users (`type=user`) across Reddit with filters (**keyless** within one subreddit; no `type=user`)
+- `get_post_comments` - Get comments from a specific post with threading (**keyless**)
+- `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren (**keyless**)
+- `get_user_posts` - Get posts submitted by a specific user (**keyless**)
+- `get_user_comments` - Get comments made by a specific user (**keyless**)
 - `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 without credentials)
 
 ### Write Tools (User Credentials Required)
@@ -92,28 +94,36 @@ pnpm lint:fix
    - OAuth2 authentication (client credentials and password flow)
    - Automatic token refresh via axios interceptors
    - Rate limiting and error handling
-   - RSS fallback routing when no OAuth credentials are available
+   - Keyless routing (RSS + Arctic Shift) when no OAuth credentials are available
    - Both read-only and authenticated operations
 
-2. **RSS Client** (`src/client/rss-client.ts`): Zero-credential fallback that parses Reddit's Atom feeds:
+2. **Arctic Shift Client** (`src/client/arctic-shift-client.ts`): Keyless read backend over the [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive, a free third-party Reddit archive:
+   - Returns Reddit's own t3/t1/t5 JSON, so it shares parsers with `RedditClient` via `src/client/reddit-parsers.ts`
+   - Sorts by creation date only: no hot/top ranking, no home feed, no multireddits (`a+b` is rejected)
+   - Pagination cursor is the `created_utc` of the last item, passed back as `before`; it must be digits (validated before use)
+   - Scores lag (often 0/1 on recent posts) and comment coverage can be incomplete; pages carry `source: "arctic"` and `index.ts` appends an archive disclaimer
+   - Errors are `{data: null, error}`; empty `data` on a lookup is `NotFoundError`. "Timeout. Maybe slow down a bit" is throttling, retried once after 3s
+   - Shares `RedditClient`'s `ResponseCache`; sends the server's User-Agent
+
+3. **RSS Client** (`src/client/rss-client.ts`): Zero-credential ranked listings from Reddit's Atom feeds (Reddit retires RSS on 2026-11-13):
    - Parses Atom 1.0 XML via `fast-xml-parser` (attributes preserved with `@_` prefix)
    - Maps Atom entries to `RedditPost` (score/numComments/upvoteRatio are 0 — RSS has no metrics)
    - Handles `fast-xml-parser`'s dual content shape (string vs `{#text, @_type}` object)
    - Returns `Page<RedditPost>` with `source: "rss"` for downstream disclaimer rendering
    - Returns typed `RedditError` (`HttpError` / `UnknownError`), not bare `Error`
 
-3. **Server and Tools** (`src/index.ts`): There is no `src/tools/` directory — every MCP tool is registered here with `server.addTool`:
-   - Shared render helpers: `formatPostSummary`, `formatUserContent`, `nextPageHint`, `rssDisclaimer`
+4. **Server and Tools** (`src/index.ts`): There is no `src/tools/` directory — every MCP tool is registered here with `server.addTool`:
+   - Shared render helpers: `formatPostSummary`, `formatUserContent`, `nextPageHint`, `sourceDisclaimer` (pages), `archiveDisclaimer` (single-item keyless tools)
    - Client setup (`setupRedditClient`) and transport startup (stdio or httpStream)
    - `src/bin.ts` is the npx/CLI entry point: it forces stdio mode and handles `--help`/`--version`
 
-4. **Formatters** (`src/utils/formatters.ts`): Turn client types into display shapes:
+5. **Formatters** (`src/utils/formatters.ts`): Turn client types into display shapes:
    - `formatPostInfo`: a link post shows its body text and then its URL; only the body is truncated
    - `formatCommentInfo(comment, maxLength = 5000)`: comment tools pass their own limit (200 for overview/saved, 300 for user comments and more-comments)
    - `truncateText`: shared cut-to-length helper; the result includes the `...`
    - Engagement and health analysis helpers
 
-5. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
+6. **Type Definitions** (`src/types.ts`): Comprehensive TypeScript types for all Reddit entities
 
 ### Authentication Flow
 
@@ -121,18 +131,18 @@ pnpm lint:fix
 
 The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
 
-1. **auto (default)**: Uses OAuth when credentials are provided, RSS fallback otherwise
+1. **auto (default)**: Uses OAuth when credentials are provided, keyless mode otherwise
    - With REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET: full API access at 60-100 req/min
-   - Without credentials: falls back to RSS feeds for `browse_subreddit` and `get_top_posts` only (~1 req/min, no metrics)
-   - All other tools return `NotAuthenticatedError` directing the user to set up OAuth
+   - Without credentials: keyless mode (`RedditClient.keyless`). Ranked listings use RSS; `sort=new` and the other read tools use the Arctic Shift archive; a failed RSS feed for a named subreddit falls back to the archive's newest posts with a `notice`
+   - Still OAuth-only: `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, `search_reddit type=user`, and all writes (`NotAuthenticatedError`)
 
 2. **authenticated**: Explicitly requires OAuth credentials
    - Server fails to start if credentials are missing
    - 60-100 req/min
    - Use for production environments
 
-3. **anonymous** (deprecated): Alias for the RSS fallback path
-   - Behaves identically to `auto` without credentials (RSS only)
+3. **anonymous** (deprecated): Alias for keyless mode
+   - Behaves identically to `auto` without credentials
    - Emits deprecation warning at startup
 
 **Write operations** (create_post, reply_to_post, edit_post, edit_comment, save_content, unsave_content, delete_post, delete_comment):
@@ -202,7 +212,7 @@ Listing tools (`get_top_posts`, `browse_subreddit`, `search_reddit`, `get_user_p
 Environment variables:
 
 ```bash
-# Reddit API Credentials (required — Reddit blocks unauthenticated requests since mid-2026)
+# Reddit API Credentials (optional — without them, reads are keyless: RSS feeds + the Arctic Shift archive)
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
@@ -235,7 +245,7 @@ OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not 
 
 ### Quick Start Examples
 
-**Zero-setup (RSS fallback, browse/top only):**
+**Zero-setup (keyless: RSS feeds + Arctic Shift archive, most read tools):**
 
 ```bash
 npx reddit-mcp-server

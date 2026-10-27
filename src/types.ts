@@ -112,16 +112,26 @@ export type RedditSubreddit = {
 }
 
 /**
- * A page of listing results plus Reddit's pagination cursors. `after` is the fullname to pass
- * back to fetch the next page; absent when there are no further results. `before` pages backward.
+ * A page of listing results plus pagination cursors. `after` is the opaque cursor to pass back
+ * for the next page (a fullname from Reddit, a created_utc timestamp from Arctic Shift); absent
+ * when there are no further results. `before` pages backward.
  */
-export type PageSource = "api" | "rss"
+export type PageSource = "api" | "rss" | "arctic"
 
 export type Page<T> = {
   readonly items: readonly T[]
   readonly after?: string
   readonly before?: string
   readonly source?: PageSource
+  /** A caveat to show with the results, e.g. that a ranked sort fell back to newest-first. */
+  readonly notice?: string
+}
+
+/** A post and its flattened comment thread, plus the ids of comments collapsed into "more" stubs. */
+export type PostComments = {
+  readonly post: RedditPost
+  readonly comments: readonly RedditComment[]
+  readonly moreIds: readonly string[]
 }
 
 /**

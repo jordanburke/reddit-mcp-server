@@ -301,29 +301,29 @@ describe("RedditClient RSS mode", () => {
     vi.restoreAllMocks()
   })
 
-  it("sets usesRss = true when authMode is anonymous", () => {
+  it("sets keyless = true when authMode is anonymous", () => {
     const client = new RedditClient(rssConfig)
-    expect(client.usesRss).toBe(true)
+    expect(client.keyless).toBe(true)
   })
 
-  it("sets usesRss = true when authMode is auto without credentials", () => {
+  it("sets keyless = true when authMode is auto without credentials", () => {
     const client = new RedditClient({
       clientId: "",
       clientSecret: "",
       userAgent: "TestApp/1.0.0",
       authMode: "auto",
     })
-    expect(client.usesRss).toBe(true)
+    expect(client.keyless).toBe(true)
   })
 
-  it("sets usesRss = false when OAuth credentials are provided", () => {
+  it("sets keyless = false when OAuth credentials are provided", () => {
     const client = new RedditClient({
       clientId: "id",
       clientSecret: "secret",
       userAgent: "TestApp/1.0.0",
       authMode: "auto",
     })
-    expect(client.usesRss).toBe(false)
+    expect(client.keyless).toBe(false)
   })
 
   it("browseSubreddit delegates to RSS and respects default limit", async () => {
@@ -368,39 +368,28 @@ describe("RedditClient RSS mode", () => {
     expect(mockFetch.mock.calls[0]![0]).toContain(".rss")
   })
 
-  it("searchReddit returns Left without making any request", async () => {
+  it("searchReddit without a subreddit returns Left without making any request", async () => {
     const client = new RedditClient(rssConfig)
     const result = await client.searchReddit("test query", {})
 
     expect(result.isLeft()).toBe(true)
     if (result.isLeft()) {
+      expect(result.value._tag).toBe("ValidationError")
+      expect(result.value.message).toContain("subreddit")
+    }
+
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it("getTrendingSubreddits returns Left without making any request", async () => {
+    const client = new RedditClient(rssConfig)
+    const result = await client.getTrendingSubreddits()
+
+    expect(result.isLeft()).toBe(true)
+    if (result.isLeft()) {
       expect(result.value._tag).toBe("NotAuthenticatedError")
-      expect(result.value.message).toContain("search_reddit")
+      expect(result.value.message).toContain("get_trending_subreddits")
       expect(result.value.message).toContain("OAuth credentials")
-    }
-
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it("getUser returns Left without making any request", async () => {
-    const client = new RedditClient(rssConfig)
-    const result = await client.getUser("someone")
-
-    expect(result.isLeft()).toBe(true)
-    if (result.isLeft()) {
-      expect(result.value._tag).toBe("NotAuthenticatedError")
-    }
-
-    expect(mockFetch).not.toHaveBeenCalled()
-  })
-
-  it("getPostComments returns Left without making any request", async () => {
-    const client = new RedditClient(rssConfig)
-    const result = await client.getPostComments("abc123", "programming")
-
-    expect(result.isLeft()).toBe(true)
-    if (result.isLeft()) {
-      expect(result.value._tag).toBe("NotAuthenticatedError")
     }
 
     expect(mockFetch).not.toHaveBeenCalled()

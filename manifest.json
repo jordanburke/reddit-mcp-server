@@ -100,7 +100,7 @@
     "reddit_client_id": {
       "type": "string",
       "title": "Reddit Client ID",
-      "description": "Your Reddit app client ID (optional - increases rate limit to 60 req/min)",
+      "description": "Your Reddit app client ID (optional - live Reddit data; without it, reads come from RSS feeds and the Arctic Shift archive)",
       "required": false,
       "sensitive": false
     },

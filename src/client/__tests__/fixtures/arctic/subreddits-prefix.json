@@ -1,0 +1,40 @@
+{
+  "data": [
+    {
+      "display_name": "Python",
+      "title": "Python",
+      "subscribers": 1325561,
+      "public_description": "The official Python community for Reddit! Stay up to date with the latest news, packages, and meta information relating to the Python programming language. \n---\n\nIf you have questions or are new to Python use r/LearnPython",
+      "description": "",
+      "created_utc": 1201230879,
+      "over18": false,
+      "subreddit_type": "public",
+      "url": "/r/Python/",
+      "id": "2qh0y"
+    },
+    {
+      "display_name": "pythontips",
+      "title": "Quick python tips to add to your collection",
+      "subscribers": 132096,
+      "public_description": "A place to get a quick fix of python tips and tricks to make you a better Pythonista.",
+      "description": "",
+      "created_utc": 1464902226,
+      "over18": false,
+      "subreddit_type": "public",
+      "url": "/r/pythontips/",
+      "id": "3evbu"
+    },
+    {
+      "display_name": "PythonProjects2",
+      "title": "Where the rookies roam",
+      "subscribers": 39463,
+      "public_description": "A place for people who are learning the programming language 'Python' to come and apply their new skills on actual projects, and get feedback.",
+      "description": "",
+      "created_utc": 1518301874,
+      "over18": false,
+      "subreddit_type": "public",
+      "url": "/r/PythonProjects2/",
+      "id": "fnrmm"
+    }
+  ]
+}

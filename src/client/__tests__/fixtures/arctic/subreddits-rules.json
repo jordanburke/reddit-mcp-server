@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "subreddit": "programming",
+      "rules": [
+        {
+          "kind": "link",
+          "priority": 0,
+          "short_name": "/r/programming is not a support forum",
+          "created_utc": 1652981693,
+          "description": "/r/programming is not a support forum. If you have a question, check out /r/learnprogramming, /r/cscareerquestions, or [Stack Overflow](https://stackoverflow.com/).",
+          "violation_reason": "/r/programming is not a support forum"
+        },
+        {
+          "kind": "link",
+          "priority": 1,
+          "short_name": "Keep submissions on topic and of high quality",
+          "created_utc": 1652981693,
+          "description": "Submissions should be directly related to programming.  Just because it has a computer in it doesn't make it programming.\n\nSubmissions containing no real content that are simply farming for e-mail addresses will be removed as spam.\n\nDirect links to app demos (unrelated to programming) will be removed.  Please link to a blog post/post-mortem about the development process instead.",
+          "violation_reason": "Not programming"
+        },
+        {
+          "kind": "link",
+          "priority": 2,
+          "short_name": "No surveys",
+          "created_utc": 1652981693,
+          "description": "Surveys/polls are typically obnoxious.  Pretty much any survey, academic or otherwise, will be removed by the mod team.  Check out /r/samplesize as an alternative place to submit surveys.\n\nExceptions are made for high quality surveys hosted by established members of the software development community (really just the annual SO Developer Survey).",
+          "violation_reason": "No surveys"
+        },
+        {
+          "kind": "link",
+          "priority": 3,
+          "short_name": "No résumés/job listings",
+          "created_utc": 1652981693,
+          "description": "/r/programming is not a jobs board.  Please visit /r/forhire or /r/jobbit for submitting résumés or open positions.\n\nSubmissions on the topic of hiring programmers or getting hired as a programmer are generally acceptable, as long as they are not a résumés or an ad for an open position in disguise.",
+          "violation_reason": "No résumés/job listings"
+        },
+        {
+          "kind": "link",
+          "priority": 4,
+          "short_name": "Project and product demos, spam",
+          "created_utc": 1652981693,
+          "description": "Reddit may have relaxed its position on self-promotion, but /r/programming has not:\n\n* If a majority of your contributions to reddit constitute self-promotion, you will be banned\n* If you immediately start submitting promotional material with a fresh account, you will be banned\n* The mods of /r/programming all have day jobs, we do not waste time handing out warnings\n\nIf you wish to use reddit as a promotional tool, [please do so legitimately](https://about.reddit.com/advertise/).",
+          "violation_reason": "Spam"
+        }
+      ],
+      "retrieved_on": 1737375221
+    }
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "data": [
+    {
+      "_meta": {
+        "retrieved_2nd_on": 1793106382
+      },
+      "all_awardings": [],
+      "allow_live_comments": false,
+      "approved_at_utc": null,
+      "approved_by": null,
+      "archived": false,
+      "author": "mcnamaragio",
+      "author_flair_background_color": null,
+      "author_flair_richtext": [],
+      "author_flair_template_id": null,
+      "author_flair_text": null,
+      "author_flair_text_color": null,
+      "author_flair_type": "text",
+      "author_fullname": "t2_6hymk",
+      "author_is_blocked": false,
+      "author_patreon_flair": false,
+      "author_premium": false,
+      "awarders": [],
+      "banned_at_utc": null,
+      "banned_by": null,
+      "can_gild": false,
+      "can_mod_post": false,
+      "category": null,
+      "clicked": false,
+      "contest_mode": false,
+      "created": 1793091980,
+      "created_utc": 1793091980,
+      "discussion_type": null,
+      "distinguished": null,
+      "domain": "giorgi.dev",
+      "downs": 0,
+      "edited": false,
+      "gilded": 0,
+      "gildings": {},
+      "hidden": false,
+      "hide_score": false,
+      "id": "1xgnigv",
+      "is_created_from_ads_ui": false,
+      "is_crosspostable": false,
+      "is_meta": false,
+      "is_reddit_media_domain": false,
+      "is_robot_indexable": true,
+      "is_self": false,
+      "is_video": false,
+      "likes": null,
+      "link_flair_background_color": "",
+      "link_flair_richtext": [],
+      "link_flair_text": null,
+      "link_flair_text_color": "dark",
+      "link_flair_type": "text",
+      "locked": false,
+      "media": null,
+      "media_embed": {},
+      "media_only": false,
+      "mod_note": null,
+      "mod_reason_by": null,
+      "mod_reason_title": null,
+      "mod_reports": [],
+      "name": "t3_1xgnigv",
+      "no_follow": false,
+      "num_comments": 3,
+      "num_reports": null,
+      "outbound_link": {
+        "created": null,
+        "expiration": 1793110001302,
+        "url": "https://out.reddit.com/t3_1xgnigv?app_name=android&token=AQAA8a_gagWaz2qXPsxSlAqq_qzBZBtG3aWIo7fa2l2U9yKdlwJP&url=https%3A%2F%2Fwww.giorgi.dev%2Fdatabase%2Fduckdb-net-1-5-6-1-data-reader-performance%2F"
+      },
+      "over_18": false,
+      "permalink": "/r/programming/comments/1xgnigv/duckdbnet_1561_reading_data_up_to_12_faster/",
+      "pinned": false,
+      "post_hint": "link",
+      "preview": {
+        "enabled": false,
+        "images": [
+          {
+            "id": "LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw",
+            "resolutions": [
+              {
+                "height": 56,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=108&auto=webp&s=0fe427d1d34727eff8795c70145502d86ef12b19",
+                "width": 108
+              },
+              {
+                "height": 113,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=216&auto=webp&s=324d492abc0915fdd5a3d85505ff7b0907c3b3b6",
+                "width": 216
+              },
+              {
+                "height": 168,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=320&auto=webp&s=72e237c1ca5fa23745e3a40c15a625b02f295def",
+                "width": 320
+              },
+              {
+                "height": 252,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=480&auto=webp&s=b7c335c0865e3bc528049c3fb92fcae0099b8d76",
+                "width": 480
+              },
+              {
+                "height": 336,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=640&auto=webp&s=4b09011697477bda5a6e9d3deb7e25dba5b5e625",
+                "width": 640
+              },
+              {
+                "height": 378,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=720&auto=webp&s=98dc0413d1b901397ed8f2dcccc40170dda02678",
+                "width": 720
+              },
+              {
+                "height": 504,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=960&auto=webp&s=e75ba654b1269f128f49d3bf72811ec156dc7937",
+                "width": 960
+              },
+              {
+                "height": 567,
+                "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=1080&auto=webp&s=e3b43c009b19be0b85a7191f08a14e7b0fb38cde",
+                "width": 1080
+              }
+            ],
+            "source": {
+              "height": 630,
+              "url": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?auto=webp&s=7895de0ed97fd78172a7d77670fde0f9538b342a",
+              "width": 1200
+            },
+            "variants": {}
+          }
+        ]
+      },
+      "profile_img": "https://www.redditstatic.com/avatars/defaults/v2/avatar_default_4.png",
+      "pwls": 6,
+      "quarantine": false,
+      "removal_reason": null,
+      "removed_by_category": null,
+      "report_reasons": null,
+      "retrieved_on": 1793092001,
+      "saved": false,
+      "score": 20,
+      "secure_media": null,
+      "secure_media_embed": {},
+      "selftext": "",
+      "send_replies": true,
+      "spoiler": false,
+      "stickied": false,
+      "subreddit": "programming",
+      "subreddit_id": "t5_2fwo",
+      "subreddit_name_prefixed": "r/programming",
+      "subreddit_subscribers": 6930108,
+      "subreddit_type": "public",
+      "suggested_sort": null,
+      "thumbnail": "https://external-preview.redd.it/LXpmTwEvcnDgLvBSbjZWZk39dQ82WC8e8MG6W5Z-_rw.png?width=140&height=73&auto=webp&s=0714eb2d061996ebb995de9b270806b6e5d91dac",
+      "thumbnail_height": 73,
+      "thumbnail_width": 140,
+      "title": "DuckDB.NET 1.5.6.1: Reading Data Up to 12× Faster",
+      "top_awarded_type": null,
+      "total_awards_received": 0,
+      "treatment_tags": [],
+      "ups": 20,
+      "upvote_ratio": 0.8125,
+      "url": "https://www.giorgi.dev/database/duckdb-net-1-5-6-1-data-reader-performance/",
+      "url_overridden_by_dest": "https://www.giorgi.dev/database/duckdb-net-1-5-6-1-data-reader-performance/",
+      "user_reports": [],
+      "view_count": null,
+      "visited": false,
+      "wls": 6
+    }
+  ]
+}

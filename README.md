@@ -27,7 +27,7 @@ A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts,
 | User Analysis                   | :white_check_mark: | :white_check_mark: |
 | Post Comments                   | :white_check_mark: | :white_check_mark: |
 | OAuth Auth (60-100 rpm)         | :white_check_mark: | :white_check_mark: |
-| **RSS Fallback (zero-setup)**   | :white_check_mark: |        :x:         |
+| **Keyless mode (zero-setup)**   | :white_check_mark: |        :x:         |
 
 ## Quick Start
 
@@ -202,6 +202,8 @@ export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
 
 **Anonymous mode no longer works.** As of mid-2026, Reddit blocks all unauthenticated API requests with HTTP 403. OAuth credentials are now required for any API access.
 
+**Reddit is shutting down its public API and RSS feeds.** Reddit announced on 2026-09-30 that it stops accepting new public API access requests on 2026-10-31, ends RSS feeds on 2026-11-13, starts removing unregistered apps on 2027-01-12, and closes public API access in March 2027. Without credentials, this server already reads from the [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive (see [Keyless Mode](#keyless-mode)).
+
 Additionally, Reddit closed self-service OAuth app creation in November 2025. New developers must request access through [Reddit's Developer Support](https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164). Existing OAuth credentials (obtained before November 2025) continue to work.
 
 ### Getting Credentials
@@ -212,27 +214,35 @@ Additionally, Reddit closed self-service OAuth app creation in November 2025. Ne
 
 ### Mode Comparison
 
-| Mode              | Rate Limit     | Setup Required    | Tools Available                                | Best For      |
-| ----------------- | -------------- | ----------------- | ---------------------------------------------- | ------------- |
-| `auto` (default)  | 60-100 req/min | OAuth credentials | All tools                                      | Most users    |
-| `authenticated`   | 60-100 req/min | OAuth credentials | All tools                                      | Explicit mode |
-| `auto` (no creds) | ~1 req/min     | None              | `browse_subreddit`, `get_top_posts` only (RSS) | Quick testing |
-| `anonymous`       | ~1 req/min     | None              | `browse_subreddit`, `get_top_posts` only (RSS) | Legacy alias  |
+| Mode              | Rate Limit     | Setup Required    | Tools Available                                 | Best For      |
+| ----------------- | -------------- | ----------------- | ----------------------------------------------- | ------------- |
+| `auto` (default)  | 60-100 req/min | OAuth credentials | All tools                                       | Most users    |
+| `authenticated`   | 60-100 req/min | OAuth credentials | All tools                                       | Explicit mode |
+| `auto` (no creds) | Shared, free   | None              | Most read tools ([Keyless Mode](#keyless-mode)) | Quick testing |
+| `anonymous`       | Shared, free   | None              | Same as `auto` without credentials              | Legacy alias  |
 
-### RSS Fallback Mode
+### Keyless Mode
 
-When no OAuth credentials are provided, the server automatically falls back to Reddit's public RSS feeds. This gives you zero-setup access to browse subreddits and get top posts.
+Without OAuth credentials, reads come from two free sources:
 
-**What works:** `browse_subreddit` and `get_top_posts` — returns up to 25 posts per request.
+- **Reddit's RSS feeds** for ranked listings (`hot`, `top`, `rising`, `controversial`, and the home feed). Reddit retires RSS on 2026-11-13. When a feed fails for a named subreddit, the server falls back to the archive's newest posts and says ranking is unavailable.
+- **The [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive**, a free third-party copy of Reddit run by one volunteer. It is not Reddit's API and has no uptime guarantee.
 
-**What's missing compared to OAuth:**
+| Tool                                        | Keyless source         | Limits                                                                  |
+| ------------------------------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| `browse_subreddit` (new)                    | Arctic Shift           | One subreddit; no multireddits                                          |
+| `browse_subreddit` (other), `get_top_posts` | RSS, then Arctic Shift | Archive fallback is newest-first, not ranked                            |
+| `get_reddit_post`                           | Arctic Shift           |                                                                         |
+| `get_post_comments`                         | Arctic Shift           | Recent comments may be missing; no sort                                 |
+| `get_more_comments`                         | Arctic Shift           |                                                                         |
+| `get_user_info`                             | Arctic Shift           | Account age estimated from first activity; status flags unknown         |
+| `get_user_posts`, `get_user_comments`       | Arctic Shift           | Newest first only                                                       |
+| `get_subreddit_info`, `get_subreddit_rules` | Arctic Shift           |                                                                         |
+| `search_reddit`                             | Arctic Shift           | Posts need `subreddit`; `type=sr` matches name prefixes; no `type=user` |
 
-- No engagement metrics (score, comments, upvote ratio are all 0)
-- No pagination (single page of ~25 results)
-- No search, user info, comments, or write operations
-- Lower rate limit (~1 req/min vs 60-100 with OAuth)
+**Archive caveats:** scores and comment counts lag, and are often 0 or 1 on recent posts. Keyword search on large subreddits is slow, and the archive throttles it; the server retries once. Every archive result ends with a note naming the source.
 
-RSS results include a disclaimer noting the data source. All other tools return a clear error directing you to set up OAuth credentials.
+**Still needs OAuth:** `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, and all write tools.
 
 ### Read-Only Access (OAuth)
 

@@ -9,6 +9,7 @@ import type {
   BotDisclosureConfig,
   CacheConfig,
   FormattedPostInfo,
+  Page,
   RedditAuthMode,
   RedditSafeMode,
   RetryConfig,
@@ -90,15 +91,29 @@ function unwrapClient() {
   return getRedditClient().orThrow(new Error("Reddit client not initialized"))
 }
 
-function rssDisclaimer(source?: string): string {
-  return source === "rss"
-    ? "\n\n> **RSS mode** — scores, comment counts, and upvote ratios are unavailable. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full data."
-    : ""
+const ARCHIVE_DISCLAIMER =
+  "\n\n> **Archive mode** — from the Arctic Shift archive, a free third-party copy of Reddit, not Reddit's API. Scores and comment counts lag and are often 0 or 1 on recent posts, and recent comments may be missing. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for live data."
+
+// Footer naming where a page of results came from, plus any caveat the client attached.
+function sourceDisclaimer(page: Page<unknown>): string {
+  const notice = Option(page.notice).fold(
+    () => "",
+    (text) => `\n\n> **Note** — ${text}`,
+  )
+  if (page.source === "rss") {
+    return `${notice}\n\n> **RSS mode** — scores, comment counts, and upvote ratios are unavailable. Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full data.`
+  }
+  return page.source === "arctic" ? `${notice}${ARCHIVE_DISCLAIMER}` : notice
+}
+
+// Footer for single-item tools, which carry no page source: keyless reads come from the archive.
+function archiveDisclaimer(client: { readonly keyless: boolean }): string {
+  return client.keyless ? ARCHIVE_DISCLAIMER : ""
 }
 
 function formatPostSummary(post: FormattedPostInfo, index: number, source?: string): string {
   const statsLines =
-    source === "rss"
+    source === "rss" || source === "arctic"
       ? []
       : [
           `- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)`,
@@ -236,8 +251,9 @@ async function setupRedditClient() {
   }
 
   if (authMode === "anonymous" || !hasCredentials) {
-    console.error("[Setup] RSS fallback mode — no OAuth credentials detected.")
-    console.error("[Setup] Only browse_subreddit and get_top_posts are available (~1 req/min, no engagement metrics).")
+    console.error("[Setup] Keyless mode — no OAuth credentials detected.")
+    console.error("[Setup] Reads come from RSS feeds (ranked listings, until Reddit retires them 2026-11-13)")
+    console.error("[Setup] and the Arctic Shift archive (a free third-party Reddit archive; scores lag).")
     console.error("[Setup] Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full API access (100 req/min).")
     console.error("[Setup] See: https://www.reddit.com/wiki/api")
   } else {
@@ -372,6 +388,10 @@ server.addTool({
       () => "Not initialized",
       () => "Initialized",
     )}
+- Read Source: ${client.fold(
+      () => "Unknown",
+      (c) => (c.keyless ? "Keyless (RSS feeds + Arctic Shift archive; scores lag)" : "Reddit API (OAuth)"),
+    )}
 - Write Access: ${hasWriteAccess} ${hasWriteAccess === "✓" ? "Available" : "Read-only mode"}
 - Version: ${VERSION}
 
@@ -383,7 +403,7 @@ Ready to handle Reddit API requests!`)
 server.addTool({
   name: "get_user_info",
   description:
-    "Get a public profile for any Reddit user: comment/post/total karma, account age and status flags, plus a short activity analysis and engagement tips. Read-only; requires OAuth credentials. Returns profile stats only — use get_user_posts / get_user_comments for their actual content. Use get_me instead for your own authenticated account; do NOT expect private fields here, as only public data is returned.",
+    "Get a public profile for any Reddit user: comment/post/total karma, account age and status flags, plus a short activity analysis and engagement tips. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns profile stats only — use get_user_posts / get_user_comments for their actual content. Use get_me instead for your own authenticated account; do NOT expect private fields here, as only public data is returned.",
   annotations: {
     title: "Get User Info",
     readOnlyHint: true,
@@ -414,15 +434,17 @@ server.addTool({
   - Comment Karma: ${formattedUser.karma.commentKarma.toLocaleString()}
   - Post Karma: ${formattedUser.karma.postKarma.toLocaleString()}
   - Total Karma: ${formattedUser.karma.totalKarma.toLocaleString()}
-- Account Status: ${formattedUser.accountStatus.join(", ")}
-- Account Created: ${formattedUser.accountCreated}
+- Account Status: ${client.keyless ? "Unknown (not in the archive)" : formattedUser.accountStatus.join(", ")}
+- Account Created: ${client.keyless && user.createdUtc === 0 ? "Unknown (no archived activity)" : formattedUser.accountCreated}
 - Profile URL: ${formattedUser.profileUrl}
 
 ## Activity Analysis
 - ${formattedUser.activityAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Recommendations
-- ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}`
+- ${formattedUser.recommendations.replace(/\n {2}- /g, "\n- ")}${
+          client.keyless ? "\n\n> Account Created is estimated from the user's first archived post or comment." : ""
+        }${archiveDisclaimer(client)}`
       },
     )
   },
@@ -529,7 +551,7 @@ server.addTool({
 server.addTool({
   name: "get_user_posts",
   description:
-    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; requires OAuth credentials. Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
+    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
   annotations: {
     title: "Get User Posts",
     readOnlyHint: true,
@@ -589,7 +611,7 @@ server.addTool({
 
         return `# Posts by u/${args.username} (${args.sort} - ${args.time_filter})
 
-${postSummaries}${nextPageHint(page.after)}`
+${postSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
       },
     )
   },
@@ -598,7 +620,7 @@ ${postSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "get_user_comments",
   description:
-    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; requires OAuth credentials. Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
+    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
   annotations: {
     title: "Get User Comments",
     readOnlyHint: true,
@@ -662,7 +684,7 @@ In r/${comment.subreddit} on "${comment.submissionTitle}"
 
         return `# Comments by u/${args.username} (${args.sort} - ${args.time_filter})
 
-${commentSummaries}${nextPageHint(page.after)}`
+${commentSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
       },
     )
   },
@@ -672,7 +694,7 @@ ${commentSummaries}${nextPageHint(page.after)}`
 server.addTool({
   name: "get_reddit_post",
   description:
-    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; requires OAuth credentials. Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
+    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
   annotations: {
     title: "Get Reddit Post",
     readOnlyHint: true,
@@ -726,7 +748,7 @@ ${formattedPost.content}
 - ${formattedPost.engagementAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Best Time to Engage
-${formattedPost.bestTimeToEngage}`
+${formattedPost.bestTimeToEngage}${archiveDisclaimer(client)}`
       },
     )
   },
@@ -735,7 +757,7 @@ ${formattedPost.bestTimeToEngage}`
 server.addTool({
   name: "get_top_posts",
   description:
-    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; works without credentials via RSS fallback (titles and links only, no scores or comment counts). Returns a page of posts plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
+    "Get the top-scoring posts from a subreddit — or from the authenticated home feed if no subreddit is given — within a time window (hour…all). Read-only; works without credentials via RSS (titles and links only, no scores); if RSS fails, it falls back to the Arctic Shift archive's newest posts, which have no ranking. Returns a page of posts plus an `after` cursor. This is a shortcut for the 'top' sort; use browse_subreddit for hot/new/rising/controversial, or search_reddit to find posts by keyword.",
   annotations: {
     title: "Get Top Posts",
     readOnlyHint: true,
@@ -788,7 +810,7 @@ server.addTool({
         )
         return `# Top Posts from ${location} (${args.time_filter})
 
-${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
+${postSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
       },
     )
   },
@@ -797,7 +819,7 @@ ${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
 server.addTool({
   name: "browse_subreddit",
   description:
-    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; works without credentials via RSS fallback (titles and links only, no scores or comment counts). `time_filter` applies only to the top and controversial sorts. Returns a page of posts plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
+    "Browse a subreddit — or the authenticated home feed when no subreddit is given — by sort order: hot, new, top, rising, or controversial. Read-only; works without credentials via RSS (titles and links only, no scores); if RSS fails, it falls back to the Arctic Shift archive's newest posts, which have no ranking. `time_filter` applies only to the top and controversial sorts. Returns a page of posts plus an `after` cursor. Use get_top_posts as a shortcut for the top sort, or search_reddit to find posts by keyword rather than by feed order.",
   annotations: {
     title: "Browse Subreddit",
     readOnlyHint: true,
@@ -860,7 +882,7 @@ server.addTool({
         const heading = location === "home feed" ? "Home Feed" : location
         return `# ${args.sort} posts from ${heading} (${args.sort}${timeSuffix})
 
-${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
+${postSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
       },
     )
   },
@@ -870,7 +892,7 @@ ${postSummaries}${nextPageHint(page.after)}${rssDisclaimer(page.source)}`
 server.addTool({
   name: "get_subreddit_info",
   description:
-    "Get a subreddit's profile: title, description, subscriber and active-user counts, creation date, flags, wiki/link URLs, plus a community analysis and posting tips. Read-only; requires OAuth credentials. Returns metadata about the community itself — use browse_subreddit / get_top_posts for its posts, or get_subreddit_rules for its posting rules. Do NOT use this to find subreddits by topic — use search_reddit with type='sr'.",
+    "Get a subreddit's profile: title, description, subscriber and active-user counts, creation date, flags, wiki/link URLs, plus a community analysis and posting tips. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns metadata about the community itself — use browse_subreddit / get_top_posts for its posts, or get_subreddit_rules for its posting rules. Do NOT use this to find subreddits by topic — use search_reddit with type='sr'.",
   annotations: {
     title: "Get Subreddit Info",
     readOnlyHint: true,
@@ -921,7 +943,7 @@ ${formattedSubreddit.description.full}
 - ${formattedSubreddit.communityAnalysis.replace(/\n {2}- /g, "\n- ")}
 
 ## Engagement Tips
-- ${formattedSubreddit.engagementTips.replace(/\n {2}- /g, "\n- ")}`
+- ${formattedSubreddit.engagementTips.replace(/\n {2}- /g, "\n- ")}${archiveDisclaimer(client)}`
       },
     )
   },
@@ -930,7 +952,7 @@ ${formattedSubreddit.description.full}
 server.addTool({
   name: "get_subreddit_rules",
   description:
-    "Get a subreddit's posting rules (each rule's name, what it applies to, and its description). Read-only; requires OAuth credentials. Returns the rules list, or a note when the subreddit lists none. Call this before create_post to check requirements and avoid auto-removal. For available post flairs use get_post_flairs instead.",
+    "Get a subreddit's posting rules (each rule's name, what it applies to, and its description). Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns the rules list, or a note when the subreddit lists none. Call this before create_post to check requirements and avoid auto-removal. For available post flairs use get_post_flairs instead.",
   annotations: {
     title: "Get Subreddit Rules",
     readOnlyHint: true,
@@ -963,7 +985,7 @@ server.addTool({
 
         return `# Posting Rules for r/${args.subreddit_name}
 
-${ruleList}`
+${ruleList}${archiveDisclaimer(client)}`
       },
     )
   },
@@ -1042,7 +1064,7 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
 server.addTool({
   name: "search_reddit",
   description:
-    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only; requires OAuth credentials. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
+    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only. Without credentials it uses the Arctic Shift archive, which needs `subreddit` for post search, matches subreddit names by prefix, and cannot search users. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
   annotations: {
     title: "Search Reddit",
     readOnlyHint: true,
@@ -1134,7 +1156,7 @@ server.addTool({
 
 Sorted by: ${args.sort} | Time: ${args.time_filter} | Type: ${args.type}
 
-${searchResults}${nextPageHint(page.after)}`
+${searchResults}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
       },
     )
   },
@@ -1536,7 +1558,7 @@ ${args.thing_id} has been removed from your saved items.`,
 server.addTool({
   name: "get_post_comments",
   description:
-    "Get the comment thread for a post (by post id + subreddit), sorted best/top/new/controversial/old/qa. Read-only; requires OAuth credentials. Returns the post header plus threaded comments (author, OP/edited badges, score, body, nesting depth) up to `limit`. Long threads are truncated with 'load more' stubs — expand those with get_more_comments. Use get_reddit_post for just the post body, not the thread.",
+    "Get the comment thread for a post (by post id + subreddit), sorted best/top/new/controversial/old/qa. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns the post header plus threaded comments (author, OP/edited badges, score, body, nesting depth) up to `limit`. Long threads are truncated with 'load more' stubs — expand those with get_more_comments. Use get_reddit_post for just the post body, not the thread.",
   annotations: {
     title: "Get Post Comments",
     readOnlyHint: true,
@@ -1580,12 +1602,15 @@ server.addTool({
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get comments: ${err.message}`)
       },
-      ({ post, comments }) => {
+      ({ post, comments, moreIds }) => {
+        // Archive scores and counts lag, so the keyless header leaves them out.
+        const statsLine = client.keyless
+          ? ""
+          : `- Score: ${post.score.toLocaleString()} | Comments: ${post.numComments.toLocaleString()}\n`
         const header = `# Comments for: ${post.title}
 
 **Post by u/${post.author} in r/${post.subreddit}**
-- Score: ${post.score.toLocaleString()} | Comments: ${post.numComments.toLocaleString()}
-- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
+${statsLine}- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
 
 ---
 
@@ -1609,7 +1634,15 @@ ${comment.body}
           })
           .join("\n\n")
 
-        return header + commentSummaries
+        // get_more_comments takes up to 100 ids per call (Reddit's /api/morechildren cap).
+        const moreHint =
+          moreIds.length > 0
+            ? `\n\n**${moreIds.length} more comments are collapsed.** Expand them with get_more_comments: link_id="t3_${post.id}", comment_ids=${JSON.stringify(moreIds.slice(0, 100))}${moreIds.length > 100 ? " (first 100 shown)" : ""}`
+            : ""
+        const sortNote =
+          client.keyless && args.sort !== "best" ? `\n\n> sort="${args.sort}" is not applied to archive comments.` : ""
+
+        return header + commentSummaries + moreHint + sortNote + archiveDisclaimer(client)
       },
     )
   },
@@ -1618,7 +1651,7 @@ ${comment.body}
 server.addTool({
   name: "get_more_comments",
   description:
-    "Expand truncated 'load more comments' stubs in a thread. Read-only; requires OAuth credentials. Pass the post's link id and the comment ids from a 'more' node (surfaced by get_post_comments) to fetch those hidden comments; returns the expanded comments (author, body excerpt, score, link). Call get_post_comments first to obtain the thread and its 'more' node ids — do NOT invent ids.",
+    "Expand truncated 'load more comments' stubs in a thread. Read-only; works without credentials via the Arctic Shift archive (scores lag). Pass the post's link id and the comment ids from a 'more' node (surfaced by get_post_comments) to fetch those hidden comments; returns the expanded comments (author, body excerpt, score, link). Call get_post_comments first to obtain the thread and its 'more' node ids — do NOT invent ids.",
   annotations: {
     title: "Get More Comments",
     readOnlyHint: true,
@@ -1663,7 +1696,7 @@ server.addTool({
 
         return `# Expanded Comments (${comments.length})
 
-${commentList}`
+${commentList}${archiveDisclaimer(client)}`
       },
     )
   },
