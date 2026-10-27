@@ -127,6 +127,13 @@ export type Page<T> = {
   readonly notice?: string
 }
 
+/** A post and its flattened comment thread, plus the ids of comments collapsed into "more" stubs. */
+export type PostComments = {
+  readonly post: RedditPost
+  readonly comments: readonly RedditComment[]
+  readonly moreIds: readonly string[]
+}
+
 /**
  * A mixed page of a user's posts and comments (saved / overview listings), split by kind, plus
  * the pagination cursor.

@@ -435,7 +435,7 @@ server.addTool({
   - Post Karma: ${formattedUser.karma.postKarma.toLocaleString()}
   - Total Karma: ${formattedUser.karma.totalKarma.toLocaleString()}
 - Account Status: ${client.keyless ? "Unknown (not in the archive)" : formattedUser.accountStatus.join(", ")}
-- Account Created: ${formattedUser.accountCreated}
+- Account Created: ${client.keyless && user.createdUtc === 0 ? "Unknown (no archived activity)" : formattedUser.accountCreated}
 - Profile URL: ${formattedUser.profileUrl}
 
 ## Activity Analysis
@@ -1602,12 +1602,15 @@ server.addTool({
         // eslint-disable-next-line functype/prefer-either
         throw new Error(`Failed to get comments: ${err.message}`)
       },
-      ({ post, comments }) => {
+      ({ post, comments, moreIds }) => {
+        // Archive scores and counts lag, so the keyless header leaves them out.
+        const statsLine = client.keyless
+          ? ""
+          : `- Score: ${post.score.toLocaleString()} | Comments: ${post.numComments.toLocaleString()}\n`
         const header = `# Comments for: ${post.title}
 
 **Post by u/${post.author} in r/${post.subreddit}**
-- Score: ${post.score.toLocaleString()} | Comments: ${post.numComments.toLocaleString()}
-- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
+${statsLine}- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
 
 ---
 
@@ -1631,7 +1634,15 @@ ${comment.body}
           })
           .join("\n\n")
 
-        return header + commentSummaries + archiveDisclaimer(client)
+        // get_more_comments takes up to 100 ids per call (Reddit's /api/morechildren cap).
+        const moreHint =
+          moreIds.length > 0
+            ? `\n\n**${moreIds.length} more comments are collapsed.** Expand them with get_more_comments: link_id="t3_${post.id}", comment_ids=${JSON.stringify(moreIds.slice(0, 100))}${moreIds.length > 100 ? " (first 100 shown)" : ""}`
+            : ""
+        const sortNote =
+          client.keyless && args.sort !== "best" ? `\n\n> sort="${args.sort}" is not applied to archive comments.` : ""
+
+        return header + commentSummaries + moreHint + sortNote + archiveDisclaimer(client)
       },
     )
   },

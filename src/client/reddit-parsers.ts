@@ -77,6 +77,19 @@ export function parseCommentTree(
   })
 }
 
+// Ids of comments collapsed into "more" stubs anywhere in the tree, for get_more_comments.
+// Reddit's "continue this thread" stubs carry the placeholder id "_", which is skipped.
+export function collectMoreIds(children: ReadonlyArray<CommentChild>): readonly string[] {
+  return children.flatMap((item) => {
+    if (item.kind === "more") {
+      const ids = item.data.children
+      return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string" && id !== "_") : []
+    }
+    const { replies } = item.data
+    return replies !== undefined && typeof replies !== "string" ? collectMoreIds(replies.data.children) : []
+  })
+}
+
 export function parseSubredditData(data: RedditApiSubredditResponse["data"]): RedditSubreddit {
   return {
     displayName: data.display_name,

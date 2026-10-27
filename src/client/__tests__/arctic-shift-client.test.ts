@@ -213,6 +213,21 @@ describe("ArcticShiftClient", () => {
     })
   })
 
+  describe("collapsed comments", () => {
+    it("returns the ids of 'more' stubs so get_more_comments can expand them", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(fixture("posts-ids")))
+        .mockResolvedValueOnce(jsonResponse(fixture("comments-tree-more")))
+
+      const { comments, moreIds } = (await arctic.getPostComments("1xbl8y1", 6)).orThrow()
+
+      expect(comments).toHaveLength(6)
+      expect(moreIds).toHaveLength(23)
+      expect(moreIds).toContain("19rith93cnjwl")
+      expect(moreIds).not.toContain("_")
+    })
+  })
+
   describe("getComments", () => {
     it("looks up collapsed comments by id", async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse(fixture("comments-ids")))
@@ -258,6 +273,22 @@ describe("ArcticShiftClient", () => {
 
       expect(result.swap().orThrow()._tag).toBe("ValidationError")
       expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it("maps a time filter to an offset from now", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+      await arctic.searchPosts("duckdb", { subreddit: "programming", timeFilter: "week" })
+
+      expect(calledUrl(mockFetch).searchParams.get("after")).toBe("7d")
+    })
+
+    it("sends no time bound for time_filter=all", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+      await arctic.searchPosts("duckdb", { subreddit: "programming", timeFilter: "all" })
+
+      expect(calledUrl(mockFetch).searchParams.has("after")).toBe(false)
     })
 
     it("searches within a subreddit", async () => {
@@ -375,6 +406,17 @@ describe("RedditClient keyless routing", () => {
     const page = (await new RedditClient(keylessConfig).getUserComments("spez", { sort: "new", limit: 2 })).orThrow()
 
     expect(page.notice).toBeUndefined()
+  })
+
+  it("returns the RSS error when paging with an RSS cursor, without asking the archive", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 429, statusText: "Too Many Requests", text: async () => "" })
+
+    const result = await new RedditClient(keylessConfig).browseSubreddit("programming", "hot", "week", 3, "t3_abc123")
+
+    const error = result.swap().orThrow()
+    expect(error._tag).toBe("HttpError")
+    expect(error.message).toContain("RSS")
+    expect(mockFetch).toHaveBeenCalledTimes(1)
   })
 
   it("returns the RSS error for the home feed, which the archive cannot serve", async () => {

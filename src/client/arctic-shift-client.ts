@@ -8,6 +8,7 @@ import { Try } from "functype"
 
 import type {
   Page,
+  PostComments,
   RedditApiCommentTreeData,
   RedditApiPostData,
   RedditApiRulesResponse,
@@ -22,6 +23,7 @@ import { normalizeSubreddit, normalizeThingId, normalizeUsername } from "../util
 import type { RedditError } from "./errors"
 import { ApiError, classifyRedditError, HttpError, NotFoundError, ValidationError } from "./errors"
 import {
+  collectMoreIds,
   parseCommentData,
   parseCommentTree,
   parsePostData,
@@ -44,7 +46,7 @@ const BASE_URL = "https://arctic-shift.photon-reddit.com/api"
 const MAX_LIMIT = 100
 const MAX_COMMENT_TREE_LIMIT = 500
 const ERROR_TEXT_MAX_LENGTH = 200
-const CURSOR_PATTERN = /^\d{1,12}$/
+const CURSOR_PATTERN = /^\d{9,10}$/
 // Arctic answers "Timeout. Maybe slow down a bit" when it is throttling expensive queries
 // (keyword search especially). A second try a few seconds later usually succeeds.
 const THROTTLE_RETRY_DELAY_MS = 3_000
@@ -93,9 +95,23 @@ function singleSubreddit(subreddit: string): string {
   return name
 }
 
+// True for a cursor this client issued (a created_utc in seconds), false for e.g. an RSS fullname.
+export function isArchiveCursor(after: string): boolean {
+  return CURSOR_PATTERN.test(after)
+}
+
+// Arctic's `after` accepts offsets from now, so Reddit's time filters map directly.
+const TIME_FILTER_OFFSETS: Readonly<Record<string, string>> = {
+  hour: "1hour",
+  day: "1d",
+  week: "7d",
+  month: "30d",
+  year: "365d",
+}
+
 function cursorParam(after?: string): Record<string, string> {
   if (after === undefined) return {}
-  if (!CURSOR_PATTERN.test(after)) {
+  if (!isArchiveCursor(after)) {
     throw new ValidationError(
       `Invalid pagination cursor "${after}". In keyless mode, pass the \`after\` value from a previous keyless call.`,
     )
@@ -180,9 +196,15 @@ export class ArcticShiftClient {
 
   async searchPosts(
     query: string,
-    options: { readonly subreddit?: string; readonly limit?: number; readonly after?: string } = {},
+    options: {
+      readonly subreddit?: string
+      readonly limit?: number
+      readonly after?: string
+      readonly timeFilter?: string
+    } = {},
   ): Promise<Either<RedditError, Page<RedditPost>>> {
-    const { subreddit, limit = 25, after } = options
+    const { subreddit, limit = 25, after, timeFilter } = options
+    const since = timeFilter !== undefined ? TIME_FILTER_OFFSETS[timeFilter] : undefined
     const context = `Failed to search the Arctic Shift archive for: ${query}`
     const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       if (subreddit === undefined) {
@@ -194,6 +216,7 @@ export class ArcticShiftClient {
       const posts = await this.request<readonly RedditApiPostData[]>("/posts/search", {
         subreddit: singleSubreddit(subreddit),
         query,
+        ...(since !== undefined ? { after: since } : {}),
         sort: "desc",
         limit: String(size),
         ...cursorParam(after),
@@ -237,10 +260,7 @@ export class ArcticShiftClient {
     return parsePostData(post)
   }
 
-  async getPostComments(
-    postId: string,
-    limit: number = 100,
-  ): Promise<Either<RedditError, { readonly post: RedditPost; readonly comments: readonly RedditComment[] }>> {
+  async getPostComments(postId: string, limit: number = 100): Promise<Either<RedditError, PostComments>> {
     const context = `Failed to get comments for post ${postId} from the Arctic Shift archive`
     const attempt = await Try.async(async () => {
       const post = await this.fetchPost(postId)
@@ -248,7 +268,7 @@ export class ArcticShiftClient {
         link_id: `t3_${post.id}`,
         limit: String(clampLimit(limit, MAX_COMMENT_TREE_LIMIT)),
       })
-      return { post, comments: parseCommentTree(tree, post.title) }
+      return { post, comments: parseCommentTree(tree, post.title), moreIds: collectMoreIds(tree) }
     })
     return attempt.toEither((error) => classifyRedditError(error, context))
   }

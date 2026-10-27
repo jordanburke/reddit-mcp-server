@@ -212,7 +212,7 @@ Listing tools (`get_top_posts`, `browse_subreddit`, `search_reddit`, `get_user_p
 Environment variables:
 
 ```bash
-# Reddit API Credentials (required — Reddit blocks unauthenticated requests since mid-2026)
+# Reddit API Credentials (optional — without them, reads are keyless: RSS feeds + the Arctic Shift archive)
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"

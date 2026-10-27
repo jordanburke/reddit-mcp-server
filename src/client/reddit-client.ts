@@ -15,6 +15,7 @@ import type {
   BotDisclosureConfig,
   ContentRecord,
   Page,
+  PostComments,
   RedditApiCommentResponse,
   RedditApiCommentTreeData,
   RedditApiEditResponse,
@@ -43,7 +44,7 @@ import type {
   UserContent,
 } from "../types"
 import { normalizeFullname, normalizeSubreddit, normalizeThingId, normalizeUsername } from "../utils/reddit-identifiers"
-import { ArcticShiftClient } from "./arctic-shift-client"
+import { ArcticShiftClient, isArchiveCursor } from "./arctic-shift-client"
 import type { RedditError } from "./errors"
 import {
   ApiError,
@@ -55,6 +56,7 @@ import {
   ValidationError,
 } from "./errors"
 import {
+  collectMoreIds,
   parseCommentData,
   parseCommentTree,
   parsePostData,
@@ -434,7 +436,9 @@ export class RedditClient {
       (error) => Option(`failed (${error.message})`),
       (page) => (page.items.length === 0 ? Option("returned no posts") : Option.none<string>()),
     )
-    if (rssProblem.isEmpty || !archivable) return rss
+    // An RSS cursor (a t3_ fullname) means nothing to the archive; surface the RSS failure instead.
+    const cursorFitsArchive = after === undefined || isArchiveCursor(after)
+    if (rssProblem.isEmpty || !archivable || !cursorFitsArchive) return rss
     const archived = await this.arctic.listSubredditPosts(subreddit, limit, after)
     return archived.map((page) => ({
       ...page,
@@ -445,7 +449,12 @@ export class RedditClient {
   private async keylessSearch(
     query: string,
     type: string,
-    options: { readonly subreddit?: string; readonly limit?: number; readonly after?: string },
+    options: {
+      readonly subreddit?: string
+      readonly limit?: number
+      readonly after?: string
+      readonly timeFilter?: string
+    },
   ): Promise<Either<RedditError, Page<RedditPost>>> {
     if (type === "sr") return this.arctic.searchSubreddits(query, options.limit)
     if (type === "user") {
@@ -1053,7 +1062,7 @@ export class RedditClient {
   ): Promise<Either<RedditError, Page<RedditPost>>> {
     const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link", after, before } = options
     if (this.keyless) {
-      const page = await this.keylessSearch(query, type, { subreddit, limit, after })
+      const page = await this.keylessSearch(query, type, { subreddit, limit, after, timeFilter })
       return type === "sr" ? page : page.map((p) => withIgnoredSortNotice(p, sort === "new" ? undefined : sort))
     }
     const params = new URLSearchParams({
@@ -1099,7 +1108,7 @@ export class RedditClient {
       readonly sort?: string
       readonly limit?: number
     } = {},
-  ): Promise<Either<RedditError, { readonly post: RedditPost; readonly comments: readonly RedditComment[] }>> {
+  ): Promise<Either<RedditError, PostComments>> {
     if (this.keyless) return this.arctic.getPostComments(postId, options.limit)
     const { sort = "best", limit = 100 } = options
     const params = new URLSearchParams({
@@ -1108,27 +1117,25 @@ export class RedditClient {
     })
     const context = `Failed to get comments for post ${postId}`
 
-    const attempt = await Try.async(
-      async (): Promise<{ readonly post: RedditPost; readonly comments: readonly RedditComment[] }> => {
-        const response = (
-          await this.makeRequest(
-            `/r/${normalizeSubreddit(subreddit)}/comments/${normalizeThingId(postId)}.json?${params}`,
-          )
-        ).orThrow()
-        if (!response.ok) {
-          throw new HttpError(response.status, `Failed to get comments: HTTP ${response.status}`)
-        }
+    const attempt = await Try.async(async (): Promise<PostComments> => {
+      const response = (
+        await this.makeRequest(
+          `/r/${normalizeSubreddit(subreddit)}/comments/${normalizeThingId(postId)}.json?${params}`,
+        )
+      ).orThrow()
+      if (!response.ok) {
+        throw new HttpError(response.status, `Failed to get comments: HTTP ${response.status}`)
+      }
 
-        const json = (await response.json()) as RedditApiPostCommentsResponse
+      const json = (await response.json()) as RedditApiPostCommentsResponse
 
-        const postData = json[0].data.children[0].data
-        const post = parsePostData(postData)
+      const postData = json[0].data.children[0].data
+      const post = parsePostData(postData)
 
-        const comments = parseCommentTree(json[1].data.children, post.title)
+      const comments = parseCommentTree(json[1].data.children, post.title)
 
-        return { post, comments }
-      },
-    )
+      return { post, comments, moreIds: collectMoreIds(json[1].data.children) }
+    })
 
     return attempt.toEither((error) => classifyRedditError(error, context))
   }
