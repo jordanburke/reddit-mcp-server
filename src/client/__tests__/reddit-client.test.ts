@@ -42,8 +42,8 @@ describe("RedditClient", () => {
       retry: { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 60000 },
     }
 
-    it("short-circuits non-RSS tools with NotAuthenticatedError in anonymous mode", async () => {
-      const result = await new RedditClient(anonConfig).getSubredditInfo("science")
+    it("short-circuits OAuth-only tools with NotAuthenticatedError in anonymous mode", async () => {
+      const result = await new RedditClient(anonConfig).getTrendingSubreddits()
 
       expect(result.isLeft()).toBe(true)
       if (result.isLeft()) {
