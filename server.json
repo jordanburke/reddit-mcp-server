@@ -18,7 +18,7 @@
       "environmentVariables": [
         {
           "name": "REDDIT_CLIENT_ID",
-          "description": "Reddit app client ID (optional - enables higher rate limits)",
+          "description": "Reddit app client ID (optional - live Reddit data; without it, reads come from RSS feeds and the Arctic Shift archive)",
           "isRequired": false,
           "format": "string",
           "isSecret": false

@@ -245,7 +245,7 @@ OAUTH_TOKEN=your_secret_token     # Optional, will generate random token if not 
 
 ### Quick Start Examples
 
-**Zero-setup (RSS fallback, browse/top only):**
+**Zero-setup (keyless: RSS feeds + Arctic Shift archive, most read tools):**
 
 ```bash
 npx reddit-mcp-server

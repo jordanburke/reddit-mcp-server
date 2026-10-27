@@ -75,6 +75,12 @@ function listingCursor(data: { readonly [key: string]: unknown }): Pick<Page<unk
   return { ...after, ...before }
 }
 
+// The archive returns newest-first only; say so when the caller asked for another order.
+function withIgnoredSortNotice<T>(page: Page<T>, sort?: string): Page<T> {
+  if (sort === undefined || sort === "new") return page
+  return { ...page, notice: `Archive results are newest-first; sort="${sort}" was ignored.` }
+}
+
 export class RedditClient {
   private readonly clientId: string
   private readonly clientSecret: string
@@ -423,15 +429,16 @@ export class RedditClient {
       return this.arctic.listSubredditPosts(subreddit, limit, after)
     }
     const rss = await this.rssClient.fetchSubredditPosts(subreddit, sort, timeFilter, limit, after)
-    if (rss.isRight() || !archivable) return rss
-    const rssError = rss.fold(
-      (error) => error.message,
-      () => "",
+    // Retired feeds may answer 200 with an HTML page or an empty feed, so treat "no items" as failure too.
+    const rssProblem = rss.fold(
+      (error) => Option(`failed (${error.message})`),
+      (page) => (page.items.length === 0 ? Option("returned no posts") : Option.none<string>()),
     )
+    if (rssProblem.isEmpty || !archivable) return rss
     const archived = await this.arctic.listSubredditPosts(subreddit, limit, after)
     return archived.map((page) => ({
       ...page,
-      notice: `The RSS feed failed (${rssError}), so these are the newest posts from the Arctic Shift archive, not "${sort}" ranking.`,
+      notice: `The RSS feed ${rssProblem.orElse("failed")}, so these are the newest posts from the Arctic Shift archive, not "${sort}" ranking.`,
     }))
   }
 
@@ -1045,7 +1052,10 @@ export class RedditClient {
     } = {},
   ): Promise<Either<RedditError, Page<RedditPost>>> {
     const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link", after, before } = options
-    if (this.keyless) return this.keylessSearch(query, type, { subreddit, limit, after })
+    if (this.keyless) {
+      const page = await this.keylessSearch(query, type, { subreddit, limit, after })
+      return type === "sr" ? page : page.map((p) => withIgnoredSortNotice(p, sort === "new" ? undefined : sort))
+    }
     const params = new URLSearchParams({
       q: query,
       sort,
@@ -1162,7 +1172,10 @@ export class RedditClient {
       readonly after?: string
     } = {},
   ): Promise<Either<RedditError, Page<RedditPost>>> {
-    if (this.keyless) return this.arctic.getUserPosts(username, options.limit, options.after)
+    if (this.keyless) {
+      const page = await this.arctic.getUserPosts(username, options.limit, options.after)
+      return page.map((p) => withIgnoredSortNotice(p, options.sort))
+    }
     const { sort = "new", timeFilter = "all", limit = 25, after } = options
     const params = new URLSearchParams({
       sort,
@@ -1200,7 +1213,10 @@ export class RedditClient {
       readonly after?: string
     } = {},
   ): Promise<Either<RedditError, Page<RedditComment>>> {
-    if (this.keyless) return this.arctic.getUserComments(username, options.limit, options.after)
+    if (this.keyless) {
+      const page = await this.arctic.getUserComments(username, options.limit, options.after)
+      return page.map((p) => withIgnoredSortNotice(p, options.sort))
+    }
     const { sort = "new", timeFilter = "all", limit = 25, after } = options
     const params = new URLSearchParams({
       sort,

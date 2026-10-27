@@ -350,6 +350,33 @@ describe("RedditClient keyless routing", () => {
     expect(page.notice).toContain('not "hot" ranking')
   })
 
+  it("falls back when a retired feed answers 200 with an HTML page", async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => "<html><body>RSS is gone</body></html>" })
+      .mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+    const page = (await new RedditClient(keylessConfig).getTopPosts("programming", "week", 3)).orThrow()
+
+    expect(page.source).toBe("arctic")
+    expect(page.notice).toContain("returned no posts")
+  })
+
+  it("notes that the archive ignored a non-new sort for user posts", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+    const page = (await new RedditClient(keylessConfig).getUserPosts("spez", { sort: "top", limit: 3 })).orThrow()
+
+    expect(page.notice).toContain('sort="top" was ignored')
+  })
+
+  it("adds no sort notice when the caller asked for new", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(fixture("comments-search")))
+
+    const page = (await new RedditClient(keylessConfig).getUserComments("spez", { sort: "new", limit: 2 })).orThrow()
+
+    expect(page.notice).toBeUndefined()
+  })
+
   it("returns the RSS error for the home feed, which the archive cannot serve", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 410, statusText: "Gone", text: async () => "" })
 

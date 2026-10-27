@@ -388,6 +388,10 @@ server.addTool({
       () => "Not initialized",
       () => "Initialized",
     )}
+- Read Source: ${client.fold(
+      () => "Unknown",
+      (c) => (c.keyless ? "Keyless (RSS feeds + Arctic Shift archive; scores lag)" : "Reddit API (OAuth)"),
+    )}
 - Write Access: ${hasWriteAccess} ${hasWriteAccess === "✓" ? "Available" : "Read-only mode"}
 - Version: ${VERSION}
 
