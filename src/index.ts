@@ -1154,7 +1154,7 @@ server.addTool({
         )
         return `# Reddit Search Results for: "${args.query}"${searchLocation}
 
-Sorted by: ${args.sort} | Time: ${args.time_filter} | Type: ${args.type}
+Sorted by: ${page.source === "arctic" ? "newest first (archive)" : args.sort} | Time: ${args.time_filter} | Type: ${args.type}
 
 ${searchResults}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
       },
