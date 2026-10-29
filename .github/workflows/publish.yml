@@ -69,18 +69,15 @@ jobs:
           curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.7.9/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
           chmod +x ./mcp-publisher
 
-      - name: Login to MCP Registry
-        run: ./mcp-publisher login github-oidc
-
       - name: Wait for npm propagation
         run: |
           VERSION=$(node -p "require('./package.json').version")
           # npm serves a version's metadata minutes before its tarball (1.7.0: ~4.5 vs ~8 min),
-          # so wait for the tarball itself.
+          # so wait for the tarball itself. The query string bypasses the CDN's 5-minute cached 404.
           TARBALL="https://registry.npmjs.org/reddit-mcp-server/-/reddit-mcp-server-${VERSION}.tgz"
           echo "Waiting for ${TARBALL}..."
           for i in $(seq 1 60); do
-            if curl -sfI "${TARBALL}" > /dev/null; then
+            if curl -sSfI "${TARBALL}?probe=${i}" > /dev/null; then
               echo "Version ${VERSION} tarball is live on npm"
               exit 0
             fi
@@ -89,6 +86,10 @@ jobs:
           done
           echo "Version ${VERSION} tarball not on npm after 15 minutes"
           exit 1
+
+      # Log in after the wait: registry tokens last 5 minutes, and the wait can run 15.
+      - name: Login to MCP Registry
+        run: ./mcp-publisher login github-oidc
 
       - name: Publish to MCP Registry
         run: ./mcp-publisher publish
