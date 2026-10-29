@@ -89,7 +89,8 @@ export function analyzeSubredditHealth(subscribers: number, activeUsers: Option<
         ? ["New subreddit still forming its community"]
         : []
 
-  return [...sizeInsights, ...activityInsights, ...ageInsights].join("\n  - ")
+  const insights = [...sizeInsights, ...activityInsights, ...ageInsights]
+  return insights.length > 0 ? insights.join("\n  - ") : "Mid-sized community with no standout activity or age signals"
 }
 
 export function getUserRecommendations(karmaRatio: number, isMod: boolean, accountAgeDays: number): string {

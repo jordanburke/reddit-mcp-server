@@ -187,6 +187,13 @@ describe("formatters", () => {
       expect(result).toContain("Highly active community with strong engagement")
     })
 
+    it("should fall back when no rule matches", () => {
+      // Keyless subreddits have no active-user count, so a mid-size, mid-age one matches nothing.
+      const result = analyzeSubredditHealth(50000, Option.none(), 365)
+
+      expect(result).toBe("Mid-sized community with no standout activity or age signals")
+    })
+
     it("should handle low activity analysis", () => {
       const result = analyzeSubredditHealth(100000, Option(50), 365)
 

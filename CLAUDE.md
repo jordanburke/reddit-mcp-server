@@ -102,7 +102,7 @@ pnpm lint:fix
    - Sorts by creation date only: no hot/top ranking, no home feed, no multireddits (`a+b` is rejected)
    - Pagination cursor is the `created_utc` of the last item, passed back as `before`; it must be digits (validated before use)
    - Scores lag (often 0/1 on recent posts) and comment coverage can be incomplete; pages carry `source: "arctic"` and `index.ts` appends an archive disclaimer
-   - Errors are `{data: null, error}`; empty `data` on a lookup is `NotFoundError`. "Timeout. Maybe slow down a bit" is throttling, retried once after 3s
+   - Errors are `{data: null, error}`; empty `data` on a lookup is `NotFoundError`. 429 and "Timeout. Maybe slow down a bit" are throttling, retried once after the `X-RateLimit-Reset` seconds (capped at 10s; 3s when the header is absent). A second failure reports the reset time
    - Shares `RedditClient`'s `ResponseCache`; sends the server's User-Agent
 
 3. **RSS Client** (`src/client/rss-client.ts`): Zero-credential ranked listings from Reddit's Atom feeds (Reddit retires RSS on 2026-11-13):

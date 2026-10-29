@@ -4,7 +4,7 @@
  * `throw`s are local control flow captured by that `Try` and never escape the method.
  */
 import type { Either } from "functype"
-import { Try } from "functype"
+import { Option, Try } from "functype"
 
 import type {
   Page,
@@ -47,9 +47,34 @@ const MAX_LIMIT = 100
 const MAX_COMMENT_TREE_LIMIT = 500
 const ERROR_TEXT_MAX_LENGTH = 200
 const CURSOR_PATTERN = /^\d{9,10}$/
-// Arctic answers "Timeout. Maybe slow down a bit" when it is throttling expensive queries
-// (keyword search especially). A second try a few seconds later usually succeeds.
-const THROTTLE_RETRY_DELAY_MS = 3_000
+// Arctic answers 429, or "Timeout. Maybe slow down a bit", when it is throttling (keyword
+// search especially). Its X-RateLimit-Reset header gives seconds until the window resets, but
+// the limit is load-based and a retry usually succeeds well before that, so the wait is capped.
+export type ThrottleDelays = { readonly fallbackMs: number; readonly maxWaitMs: number }
+const THROTTLE_DELAYS: ThrottleDelays = { fallbackMs: 3_000, maxWaitMs: 10_000 }
+
+// How long to wait before the one retry: the header's reset time, capped; else the fallback.
+export function throttleWaitMs(resetSeconds: Option<number>, delays: ThrottleDelays): number {
+  return resetSeconds.fold(
+    () => delays.fallbackMs,
+    (seconds) => Math.min(seconds * 1000, delays.maxWaitMs),
+  )
+}
+
+function throttleMessage(resetSeconds: Option<number>): string {
+  return resetSeconds.fold(
+    () =>
+      "Arctic Shift is throttling or timed out on this query. Wait a few seconds and retry; keyword searches on large subreddits are slowest.",
+    (seconds) =>
+      `Arctic Shift is throttling this query. Its limit resets in ${seconds} seconds; retry after that. Keyword searches on large subreddits are slowest.`,
+  )
+}
+
+// X-RateLimit-Reset is whole seconds until the limit resets; absent or malformed means unknown.
+function resetSecondsOf(headers: Headers): Option<number> {
+  const value = Number(headers.get("x-ratelimit-reset") ?? Number.NaN)
+  return Number.isFinite(value) && value >= 0 ? Option(value) : Option.none<number>()
+}
 
 type ArcticResponse<T> = {
   // eslint-disable-next-line functype/prefer-option -- wire format: Arctic Shift returns literal null on error
@@ -130,36 +155,31 @@ function pageOf<T extends { readonly createdUtc: number }>(items: readonly T[], 
 export class ArcticShiftClient {
   private readonly userAgent: string
   private readonly cache?: ResponseCache
-  private readonly throttleRetryDelayMs: number
+  private readonly throttleDelays: ThrottleDelays
 
-  constructor(userAgent: string, cache?: ResponseCache, throttleRetryDelayMs: number = THROTTLE_RETRY_DELAY_MS) {
+  constructor(userAgent: string, cache?: ResponseCache, throttleDelays: ThrottleDelays = THROTTLE_DELAYS) {
     this.userAgent = userAgent
     this.cache = cache
-    this.throttleRetryDelayMs = throttleRetryDelayMs
+    this.throttleDelays = throttleDelays
   }
 
   // GET an Arctic Shift endpoint and return its `data`. Throws a typed RedditError on failure.
   private async request<T>(path: string, params: Record<string, string>, retried: boolean = false): Promise<T> {
     const url = `${BASE_URL}${path}?${new URLSearchParams(params)}`
     const cached = this.cache?.get(url)
-    const { status, body } = cached ?? (await this.fetchBody(url))
-
-    if (status === 429) {
-      throw new HttpError(429, "Arctic Shift rate limit reached. It is a free service; wait a minute and try again.")
-    }
+    // Only successes are cached, so a cached entry never needs its rate-limit headers.
+    const { status, body, resetSeconds } =
+      cached !== undefined ? { ...cached, resetSeconds: Option.none<number>() } : await this.fetchBody(url)
 
     const json = Try(() => JSON.parse(body) as ArcticResponse<T>).orElse({ data: null, error: `HTTP ${status}` })
     if (status < 200 || status >= 300 || json.error !== undefined || json.data === null) {
       const detail = (json.error ?? `HTTP ${status}`).slice(0, ERROR_TEXT_MAX_LENGTH)
-      if (/timeout|timed out/i.test(detail)) {
+      if (status === 429 || /timeout|timed out/i.test(detail)) {
         if (!retried) {
-          await new Promise((resolve) => setTimeout(resolve, this.throttleRetryDelayMs))
+          await new Promise((resolve) => setTimeout(resolve, throttleWaitMs(resetSeconds, this.throttleDelays)))
           return this.request<T>(path, params, true)
         }
-        throw new HttpError(
-          status,
-          "Arctic Shift is throttling or timed out on this query. Wait a few seconds and retry; keyword searches on large subreddits are slowest.",
-        )
+        throw new HttpError(status, throttleMessage(resetSeconds))
       }
       throw status >= 400
         ? new HttpError(status, `Arctic Shift error: ${detail}`)
@@ -170,9 +190,11 @@ export class ArcticShiftClient {
     return json.data
   }
 
-  private async fetchBody(url: string): Promise<{ readonly status: number; readonly body: string }> {
+  private async fetchBody(
+    url: string,
+  ): Promise<{ readonly status: number; readonly body: string; readonly resetSeconds: Option<number> }> {
     const response = await fetch(url, { headers: { "User-Agent": this.userAgent, Accept: "application/json" } })
-    return { status: response.status, body: await response.text() }
+    return { status: response.status, body: await response.text(), resetSeconds: resetSecondsOf(response.headers) }
   }
 
   async listSubredditPosts(
