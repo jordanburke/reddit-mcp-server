@@ -400,6 +400,24 @@ describe("RedditClient keyless routing", () => {
     expect(page.notice).toContain('sort="top" was ignored')
   })
 
+  it("adds no sort notice for a search with the default relevance sort", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+    const page = (await new RedditClient(keylessConfig).searchReddit("duckdb", { subreddit: "programming" })).orThrow()
+
+    expect(page.notice).toBeUndefined()
+  })
+
+  it("notes that the archive ignored an explicit search sort", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+    const page = (
+      await new RedditClient(keylessConfig).searchReddit("duckdb", { subreddit: "programming", sort: "top" })
+    ).orThrow()
+
+    expect(page.notice).toContain('sort="top" was ignored')
+  })
+
   it("adds no sort notice when the caller asked for new", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse(fixture("comments-search")))
 

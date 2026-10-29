@@ -146,6 +146,12 @@ describe("formatters", () => {
       expect(result).toContain("Yet to receive community interaction")
     })
 
+    it("should fall back when no rule matches", () => {
+      const result = analyzePostEngagement(65, 0.8, 19)
+
+      expect(result).toBe("Moderate engagement with no standout signals")
+    })
+
     it("should handle edge cases", () => {
       const result = analyzePostEngagement(0, 0, 0)
 

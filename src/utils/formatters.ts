@@ -57,7 +57,7 @@ export function analyzePostEngagement(score: number, ratio: number, numComments:
           : []),
   ]
 
-  return insights.join("\n  - ")
+  return insights.length > 0 ? insights.join("\n  - ") : "Moderate engagement with no standout signals"
 }
 
 export function analyzeSubredditHealth(subscribers: number, activeUsers: Option<number>, ageDays: number): string {

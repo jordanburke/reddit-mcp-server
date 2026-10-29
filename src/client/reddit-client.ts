@@ -1063,7 +1063,8 @@ export class RedditClient {
     const { subreddit, sort = "relevance", timeFilter = "all", limit = 25, type = "link", after, before } = options
     if (this.keyless) {
       const page = await this.keylessSearch(query, type, { subreddit, limit, after, timeFilter })
-      return type === "sr" ? page : page.map((p) => withIgnoredSortNotice(p, sort === "new" ? undefined : sort))
+      // "relevance" is the tool's default, so it isn't flagged; the tool header names the archive order instead.
+      return type === "sr" || sort === "relevance" ? page : page.map((p) => withIgnoredSortNotice(p, sort))
     }
     const params = new URLSearchParams({
       q: query,
