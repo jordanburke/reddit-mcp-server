@@ -11,12 +11,19 @@ import type {
   FormattedPostInfo,
   Page,
   RedditAuthMode,
+  RedditPost,
   RedditSafeMode,
   RetryConfig,
   SafeModeConfig,
   UserContent,
 } from "./types"
-import { formatCommentInfo, formatPostInfo, formatSubredditInfo, formatUserInfo } from "./utils/formatters"
+import {
+  formatCommentInfo,
+  formatPostInfo,
+  formatSubredditInfo,
+  formatUserInfo,
+  truncateText,
+} from "./utils/formatters"
 
 // Load environment variables
 dotenv.config({ quiet: true })
@@ -111,21 +118,51 @@ function archiveDisclaimer(client: { readonly keyless: boolean }): string {
   return client.keyless ? ARCHIVE_DISCLAIMER : ""
 }
 
-function formatPostSummary(post: FormattedPostInfo, index: number, source?: string): string {
-  const statsLines =
-    source === "rss" || source === "arctic"
-      ? []
-      : [
-          `- Score: ${post.stats.score.toLocaleString()} (${(post.stats.upvoteRatio * 100).toFixed(1)}% upvoted)`,
-          `- Comments: ${post.stats.comments.toLocaleString()}`,
-        ]
+// Score and comment lines for a listed post. RSS has no stats and archive stats lag, so both omit them.
+function postStatsLines(score: number, upvoteRatio: number, comments: number, source?: string): readonly string[] {
+  return source === "rss" || source === "arctic"
+    ? []
+    : [
+        `- Score: ${score.toLocaleString()} (${(upvoteRatio * 100).toFixed(1)}% upvoted)`,
+        `- Comments: ${comments.toLocaleString()}`,
+      ]
+}
 
+function formatPostSummary(post: FormattedPostInfo, index: number, source?: string): string {
   return [
     `### ${index + 1}. ${post.title}`,
     `- Author: u/${post.author}`,
-    ...statsLines,
+    ...postStatsLines(post.stats.score, post.stats.upvoteRatio, post.stats.comments, source),
     `- Posted: ${post.metadata.posted}`,
     `- Link: ${post.links.shortLink}`,
+  ].join("\n")
+}
+
+const SEARCH_ABOUT_MAX_LENGTH = 200
+
+// One search hit. Subreddit (type=sr) and user (type=user) hits ride in the RedditPost shape with
+// the subscriber or karma count in the title, so they skip the post-only fields.
+function formatSearchResult(post: RedditPost, index: number, type: string, source?: string): string {
+  const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
+  const heading = `### ${index + 1}. ${[post.title, ...flags].join(" ")}`
+  const created = new Date(post.createdUtc * 1000).toLocaleString()
+  const link = `- Link: https://reddit.com${post.permalink}`
+
+  if (type === "sr") {
+    // Descriptions can hold line breaks and markdown rules; flatten them so they stay one list item.
+    const about = truncateText((post.selftext ?? "").replace(/\s+/g, " ").trim(), SEARCH_ABOUT_MAX_LENGTH)
+    return [heading, ...(about !== "" ? [`- About: ${about}`] : []), `- Created: ${created}`, link].join("\n")
+  }
+  if (type === "user") {
+    return [heading, `- Account created: ${created}`, link].join("\n")
+  }
+  return [
+    heading,
+    `- Subreddit: r/${post.subreddit}`,
+    `- Author: u/${post.author}`,
+    ...postStatsLines(post.score, post.upvoteRatio, post.numComments, source),
+    `- Posted: ${created}`,
+    link,
   ].join("\n")
 }
 
@@ -551,7 +588,7 @@ server.addTool({
 server.addTool({
   name: "get_user_posts",
   description:
-    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
+    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive, newest first and without scores or comment counts. Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
   annotations: {
     title: "Get User Posts",
     readOnlyHint: true,
@@ -600,12 +637,13 @@ server.addTool({
           .map((post, index) => {
             const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
 
-            return `### ${index + 1}. ${post.title} ${flags.join(" ")}
-- Subreddit: r/${post.subreddit}
-- Score: ${post.score.toLocaleString()} (${(post.upvoteRatio * 100).toFixed(1)}% upvoted)
-- Comments: ${post.numComments.toLocaleString()}
-- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
-- Link: https://reddit.com${post.permalink}`
+            return [
+              `### ${index + 1}. ${[post.title, ...flags].join(" ")}`,
+              `- Subreddit: r/${post.subreddit}`,
+              ...postStatsLines(post.score, post.upvoteRatio, post.numComments, page.source),
+              `- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}`,
+              `- Link: https://reddit.com${post.permalink}`,
+            ].join("\n")
           })
           .join("\n\n")
 
@@ -620,7 +658,7 @@ ${postSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
 server.addTool({
   name: "get_user_comments",
   description:
-    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
+    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive, newest first and without scores. Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
   annotations: {
     title: "Get User Comments",
     readOnlyHint: true,
@@ -676,8 +714,7 @@ In r/${comment.subreddit} on "${comment.submissionTitle}"
 
 > ${formatted.content}
 
-- Score: ${comment.score.toLocaleString()}
-- Posted: ${new Date(comment.createdUtc * 1000).toLocaleString()}
+${page.source === "arctic" ? "" : `- Score: ${comment.score.toLocaleString()}\n`}- Posted: ${new Date(comment.createdUtc * 1000).toLocaleString()}
 - Link: ${formatted.link}`
           })
           .join("\n\n")
@@ -694,7 +731,7 @@ ${commentSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
 server.addTool({
   name: "get_reddit_post",
   description:
-    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
+    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; works without credentials via the Arctic Shift archive, which omits the score, upvote ratio, comment count and engagement analysis. Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
   annotations: {
     title: "Get Reddit Post",
     readOnlyHint: true,
@@ -731,9 +768,13 @@ server.addTool({
 ${formattedPost.content}
 
 ## Stats
-- Score: ${formattedPost.stats.score.toLocaleString()}
+${
+  client.keyless
+    ? "- Not shown: the archive's scores and comment counts lag, and are often 0 or 1 on recent posts."
+    : `- Score: ${formattedPost.stats.score.toLocaleString()}
 - Upvote Ratio: ${(formattedPost.stats.upvoteRatio * 100).toFixed(1)}%
-- Comments: ${formattedPost.stats.comments.toLocaleString()}
+- Comments: ${formattedPost.stats.comments.toLocaleString()}`
+}
 
 ## Metadata
 - Posted: ${formattedPost.metadata.posted}
@@ -744,10 +785,10 @@ ${formattedPost.content}
 - Full Post: ${formattedPost.links.fullPost}
 - Short Link: ${formattedPost.links.shortLink}
 
-## Engagement Analysis
-- ${formattedPost.engagementAnalysis.replace(/\n {2}- /g, "\n- ")}
-
-## Best Time to Engage
+${
+  // The analysis reads the same lagging stats, so archive mode leaves it out.
+  client.keyless ? "" : `## Engagement Analysis\n- ${formattedPost.engagementAnalysis.replace(/\n {2}- /g, "\n- ")}\n\n`
+}## Best Time to Engage
 ${formattedPost.bestTimeToEngage}${archiveDisclaimer(client)}`
       },
     )
@@ -1064,7 +1105,7 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
 server.addTool({
   name: "search_reddit",
   description:
-    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only. Without credentials it uses the Arctic Shift archive, which needs `subreddit` for post search, matches subreddit names by prefix, and cannot search users. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
+    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only. Without credentials it uses the Arctic Shift archive, which needs `subreddit` for post search, matches subreddit names by prefix, cannot search users, and omits scores and comment counts. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
   annotations: {
     title: "Search Reddit",
     readOnlyHint: true,
@@ -1135,17 +1176,7 @@ server.addTool({
         }
 
         const searchResults = posts
-          .map((post, index) => {
-            const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
-
-            return `### ${index + 1}. ${post.title} ${flags.join(" ")}
-- Subreddit: r/${post.subreddit}
-- Author: u/${post.author}
-- Score: ${post.score.toLocaleString()} (${(post.upvoteRatio * 100).toFixed(1)}% upvoted)
-- Comments: ${post.numComments.toLocaleString()}
-- Posted: ${new Date(post.createdUtc * 1000).toLocaleString()}
-- Link: https://reddit.com${post.permalink}`
-          })
+          .map((post, index) => formatSearchResult(post, index, args.type, page.source))
           .join("\n\n")
 
         const searchLocation = Option(args.subreddit).fold(

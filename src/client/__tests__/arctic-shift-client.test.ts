@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
+import { Option } from "functype"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { RedditClientConfig } from "../../types"
-import { ArcticShiftClient } from "../arctic-shift-client"
+import { ArcticShiftClient, throttleWaitMs } from "../arctic-shift-client"
 import { RedditClient } from "../reddit-client"
 import { ResponseCache } from "../response-cache"
 
@@ -13,9 +14,11 @@ const fixture = (name: string): string => readFileSync(resolve(__dirname, `fixtu
 
 const originalFetch = global.fetch
 
-function jsonResponse(body: string, status: number = 200) {
-  return { ok: status >= 200 && status < 300, status, text: async () => body }
+function jsonResponse(body: string, status: number = 200, headers: Record<string, string> = {}) {
+  return { ok: status >= 200 && status < 300, status, headers: new Headers(headers), text: async () => body }
 }
+
+const NO_WAIT = { fallbackMs: 0, maxWaitMs: 0 }
 
 function calledUrl(mockFetch: ReturnType<typeof vi.fn>, call: number = 0): URL {
   return new URL(mockFetch.mock.calls[call]![0] as string)
@@ -23,7 +26,7 @@ function calledUrl(mockFetch: ReturnType<typeof vi.fn>, call: number = 0): URL {
 
 describe("ArcticShiftClient", () => {
   const mockFetch = vi.fn()
-  const arctic = new ArcticShiftClient("test-agent/1.0", undefined, 0)
+  const arctic = new ArcticShiftClient("test-agent/1.0", undefined, NO_WAIT)
 
   beforeEach(() => {
     mockFetch.mockReset()
@@ -140,13 +143,65 @@ describe("ArcticShiftClient", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 
-    it("reports a 429 as a rate limit", async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse("rate limited", 429))
+    it("does not tell a timed-out query to wait for the minute-aligned reset", async () => {
+      mockFetch.mockResolvedValue(
+        jsonResponse('{"data":null,"error":"Timeout. Maybe slow down a bit"}', 422, { "x-ratelimit-reset": "52" }),
+      )
+
+      const error = (await arctic.listSubredditPosts("programming")).swap().orThrow()
+
+      expect(error.message).toContain("Wait a few seconds")
+      expect(error.message).not.toContain("52")
+    })
+
+    it("ignores a blank reset header", async () => {
+      mockFetch.mockResolvedValue(jsonResponse("rate limited", 429, { "x-ratelimit-reset": " " }))
+
+      const error = (await arctic.listSubredditPosts("programming")).swap().orThrow()
+
+      expect(error.message).toContain("wait a minute")
+      expect(error.message).not.toContain("0 seconds")
+    })
+
+    it("waits the header's reset time before retrying", async () => {
+      vi.useFakeTimers()
+      try {
+        const timed = new ArcticShiftClient("test-agent/1.0", undefined, { fallbackMs: 3_000, maxWaitMs: 10_000 })
+        mockFetch
+          .mockResolvedValueOnce(
+            jsonResponse('{"data":null,"error":"Timeout. Maybe slow down a bit"}', 422, { "x-ratelimit-reset": "5" }),
+          )
+          .mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+        const pending = timed.listSubredditPosts("programming", 3)
+        await vi.advanceTimersByTimeAsync(4_999)
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+        expect((await pending).isRight()).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it("retries a 429 once, then reports the reset time from the header", async () => {
+      mockFetch.mockResolvedValue(jsonResponse("rate limited", 429, { "x-ratelimit-reset": "47" }))
 
       const error = (await arctic.listSubredditPosts("programming")).swap().orThrow()
 
       expect(error._tag).toBe("HttpError")
-      expect(error.message).toContain("rate limit")
+      expect(error.message).toContain("resets in 47 seconds")
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it("recovers when a retried 429 succeeds", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse("rate limited", 429, { "x-ratelimit-reset": "5" }))
+        .mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
+
+      const result = await arctic.listSubredditPosts("programming", 3)
+
+      expect(result.isRight()).toBe(true)
     })
 
     it("handles a non-JSON body", async () => {
@@ -167,9 +222,25 @@ describe("ArcticShiftClient", () => {
     })
   })
 
+  describe("throttleWaitMs", () => {
+    const delays = { fallbackMs: 3_000, maxWaitMs: 10_000 }
+
+    it("waits for the header's reset time when it is under the cap", () => {
+      expect(throttleWaitMs(Option(4), delays)).toBe(4_000)
+    })
+
+    it("caps a long reset time", () => {
+      expect(throttleWaitMs(Option(47), delays)).toBe(10_000)
+    })
+
+    it("falls back when the header is absent", () => {
+      expect(throttleWaitMs(Option.none<number>(), delays)).toBe(3_000)
+    })
+  })
+
   describe("caching", () => {
     it("serves a repeated request from the shared response cache", async () => {
-      const cached = new ArcticShiftClient("test-agent/1.0", new ResponseCache({ maxBytes: 1_000_000 }), 0)
+      const cached = new ArcticShiftClient("test-agent/1.0", new ResponseCache({ maxBytes: 1_000_000 }), NO_WAIT)
       mockFetch.mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
 
       await cached.listSubredditPosts("programming", 3)
@@ -180,7 +251,7 @@ describe("ArcticShiftClient", () => {
     })
 
     it("does not cache errors", async () => {
-      const cached = new ArcticShiftClient("test-agent/1.0", new ResponseCache({ maxBytes: 1_000_000 }), 0)
+      const cached = new ArcticShiftClient("test-agent/1.0", new ResponseCache({ maxBytes: 1_000_000 }), NO_WAIT)
       mockFetch
         .mockResolvedValueOnce(jsonResponse('{"data":null,"error":"Invalid subreddit"}', 400))
         .mockResolvedValueOnce(jsonResponse(fixture("posts-search")))
