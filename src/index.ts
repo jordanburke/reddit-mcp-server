@@ -588,7 +588,7 @@ server.addTool({
 server.addTool({
   name: "get_user_posts",
   description:
-    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
+    "Get posts submitted by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive, newest first and without scores or comment counts. Returns a page of posts (title, subreddit, score, upvote ratio, comment count, permalink) plus an `after` cursor for paging. Use get_user_comments for their comments, or get_user_info for karma/profile stats. Do NOT use this to search a subreddit — use search_reddit or browse_subreddit.",
   annotations: {
     title: "Get User Posts",
     readOnlyHint: true,
@@ -658,7 +658,7 @@ ${postSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
 server.addTool({
   name: "get_user_comments",
   description:
-    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
+    "Get comments made by a specific user, with sort (new/hot/top) and time filter. Read-only; works without credentials via the Arctic Shift archive, newest first and without scores. Returns a page of comments (subreddit, parent post title, body excerpt, score, permalink) plus an `after` cursor. Use get_user_posts for their submissions, or get_user_info for karma/profile stats. Do NOT use this to read one post's thread — use get_post_comments.",
   annotations: {
     title: "Get User Comments",
     readOnlyHint: true,
@@ -731,7 +731,7 @@ ${commentSummaries}${nextPageHint(page.after)}${sourceDisclaimer(page)}`
 server.addTool({
   name: "get_reddit_post",
   description:
-    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; works without credentials via the Arctic Shift archive (scores lag). Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
+    "Get a single post by subreddit + post id: title, author, self-text or link content, score, upvote ratio, comment count, flair/flags, and an engagement analysis. Read-only; works without credentials via the Arctic Shift archive, which omits the score, upvote ratio, comment count and engagement analysis. Returns the post only — use get_post_comments for its comment thread. Do NOT use this to list a subreddit's posts (use browse_subreddit / get_top_posts) or to find posts by keyword (use search_reddit).",
   annotations: {
     title: "Get Reddit Post",
     readOnlyHint: true,
@@ -1105,7 +1105,7 @@ ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).j
 server.addTool({
   name: "search_reddit",
   description:
-    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only. Without credentials it uses the Arctic Shift archive, which needs `subreddit` for post search, matches subreddit names by prefix, and cannot search users. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
+    "Search Reddit for posts — or subreddits/users via `type` — optionally scoped to one subreddit, with sort and time filters. Read-only. Without credentials it uses the Arctic Shift archive, which needs `subreddit` for post search, matches subreddit names by prefix, cannot search users, and omits scores and comment counts. Returns a page of results (title, subreddit, author, score, comments, link) plus an `after` cursor for paging. Use this to find content by keyword; use browse_subreddit / get_top_posts to list a known subreddit's feed instead.",
   annotations: {
     title: "Search Reddit",
     readOnlyHint: true,

@@ -191,6 +191,12 @@ describe("formatters", () => {
       // Keyless subreddits have no active-user count, so a mid-size, mid-age one matches nothing.
       const result = analyzeSubredditHealth(50000, Option.none(), 365)
 
+      expect(result).toBe("Mid-sized community with no standout age signals; active-user count unavailable")
+    })
+
+    it("should fall back without implying activity was unmeasured when it was", () => {
+      const result = analyzeSubredditHealth(50000, Option(2500), 365)
+
       expect(result).toBe("Mid-sized community with no standout activity or age signals")
     })
 

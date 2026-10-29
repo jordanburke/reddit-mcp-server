@@ -240,7 +240,7 @@ Without OAuth credentials, reads come from two free sources:
 | `get_subreddit_info`, `get_subreddit_rules` | Arctic Shift           |                                                                         |
 | `search_reddit`                             | Arctic Shift           | Posts need `subreddit`; `type=sr` matches name prefixes; no `type=user` |
 
-**Archive caveats:** scores and comment counts lag, and are often 0 or 1 on recent posts. Keyword search on large subreddits is slow, and the archive throttles it. The server waits up to 10 seconds and retries once, then reports how long until the limit resets. Every archive result ends with a note naming the source.
+**Archive caveats:** scores and comment counts lag, and are often 0 or 1 on recent posts. Keyword search on large subreddits is slow, and the archive throttles it. The server waits up to 10 seconds and retries once. If that fails too, the error says when to retry. Every archive result ends with a note naming the source.
 
 **Still needs OAuth:** `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, and all write tools.
 

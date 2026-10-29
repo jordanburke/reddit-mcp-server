@@ -61,19 +61,24 @@ export function throttleWaitMs(resetSeconds: Option<number>, delays: ThrottleDel
   )
 }
 
-function throttleMessage(resetSeconds: Option<number>): string {
+// The reset header rides on every response and only marks the next minute boundary, so it is
+// advice for a real 429. A query timeout usually clears in seconds.
+function throttleMessage(status: number, resetSeconds: Option<number>): string {
+  if (status !== 429) {
+    return "Arctic Shift timed out on this query, which it does under load. Wait a few seconds and retry; keyword searches on large subreddits are slowest."
+  }
   return resetSeconds.fold(
-    () =>
-      "Arctic Shift is throttling or timed out on this query. Wait a few seconds and retry; keyword searches on large subreddits are slowest.",
-    (seconds) =>
-      `Arctic Shift is throttling this query. Its limit resets in ${seconds} seconds; retry after that. Keyword searches on large subreddits are slowest.`,
+    () => "Arctic Shift's rate limit was reached. It is a free service; wait a minute and retry.",
+    (seconds) => `Arctic Shift's rate limit was reached. It resets in ${seconds} seconds; retry after that.`,
   )
 }
 
 // X-RateLimit-Reset is whole seconds until the limit resets; absent or malformed means unknown.
 function resetSecondsOf(headers: Headers): Option<number> {
-  const value = Number(headers.get("x-ratelimit-reset") ?? Number.NaN)
-  return Number.isFinite(value) && value >= 0 ? Option(value) : Option.none<number>()
+  return Option(headers.get("x-ratelimit-reset"))
+    .filter((raw) => raw.trim() !== "")
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value >= 0)
 }
 
 type ArcticResponse<T> = {
@@ -179,7 +184,7 @@ export class ArcticShiftClient {
           await new Promise((resolve) => setTimeout(resolve, throttleWaitMs(resetSeconds, this.throttleDelays)))
           return this.request<T>(path, params, true)
         }
-        throw new HttpError(status, throttleMessage(resetSeconds))
+        throw new HttpError(status, throttleMessage(status, resetSeconds))
       }
       throw status >= 400
         ? new HttpError(status, `Arctic Shift error: ${detail}`)
