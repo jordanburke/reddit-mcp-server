@@ -8,11 +8,23 @@ All notable changes to this project will be documented in this file.
 
 - The server runs on [somamcp](https://github.com/sapientsai/somamcp) 2.2 (MCP TypeScript SDK 2.x) instead of FastMCP. Tool names, descriptions and parameters are unchanged; tools now also carry a top-level `title`, and their input schemas are JSON Schema draft 2020-12
 - Tool errors read as plain text: `Failed to search: …` instead of `Tool 'search_reddit' execution failed: Failed to search: …`, still with `isError: true`
+- Invalid tool arguments come back as a tool result with `isError: true` (`Invalid arguments for tool 'get_user_posts': Too big: …`), not a JSON-RPC `-32602` protocol error, and the message no longer names the field
+- HTTP serving is stateless: no `Mcp-Session-Id`, and `GET`/`DELETE /mcp` answer 405. MCP SDK clients handle this
+- `/health` answers JSON (`{"name":"reddit-mcp-server","status":"running"}`) instead of the text `✓ Ok`. `/health/detail` is new and takes the bearer token when `OAUTH_ENABLED=true`
+- Requests over 4 MiB get 413
+- 401 and 403 responses carry the standard reason phrases instead of custom ones; the status codes are unchanged
+- The Docker Compose health check probes `/health` instead of `/`, which was always 404
 - `functype` 1.22
 
 ### Removed
 
 - The legacy SSE endpoint (`/sse`). HTTP clients use Streamable HTTP at `/mcp`
+- `/ready`. Use `/health`
+
+### Unchanged on purpose
+
+- CORS: preflight and responses still allow any origin, as under FastMCP
+- Keepalive: HTTP responses stream as SSE with periodic keepalive frames, as FastMCP's pings did, so idle-timeout proxies don't cut long tool calls
 
 ## [1.5.0] - 2026-06-22
 

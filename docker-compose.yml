@@ -20,7 +20,7 @@ services:
     #   - OAUTH_TOKEN=${OAUTH_TOKEN}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

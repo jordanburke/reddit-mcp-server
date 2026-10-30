@@ -352,7 +352,7 @@ if (process.env.OAUTH_ENABLED === "true" && process.env.OAUTH_TOKEN === undefine
 function authenticateBearer(request: Request | undefined): Promise<Record<string, unknown>> {
   const authHeader = getRequestHeader(request, "authorization")
   if (!authHeader?.startsWith("Bearer ")) {
-    return Promise.reject(new Response(null, { status: 401, statusText: "Missing or invalid Authorization header" }))
+    return Promise.reject(new Response(null, { status: 401 }))
   }
 
   const tokenHash = crypto
@@ -361,7 +361,7 @@ function authenticateBearer(request: Request | undefined): Promise<Record<string
     .digest()
   const expectedHash = crypto.createHash("sha256").update(Buffer.from(oauthToken)).digest()
   if (!crypto.timingSafeEqual(tokenHash, expectedHash)) {
-    return Promise.reject(new Response(null, { status: 403, statusText: "Invalid token" }))
+    return Promise.reject(new Response(null, { status: 403 }))
   }
 
   return Promise.resolve({ authenticated: true })
@@ -400,6 +400,12 @@ For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Res
   ...(useHttp && process.env.OAUTH_ENABLED === "true" ? { authenticate: authenticateBearer } : {}),
   // test_reddit_mcp_server already reports server health; keep the tool list to Reddit's tools.
   enableIntrospection: false,
+  // Keep /health and /health/detail; FastMCP served no /info or /dashboard.
+  enableInfoEndpoint: false,
+  enableDashboard: false,
+  // FastMCP pinged HTTP clients every 5s. Keepalive frames stop an idle-timeout proxy from cutting a
+  // tool call that waits out Reddit's rate-limit retries (up to 60s each).
+  streamKeepalive: { enabled: useHttp },
 })
 
 // Test tool
@@ -1669,6 +1675,8 @@ async function main() {
         port,
         host,
         endpoint: "/mcp",
+        // FastMCP answered CORS preflight with Access-Control-Allow-Origin: *; keep browser clients working.
+        cors: true,
       },
     })
     console.error(`[Setup] HTTP server ready at http://${host}:${port}/mcp`)

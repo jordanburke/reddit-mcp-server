@@ -50,6 +50,9 @@ The server supports two transport modes:
    - Used for Docker deployments and direct execution
    - Access via: `http://localhost:3000/mcp`
    - Streamable HTTP only: somamcp has no legacy SSE endpoint, so `/sse` (served under FastMCP until 1.7.x) returns 404
+   - Stateless: no `Mcp-Session-Id`; `GET`/`DELETE /mcp` answer 405. Bodies over 4 MiB get 413
+   - `cors: true` (any origin, as under FastMCP) and `streamKeepalive` (SSE keepalive frames, so idle-timeout proxies don't cut a tool call waiting out 429 retries)
+   - `/health` returns JSON and needs no token; `/health/detail` takes the bearer token when `OAUTH_ENABLED=true`. `/info` and `/dashboard` are turned off; `/ready` no longer exists
 
 2. **Stdio Mode**: For CLI and npx usage
    - Automatically enabled when using `npx reddit-mcp-server` or the bin entry point
@@ -292,7 +295,7 @@ The HTTP server supports optional OAuth protection:
   - Provide your own: `OAUTH_TOKEN=your-secure-token`
   - Auto-generate: Server creates a random 32-character token on startup
 - **Usage**: Include `Authorization: Bearer <token>` header in requests to `/mcp`
-- **Responses**: no or malformed header → 401; wrong token → 403. Ignored on stdio
+- **Responses**: no or malformed header → 401; wrong token → 403 on `/mcp` (somamcp answers 401 on `/health/detail`). Ignored on stdio
 
 Example request with OAuth:
 
