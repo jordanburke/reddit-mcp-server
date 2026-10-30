@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Reddit MCP (Model Context Protocol) server that provides tools for interacting with the Reddit API. It's built with TypeScript and uses FastMCP to expose Reddit functionality as tools that can be used by AI assistants.
+This is a Reddit MCP (Model Context Protocol) server that provides tools for interacting with the Reddit API. It's built with TypeScript and uses [somamcp](https://github.com/sapientsai/somamcp) (SapientsAI's MCP framework on the MCP TypeScript SDK 2.x) to expose Reddit functionality as tools that can be used by AI assistants.
 
 ## Available Tools
 
@@ -49,7 +49,10 @@ The server supports two transport modes:
 1. **HTTP Server (Default)**: Runs on port 3000 with `/mcp` endpoint
    - Used for Docker deployments and direct execution
    - Access via: `http://localhost:3000/mcp`
-   - SSE endpoint: `http://localhost:3000/sse`
+   - Streamable HTTP only: somamcp has no legacy SSE endpoint, so `/sse` (served under FastMCP until 1.7.x) returns 404
+   - Stateless: no `Mcp-Session-Id`; `GET`/`DELETE /mcp` answer 405. Bodies over 4 MiB get 413
+   - `cors: true` (any origin, as under FastMCP) and `streamKeepalive` (SSE keepalive frames, so idle-timeout proxies don't cut a tool call waiting out 429 retries)
+   - `/health` returns JSON and needs no token; `/health/detail` takes the bearer token when `OAUTH_ENABLED=true`. `/info` and `/dashboard` are turned off; `/ready` no longer exists
 
 2. **Stdio Mode**: For CLI and npx usage
    - Automatically enabled when using `npx reddit-mcp-server` or the bin entry point
@@ -113,6 +116,9 @@ pnpm lint:fix
    - Returns typed `RedditError` (`HttpError` / `UnknownError`), not bare `Error`
 
 4. **Server and Tools** (`src/index.ts`): There is no `src/tools/` directory — every MCP tool is registered here with `server.addTool`:
+   - The server is `createServer` from `somamcp/node` (port + stdio), with `enableIntrospection: false` so the tool list stays Reddit's 25 tools (`test_reddit_mcp_server` covers health)
+   - Tools never throw: a failure returns `toolError(text)`, a `ContentResult` with `isError: true`. somamcp would turn a thrown error into an auto-classified JSON report whose keyword-matched suggestions mislead (a missing `subreddit` reads as "internal error"). `fold` needs `fold<string | ContentResult>(…)`, because it takes its type from the first branch
+   - `authenticateBearer` is attached only for HTTP with `OAUTH_ENABLED=true`; on stdio somamcp calls `authenticate` once with no request, which would always fail
    - Shared render helpers: `formatPostSummary`, `formatUserContent`, `nextPageHint`, `sourceDisclaimer` (pages), `archiveDisclaimer` (single-item keyless tools)
    - Client setup (`setupRedditClient`) and transport startup (stdio or httpStream)
    - `src/bin.ts` is the npx/CLI entry point: it forces stdio mode and handles `--help`/`--version`
@@ -289,6 +295,7 @@ The HTTP server supports optional OAuth protection:
   - Provide your own: `OAUTH_TOKEN=your-secure-token`
   - Auto-generate: Server creates a random 32-character token on startup
 - **Usage**: Include `Authorization: Bearer <token>` header in requests to `/mcp`
+- **Responses**: no or malformed header → 401; wrong token → 403 on `/mcp` (somamcp answers 401 on `/health/detail`). Ignored on stdio
 
 Example request with OAuth:
 
@@ -298,7 +305,7 @@ curl -H "Authorization: Bearer your-token" http://localhost:3000/mcp
 
 ## Key Implementation Details
 
-1. **Error Handling**: All tools use try-catch blocks and return MCP-compliant error responses
+1. **Error Handling**: Client methods return `Either<RedditError, T>`; each tool folds it into its text or a `toolError` result (`isError: true`), never a throw
 2. **Rate Limiting**: Built into the Reddit client to respect API limits
 3. **Token Refresh**: Automatic when tokens expire via authentication checks
 4. **Singleton Client**: Ensures single authenticated instance across all tools
