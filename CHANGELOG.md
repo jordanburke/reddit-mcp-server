@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- The server runs on [somamcp](https://github.com/sapientsai/somamcp) 2.2 (MCP TypeScript SDK 2.x) instead of FastMCP. Tool names, descriptions and parameters are unchanged; tools now also carry a top-level `title`, and their input schemas are JSON Schema draft 2020-12
+- Tool errors read as plain text: `Failed to search: …` instead of `Tool 'search_reddit' execution failed: Failed to search: …`, still with `isError: true`
+- `functype` 1.22
+
+### Removed
+
+- The legacy SSE endpoint (`/sse`). HTTP clients use Streamable HTTP at `/mcp`
+
 ## [1.5.0] - 2026-06-22
 
 ### Added

@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import dotenv from "dotenv"
-import { FastMCP } from "fastmcp"
 import { Option } from "functype"
+import { type ContentResult, createServer, getRequestHeader } from "somamcp/node"
 import { z } from "zod"
 
 import { getRedditClient, initializeRedditClient } from "./client/reddit-client"
@@ -92,6 +92,12 @@ function buildSafeModeConfig(safeMode: RedditSafeMode): SafeModeConfig {
         maxRecentHashes: 20,
       }
   }
+}
+
+// A tool failure the model can read as plain text. somamcp passes a returned ContentResult through
+// unchanged; a thrown error would come back as an auto-classified JSON report instead.
+function toolError(text: string): ContentResult {
+  return { content: [{ text, type: "text" }], isError: true }
 }
 
 function unwrapClient() {
@@ -341,8 +347,29 @@ if (process.env.OAUTH_ENABLED === "true" && process.env.OAUTH_TOKEN === undefine
   console.error(`[Auth] Generated OAuth token: ${oauthToken}`)
 }
 
-// Create FastMCP server
-const server = new FastMCP({
+// Bearer-token check for the HTTP transport. Rejecting with a Response sends that response.
+// eslint-disable-next-line functype/prefer-option -- somamcp's authenticate signature
+function authenticateBearer(request: Request | undefined): Promise<Record<string, unknown>> {
+  const authHeader = getRequestHeader(request, "authorization")
+  if (!authHeader?.startsWith("Bearer ")) {
+    return Promise.reject(new Response(null, { status: 401, statusText: "Missing or invalid Authorization header" }))
+  }
+
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(Buffer.from(authHeader.slice(7)))
+    .digest()
+  const expectedHash = crypto.createHash("sha256").update(Buffer.from(oauthToken)).digest()
+  if (!crypto.timingSafeEqual(tokenHash, expectedHash)) {
+    return Promise.reject(new Response(null, { status: 403, statusText: "Invalid token" }))
+  }
+
+  return Promise.resolve({ authenticated: true })
+}
+
+const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
+
+const server = createServer({
   name: "reddit-mcp-server",
   version: VERSION,
   instructions: `A comprehensive Reddit MCP server that provides tools for interacting with Reddit API.
@@ -369,34 +396,10 @@ IMPORTANT - Reddit Responsible Builder Policy compliance:
 - Bots must NOT send private/direct messages without explicit user consent
 For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy`,
 
-  // Optional OAuth configuration for HTTP transport
-  ...(process.env.OAUTH_ENABLED === "true" && {
-    authenticate: (request: { readonly headers: { readonly authorization?: string } }) => {
-      const authHeader = request.headers.authorization
-      if (!authHeader?.startsWith("Bearer ")) {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Response(null, {
-          status: 401,
-          statusText: "Missing or invalid Authorization header",
-        })
-      }
-
-      const token = authHeader.slice(7)
-      const tokenBuffer = Buffer.from(token)
-      const expectedBuffer = Buffer.from(oauthToken)
-      const tokenHash = crypto.createHash("sha256").update(tokenBuffer).digest()
-      const expectedHash = crypto.createHash("sha256").update(expectedBuffer).digest()
-      if (!crypto.timingSafeEqual(tokenHash, expectedHash)) {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Response(null, {
-          status: 403,
-          statusText: "Invalid token",
-        })
-      }
-
-      return Promise.resolve({ authenticated: true })
-    },
-  }),
+  // On stdio somamcp calls authenticate once with no request, so only HTTP gets the bearer check.
+  ...(useHttp && process.env.OAUTH_ENABLED === "true" ? { authenticate: authenticateBearer } : {}),
+  // test_reddit_mcp_server already reports server health; keep the tool list to Reddit's tools.
+  enableIntrospection: false,
 })
 
 // Test tool
@@ -455,11 +458,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getUser(args.username)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get user info: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get user info: ${err.message}`),
       (user) => {
         const formattedUser = formatUserInfo(user)
 
@@ -501,11 +501,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getMe()
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get authenticated user: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get authenticated user: ${err.message}`),
       (user) => {
         const formattedUser = formatUserInfo(user)
 
@@ -545,11 +542,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getMyOverview({ limit: args.limit, after: args.after })
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get your overview: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get your overview: ${err.message}`),
       (content) => formatUserContent("Your Overview", content),
     )
   },
@@ -575,11 +569,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getMySaved({ limit: args.limit, after: args.after })
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get saved content: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get saved content: ${err.message}`),
       (content) => formatUserContent("Your Saved Content", content),
     )
   },
@@ -622,11 +613,8 @@ server.addTool({
       after: args.after,
     })
 
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get user posts: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get user posts: ${err.message}`),
       (page) => {
         const posts = page.items
         if (posts.length === 0) {
@@ -692,11 +680,8 @@ server.addTool({
       after: args.after,
     })
 
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get user comments: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get user comments: ${err.message}`),
       (page) => {
         const comments = page.items
         if (comments.length === 0) {
@@ -749,11 +734,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getPost(args.post_id, args.subreddit)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get post: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get post: ${err.message}`),
       (post) => {
         const formattedPost = formatPostInfo(post)
 
@@ -825,11 +807,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getTopPosts(args.subreddit ?? "", args.time_filter, args.limit, args.after)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get top posts: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get top posts: ${err.message}`),
       (page) => {
         const posts = page.items
         if (posts.length === 0) {
@@ -899,11 +878,8 @@ server.addTool({
       args.limit,
       args.after,
     )
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to browse subreddit: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to browse subreddit: ${err.message}`),
       (page) => {
         const posts = page.items
         const location = Option(args.subreddit).fold(
@@ -946,11 +922,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getSubredditInfo(args.subreddit_name)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get subreddit info: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get subreddit info: ${err.message}`),
       (subreddit) => {
         const formattedSubreddit = formatSubredditInfo(subreddit)
 
@@ -1006,11 +979,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getSubredditRules(args.subreddit_name)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get subreddit rules: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get subreddit rules: ${err.message}`),
       (rules) => {
         if (rules.length === 0) {
           return `r/${args.subreddit_name} has no listed subreddit-specific rules.`
@@ -1048,11 +1018,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getPostFlairs(args.subreddit_name)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get post flairs: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get post flairs: ${err.message}`),
       (flairs) => {
         if (flairs.length === 0) {
           return `r/${args.subreddit_name} has no selectable link flairs (or none are visible to this account).`
@@ -1089,11 +1056,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getTrendingSubreddits()
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get trending subreddits: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get trending subreddits: ${err.message}`),
       (trendingSubreddits) => `# Trending Subreddits
 
 ${trendingSubreddits.map((subreddit, index) => `${index + 1}. r/${subreddit}`).join("\n")}`,
@@ -1147,8 +1111,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (args.query.trim() === "") {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error("Search query cannot be empty")
+      return toolError("Search query cannot be empty")
     }
 
     const result = await client.searchReddit(args.query, {
@@ -1160,11 +1123,8 @@ server.addTool({
       after: args.after,
     })
 
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to search: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to search: ${err.message}`),
       (page) => {
         const posts = page.items
         if (posts.length === 0) {
@@ -1234,8 +1194,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
@@ -1248,11 +1207,8 @@ server.addTool({
       args.flair_id,
       args.flair_text,
     )
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to create post: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to create post: ${err.message}`),
       (post) => {
         const formattedPost = formatPostInfo(post)
 
@@ -1293,18 +1249,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.replyToPost(args.post_id, args.content)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to reply: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to reply: ${err.message}`),
       (comment) => `# Reply Posted Successfully
 
 ## Comment Details
@@ -1339,18 +1291,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.deletePost(args.thing_id)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to delete post: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to delete post: ${err.message}`),
       () => `# Post Deleted Successfully
 
 The post ${args.thing_id} has been permanently deleted from Reddit.
@@ -1382,18 +1330,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.deleteComment(args.thing_id)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to delete comment: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to delete comment: ${err.message}`),
       () => `# Comment Deleted Successfully
 
 The comment ${args.thing_id} has been permanently deleted from Reddit.
@@ -1428,18 +1372,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.editPost(args.thing_id, args.new_text)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to edit post: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to edit post: ${err.message}`),
       () => `# Post Edited Successfully
 
 The post ${args.thing_id} has been updated with your new content.
@@ -1478,18 +1418,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.editComment(args.thing_id, args.new_text)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to edit comment: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to edit comment: ${err.message}`),
       () => `# Comment Edited Successfully
 
 The comment ${args.thing_id} has been updated with your new content.
@@ -1525,18 +1461,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.saveContent(args.thing_id, args.category)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to save content: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to save content: ${err.message}`),
       () => `# Content Saved Successfully
 
 ${args.thing_id} has been saved to your account. Use get_my_saved to view your saved items.`,
@@ -1566,18 +1498,14 @@ server.addTool({
     const client = unwrapClient()
 
     if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error(
+      return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
     }
 
     const result = await client.unsaveContent(args.thing_id)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to unsave content: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to unsave content: ${err.message}`),
       () => `# Content Unsaved Successfully
 
 ${args.thing_id} has been removed from your saved items.`,
@@ -1619,8 +1547,7 @@ server.addTool({
     const client = unwrapClient()
 
     if (args.post_id === "" || args.subreddit === "") {
-      // eslint-disable-next-line functype/prefer-either
-      throw new Error("post_id and subreddit are required")
+      return toolError("post_id and subreddit are required")
     }
 
     const result = await client.getPostComments(args.post_id, args.subreddit, {
@@ -1628,11 +1555,8 @@ server.addTool({
       limit: args.limit,
     })
 
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to get comments: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to get comments: ${err.message}`),
       ({ post, comments, moreIds }) => {
         // Archive scores and counts lag, so the keyless header leaves them out.
         const statsLine = client.keyless
@@ -1703,11 +1627,8 @@ server.addTool({
     const client = unwrapClient()
 
     const result = await client.getMoreComments(args.link_id, args.comment_ids)
-    return result.fold(
-      (err) => {
-        // eslint-disable-next-line functype/prefer-either
-        throw new Error(`Failed to expand comments: ${err.message}`)
-      },
+    return result.fold<string | ContentResult>(
+      (err) => toolError(`Failed to expand comments: ${err.message}`),
       (comments) => {
         if (comments.length === 0) {
           return "No additional comments were returned for those ids."
@@ -1737,7 +1658,6 @@ ${commentList}${archiveDisclaimer(client)}`
 async function main() {
   await setupRedditClient()
 
-  const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
   const port = parseInt(process.env.PORT ?? "3000")
   const host = process.env.HOST ?? "127.0.0.1"
 
@@ -1752,7 +1672,6 @@ async function main() {
       },
     })
     console.error(`[Setup] HTTP server ready at http://${host}:${port}/mcp`)
-    console.error(`[Setup] SSE endpoint available at http://${host}:${port}/sse`)
   } else {
     console.error("[Setup] Starting in stdio mode")
     if (process.stdin.isTTY) {

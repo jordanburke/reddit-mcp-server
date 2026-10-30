@@ -71,8 +71,8 @@
   "dependencies": {
     "dotenv": "^18.0.9",
     "fast-xml-parser": "^5.11.2",
-    "fastmcp": "^4.23.7",
-    "functype": "^1.20.0",
+    "functype": "^1.22.0",
+    "somamcp": "^2.2.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
