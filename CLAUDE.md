@@ -295,7 +295,8 @@ The HTTP server supports optional OAuth protection:
   - Provide your own: `OAUTH_TOKEN=your-secure-token`
   - Auto-generate: Server creates a random 32-character token on startup
 - **Usage**: Include `Authorization: Bearer <token>` header in requests to `/mcp`
-- **Responses**: no or malformed header → 401; wrong token → 403 on `/mcp` (somamcp answers 401 on `/health/detail`). Ignored on stdio
+- **Responses**: no or malformed header → 401; wrong token → 403, on both `/mcp` and `/health/detail`. Ignored on stdio
+- **With OAuth off**, `/health/detail` always answers 401, because it has no token to check
 
 Example request with OAuth:
 

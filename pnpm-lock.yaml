@@ -201,8 +201,8 @@ importers:
         specifier: ^1.22.0
         version: 1.22.0
       somamcp:
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: ^2.2.1
+        version: 2.2.1
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -1863,8 +1863,8 @@ packages:
     resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
     engines: {node: '>=18'}
 
-  somamcp@2.2.0:
-    resolution: {integrity: sha512-h8RHhChBmoup/BMFxuAA0vSUdw/hs6JSj8l0IeegPvsf3PnwFzorebbRJbDZyE8I6wqr3kRVY7NZHQUTUozJNA==}
+  somamcp@2.2.1:
+    resolution: {integrity: sha512-08v9yLQ4wDTGNggelTvZybrpayf2i4GgQ544lDCFZIMr0EqC72Np9Zfr0AgqQgU2kVP1FbCIoNw2MUy17aoLsQ==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -3615,7 +3615,7 @@ snapshots:
       mrmime: 2.0.1
       totalist: 3.0.1
 
-  somamcp@2.2.0:
+  somamcp@2.2.1:
     dependencies:
       '@hono/node-server': 2.1.5(hono@4.13.14)
       '@modelcontextprotocol/client': 2.4.0

@@ -10,11 +10,11 @@ All notable changes to this project will be documented in this file.
 - Tool errors read as plain text: `Failed to search: …` instead of `Tool 'search_reddit' execution failed: Failed to search: …`, still with `isError: true`
 - Invalid tool arguments come back as a tool result with `isError: true` (`Invalid arguments for tool 'get_user_posts': Too big: …`), not a JSON-RPC `-32602` protocol error, and the message no longer names the field
 - HTTP serving is stateless: no `Mcp-Session-Id`, and `GET`/`DELETE /mcp` answer 405. MCP SDK clients handle this
-- `/health` answers JSON (`{"name":"reddit-mcp-server","status":"running"}`) instead of the text `✓ Ok`. `/health/detail` is new and takes the bearer token when `OAUTH_ENABLED=true`
+- `/health` answers JSON (`{"name":"reddit-mcp-server","status":"running"}`) instead of the text `✓ Ok`. `/health/detail` is new and takes the bearer token when `OAUTH_ENABLED=true`; with OAuth off it always answers 401
 - Requests over 4 MiB get 413
 - 401 and 403 responses carry the standard reason phrases instead of custom ones; the status codes are unchanged
 - The Docker Compose health check probes `/health` instead of `/`, which was always 404
-- `functype` 1.22
+- `functype` 1.22; `somamcp` 2.2.1, so `/health/detail` answers a wrong token with 403, as `/mcp` does
 
 ### Removed
 
