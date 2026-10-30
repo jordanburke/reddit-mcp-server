@@ -7,6 +7,7 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - "ts-builds"
   - "*functype*"
+  - "somamcp"
 
 publicHoistPattern:
   - "*eslint*"
