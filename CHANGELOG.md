@@ -56,6 +56,7 @@ A major version because HTTP clients lose `/sse` and `/ready`, and invalid argum
 
 - Keyless reads through the [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive, a free third-party Reddit archive, for posts, comment threads, users, subreddit info and rules, and search within a subreddit. Ranked listings stay on RSS and fall back to the archive's newest posts when RSS fails. Every archive result says where it came from
 - `get_post_comments` lists the ids of collapsed comments, so `get_more_comments` can expand them
+- `test_reddit_mcp_server` reports whether reads come from Reddit's API or keyless sources
 
 ### Changed
 
@@ -87,6 +88,7 @@ A major version because HTTP clients lose `/sse` and `/ready`, and invalid argum
 ### Fixed
 
 - `search_reddit` with `type=sr` or `type=user` always returned no results
+- The publish workflow tolerates an npm version that is already published
 
 ## [1.6.0] - 2026-09-17
 

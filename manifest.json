@@ -154,7 +154,7 @@
     "reddit_username": {
       "type": "string",
       "title": "Reddit Username",
-      "description": "Your Reddit username (required for write operations and 100 req/min)",
+      "description": "Your Reddit username (required for write operations)",
       "required": false,
       "sensitive": false
     },

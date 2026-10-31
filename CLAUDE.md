@@ -27,7 +27,7 @@ Tools marked **keyless** work without OAuth credentials via RSS and/or the Arcti
 - `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren (**keyless**)
 - `get_user_posts` - Get posts submitted by a specific user (**keyless**)
 - `get_user_comments` - Get comments made by a specific user (**keyless**)
-- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 without credentials)
+- `get_post_flairs` - List a subreddit's available link flairs (requires OAuth credentials)
 
 ### Write Tools (User Credentials Required)
 
@@ -246,7 +246,8 @@ REDDIT_CACHE_MAX_MB=50           # Cache size cap in MB (LRU eviction beyond thi
 REDDIT_MAX_RETRIES=3             # Retries on HTTP 429 with Retry-After backoff (0 disables)
 
 # Transport Configuration
-# TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)
+# TRANSPORT_TYPE=httpStream       # Serve Streamable HTTP at /mcp (default: stdio)
+# HOST=127.0.0.1                  # HTTP bind address (default; the Docker image sets 0.0.0.0)
 PORT=3000                          # HTTP server port (default: 3000)
 
 # OAuth Authentication (for HTTP server)

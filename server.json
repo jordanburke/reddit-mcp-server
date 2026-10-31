@@ -46,7 +46,7 @@
         },
         {
           "name": "REDDIT_AUTH_MODE",
-          "description": "Authentication mode: auto, authenticated, or anonymous",
+          "description": "Authentication mode: auto or authenticated (anonymous is a deprecated alias for keyless)",
           "isRequired": false,
           "format": "string",
           "isSecret": false

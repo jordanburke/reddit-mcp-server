@@ -285,7 +285,7 @@ Without OAuth credentials, reads come from two free sources:
 
 **Archive caveats:** scores and comment counts lag, and are often 0 or 1 on recent posts. Keyword search on large subreddits is slow, and the archive throttles it. The server waits up to 10 seconds and retries once. If that fails too, the error says when to retry. Every archive result ends with a note naming the source.
 
-**Still needs OAuth:** `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, and all write tools.
+**Still needs OAuth:** `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, `search_reddit` with `type=user`, and all write tools.
 
 ### Read-Only Access (OAuth)
 
@@ -402,7 +402,8 @@ services:
       - REDDIT_PASSWORD=${REDDIT_PASSWORD}
       - REDDIT_SAFE_MODE=standard
       - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-      - OAUTH_TOKEN=${OAUTH_TOKEN}
+      # Set OAUTH_TOKEN on the host when OAUTH_ENABLED=true. An empty value rejects every request.
+      # - OAUTH_TOKEN=${OAUTH_TOKEN}
     restart: unless-stopped
 ```
 
