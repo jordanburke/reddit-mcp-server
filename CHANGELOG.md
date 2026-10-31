@@ -2,15 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.0.1] - 2026-10-31
 
 ### Fixed
 
 - A blank environment value (`KEY=`, as in a copied `.env.example`) now counts as unset everywhere:
   - `OAUTH_TOKEN=` with `OAUTH_ENABLED=true` generated no token and rejected every HTTP request; the server now generates one and prints it
   - `REDDIT_AUTH_MODE=authenticated` with blank `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` started keyless; it now fails at startup, as documented
-  - Blank `REDDIT_USERNAME`/`REDDIT_PASSWORD` counted as write credentials, so `test_reddit_mcp_server` reported write access and write tools tried to log in
-  - Blank `PORT`, `HOST`, `TRANSPORT_TYPE`, `REDDIT_AUTH_MODE`, `REDDIT_SAFE_MODE`, cache and retry settings now take their defaults, instead of `NaN`, an empty bind address, or a startup error
+  - Blank `REDDIT_USERNAME`/`REDDIT_PASSWORD` counted as write credentials, so `test_reddit_mcp_server` reported write access and the write tools' credential checks passed
+  - Blank `PORT` and `HOST` gave a `NaN` port and an empty bind address; they now default to 3000 and 127.0.0.1
+  - Blank `REDDIT_AUTH_MODE` and `REDDIT_SAFE_MODE` stopped the server with an "invalid mode" error; they now default to `auto` and `standard`
+  - Blank `REDDIT_MAX_RETRIES` turned off 429 retries; it now defaults to 3
+  - Blank `REDDIT_USER_AGENT` sent an empty `User-Agent` to Reddit; the server now uses its auto-generated agent
+  - Blank `REDDIT_BOT_FOOTER` with `REDDIT_BOT_DISCLOSURE=auto` posted no disclosure; the built-in footer is used
+
+### Changed
+
+- The README, CLAUDE.md, ROADMAP, SECURITY, `.env.example`, `manifest.json` and `server.json` descriptions, CLI help and startup message are brought up to date with 2.0 and Reddit's API shutdown, citing Reddit's 2026-09-30 announcements
+- The CHANGELOG gains entries for 1.5.1 through 1.7.2
 
 ## [2.0.0] - 2026-10-31
 
