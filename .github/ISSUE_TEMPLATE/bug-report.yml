@@ -37,9 +37,10 @@ body:
     attributes:
       label: Auth mode
       options:
-        - auto
+        - auto, with OAuth credentials
+        - auto, no credentials (keyless)
         - authenticated
-        - anonymous
+        - anonymous (deprecated alias for keyless)
         - Not sure
       default: 0
     validations:
@@ -49,7 +50,7 @@ body:
     attributes:
       label: Version
       description: Package version or commit hash.
-      placeholder: "1.3.0 or abc1234"
+      placeholder: "2.0.0 or abc1234"
     validations:
       required: false
   - type: textarea

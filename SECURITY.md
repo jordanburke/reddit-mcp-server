@@ -8,8 +8,8 @@ older release.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.5.x   | ✅        |
-| < 1.5   | ❌        |
+| 2.0.x   | ✅        |
+| < 2.0   | ❌        |
 
 ## Reporting a vulnerability
 
@@ -56,6 +56,7 @@ In scope:
 Out of scope:
 
 - Reddit API behavior, rate limits, and outages. Report those to Reddit.
+- The Arctic Shift archive's data, throttling, and outages (keyless mode reads from it). Report those to [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift).
 - Findings that require an attacker who already controls the machine or the environment
   variables the server reads.
 - Exposing the HTTP transport to an untrusted network on purpose. It binds `127.0.0.1` by
@@ -66,9 +67,9 @@ Out of scope:
 
 ## Operational notes
 
-- Write tools (`create_post`, `reply_to_post`, `edit_post`, `edit_comment`, `delete_post`,
-  `delete_comment`) require `REDDIT_USERNAME` and `REDDIT_PASSWORD`. Omit those variables and
-  the server can only read.
+- Write tools (`create_post`, `reply_to_post`, `edit_post`, `edit_comment`, `save_content`,
+  `unsave_content`, `delete_post`, `delete_comment`) require `REDDIT_USERNAME` and
+  `REDDIT_PASSWORD`. Omit those variables and the server can only read.
 - Credentials are read from the environment and are never written to disk or included in tool
   responses.
 - Deletions are permanent. `REDDIT_SAFE_MODE=standard` or `strict` adds write delays and

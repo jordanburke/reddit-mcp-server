@@ -297,8 +297,9 @@ async function setupRedditClient() {
     console.error("[Setup] Keyless mode — no OAuth credentials detected.")
     console.error("[Setup] Reads come from RSS feeds (ranked listings, until Reddit retires them 2026-11-13)")
     console.error("[Setup] and the Arctic Shift archive (a free third-party Reddit archive; scores lag).")
-    console.error("[Setup] Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET for full API access (100 req/min).")
-    console.error("[Setup] See: https://www.reddit.com/wiki/api")
+    console.error("[Setup] Existing REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET still give live data (60-100 req/min).")
+    console.error("[Setup] Reddit takes no new API access requests and closes its public API in March 2027.")
+    console.error("[Setup] See: https://github.com/jordanburke/reddit-mcp-server#reddit-is-closing-its-public-api")
   } else {
     console.error("[Setup] Testing Reddit API connection...")
     const isConnected = await client.checkAuthentication()
