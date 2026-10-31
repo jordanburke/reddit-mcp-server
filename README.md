@@ -104,15 +104,26 @@ Leave out the two variables to run keyless.
 | `get_reddit_post`         | Get a specific Reddit post with engagement analysis                         |
 | `get_top_posts`           | Get top posts from a subreddit or home feed                                 |
 | `browse_subreddit`        | Browse a subreddit/home feed by sort (hot, new, top, rising, controversial) |
+| `get_post_comments`       | Get comments from a specific post with threading                            |
+| `get_more_comments`       | Expand collapsed comments in a thread                                       |
 | `get_user_info`           | Get detailed information about a Reddit user                                |
 | `get_user_posts`          | Get posts submitted by a specific user                                      |
 | `get_user_comments`       | Get comments made by a specific user                                        |
 | `get_subreddit_info`      | Get subreddit details and statistics                                        |
-| `get_trending_subreddits` | Get currently trending subreddits                                           |
-| `get_post_comments`       | Get comments from a specific post with threading                            |
-| `search_reddit`           | Search for posts across Reddit                                              |
+| `get_subreddit_rules`     | Get a subreddit's posting rules                                             |
+| `search_reddit`           | Search for posts, subreddits, or users                                      |
+| `get_trending_subreddits` | Get currently trending subreddits (needs OAuth)                             |
+| `get_post_flairs`         | List a subreddit's available post flairs (needs OAuth)                      |
+| `get_me`                  | Get your own account info (needs OAuth and user credentials)                |
+| `get_my_overview`         | Get your own recent posts and comments (needs OAuth and user credentials)   |
+| `get_my_saved`            | Get your saved posts and comments (needs OAuth and user credentials)        |
+| `test_reddit_mcp_server`  | Check server status and configuration                                       |
+
+Most read tools also work without credentials. See [Keyless Mode](#keyless-mode) for each tool's limits.
 
 ### Write Tools (Require User Credentials)
+
+Write tools need Reddit's API, so they need OAuth credentials plus `REDDIT_USERNAME` and `REDDIT_PASSWORD`. Reddit closes its public API in March 2027 ([details](#reddit-is-closing-its-public-api)).
 
 | Tool             | Description                                    |
 | ---------------- | ---------------------------------------------- |
@@ -144,7 +155,7 @@ Leave out the two variables to run keyless.
 | `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)                       |
 | `REDDIT_MAX_RETRIES`    | No       | `3`            | Retries on HTTP 429 with Retry-After backoff (`0` to disable)         |
 
-Reddit closed self-service app creation in November 2025. See [Authentication](#authentication) for what works without them.
+Credentials are optional. See [Keyless Mode](#keyless-mode) for what works without them.
 
 ### Full MCP Config Example
 
@@ -232,7 +243,7 @@ export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
 
 ### ⚠️ Reddit API Changes (2026)
 
-**Anonymous mode no longer works.** As of mid-2026, Reddit blocks all unauthenticated API requests with HTTP 403. OAuth credentials are now required for any API access.
+**Reddit's unauthenticated API no longer works.** As of mid-2026, Reddit blocks unauthenticated API requests with HTTP 403, so reading Reddit's API needs OAuth credentials. `REDDIT_AUTH_MODE=anonymous` still exists, but it is now an alias for [keyless mode](#keyless-mode).
 
 **Reddit is closing its public API.** See [Reddit is closing its public API](#reddit-is-closing-its-public-api) for the dates and what this server does about them.
 
@@ -274,7 +285,7 @@ Without OAuth credentials, reads come from two free sources:
 
 **Archive caveats:** scores and comment counts lag, and are often 0 or 1 on recent posts. Keyword search on large subreddits is slow, and the archive throttles it. The server waits up to 10 seconds and retries once. If that fails too, the error says when to retry. Every archive result ends with a note naming the source.
 
-**Still needs OAuth:** `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, and all write tools.
+**Still needs OAuth:** `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, `search_reddit` with `type=user`, and all write tools.
 
 ### Read-Only Access (OAuth)
 
@@ -310,7 +321,9 @@ To create posts, reply, edit, or delete content, add your Reddit username and pa
 ```bash
 pnpm install        # Install dependencies
 pnpm build          # Build TypeScript
-pnpm dev            # Build and run MCP inspector
+pnpm dev            # Rebuild on every change
+pnpm inspect        # Build and open the MCP inspector
+pnpm validate       # Format, lint, typecheck, test and build
 pnpm test           # Run tests
 pnpm lint           # Lint code
 pnpm format         # Format code
@@ -321,7 +334,6 @@ pnpm format         # Format code
 ```bash
 npx reddit-mcp-server --version         # Show version
 npx reddit-mcp-server --help            # Show help
-npx reddit-mcp-server --generate-token  # Generate OAuth token for HTTP mode
 ```
 
 ## HTTP Server Mode
@@ -332,22 +344,29 @@ For Docker deployments or web-based clients, use HTTP transport:
 TRANSPORT_TYPE=httpStream PORT=3000 node dist/index.js
 ```
 
+- The MCP endpoint is Streamable HTTP at `/mcp`. Version 2.0 removed the legacy SSE endpoint (`/sse`) and `/ready`.
+- The server binds `127.0.0.1` unless you set `HOST`. The Docker image sets `HOST=0.0.0.0`.
+- `/health` answers `{"name":"reddit-mcp-server","status":"running"}` and needs no token.
+
 ### With OAuth Protection
 
 ```bash
 export OAUTH_ENABLED=true
-export OAUTH_TOKEN=$(npx reddit-mcp-server --generate-token | tail -1)
+export OAUTH_TOKEN=$(openssl rand -hex 32)
 TRANSPORT_TYPE=httpStream node dist/index.js
 ```
 
-Make authenticated requests:
+If you leave `OAUTH_TOKEN` unset, the server generates one and prints it at startup. Make authenticated requests:
 
 ```bash
 curl -H "Authorization: Bearer $OAUTH_TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{"method":"tools/list","params":{}}' \
+     -H "Accept: application/json, text/event-stream" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
      http://localhost:3000/mcp
 ```
+
+A request with no token gets 401, and a wrong token gets 403.
 
 ## Docker
 
@@ -366,6 +385,8 @@ docker run -d \
   ghcr.io/jordanburke/reddit-mcp-server:latest
 ```
 
+Leave out the two credential variables to run the container keyless.
+
 ### Docker Compose
 
 ```yaml
@@ -381,7 +402,8 @@ services:
       - REDDIT_PASSWORD=${REDDIT_PASSWORD}
       - REDDIT_SAFE_MODE=standard
       - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-      - OAUTH_TOKEN=${OAUTH_TOKEN}
+      # Set OAUTH_TOKEN on the host when OAUTH_ENABLED=true. An empty value rejects every request.
+      # - OAUTH_TOKEN=${OAUTH_TOKEN}
     restart: unless-stopped
 ```
 

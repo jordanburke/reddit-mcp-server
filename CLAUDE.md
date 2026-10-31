@@ -27,7 +27,7 @@ Tools marked **keyless** work without OAuth credentials via RSS and/or the Arcti
 - `get_more_comments` - Expand truncated "load more" comment stubs via /api/morechildren (**keyless**)
 - `get_user_posts` - Get posts submitted by a specific user (**keyless**)
 - `get_user_comments` - Get comments made by a specific user (**keyless**)
-- `get_post_flairs` - List a subreddit's available link flairs (requires user creds; may 403 without credentials)
+- `get_post_flairs` - List a subreddit's available link flairs (requires OAuth credentials)
 
 ### Write Tools (User Credentials Required)
 
@@ -46,16 +46,16 @@ Tools marked **keyless** work without OAuth credentials via RSS and/or the Arcti
 
 The server supports two transport modes:
 
-1. **HTTP Server (Default)**: Runs on port 3000 with `/mcp` endpoint
-   - Used for Docker deployments and direct execution
-   - Access via: `http://localhost:3000/mcp`
+1. **HTTP Server**: set `TRANSPORT_TYPE=httpStream` (the Docker image does); runs on port 3000 with the `/mcp` endpoint
+   - Used for Docker deployments and web-based clients
+   - Access via: `http://localhost:3000/mcp`. Binds `127.0.0.1` unless `HOST` is set
    - Streamable HTTP only: somamcp has no legacy SSE endpoint, so `/sse` (served under FastMCP until 1.7.x) returns 404
    - Stateless: no `Mcp-Session-Id`; `GET`/`DELETE /mcp` answer 405. Bodies over 4 MiB get 413
    - `cors: true` (any origin, as under FastMCP) and `streamKeepalive` (SSE keepalive frames, so idle-timeout proxies don't cut a tool call waiting out 429 retries)
    - `/health` returns JSON and needs no token; `/health/detail` takes the bearer token when `OAUTH_ENABLED=true`. `/info` and `/dashboard` are turned off; `/ready` no longer exists
 
-2. **Stdio Mode**: For CLI and npx usage
-   - Automatically enabled when using `npx reddit-mcp-server` or the bin entry point
+2. **Stdio Mode (default)**: For CLI and npx usage
+   - Used whenever `TRANSPORT_TYPE` is unset, including `npx reddit-mcp-server` and `node dist/index.js`
    - Used for integration with Claude Desktop and other MCP clients
 
 ## Development Commands
@@ -64,14 +64,17 @@ The server supports two transport modes:
 # Install dependencies
 pnpm install
 
-# Build TypeScript to JavaScript with tsup
+# Build TypeScript to JavaScript with tsdown (via ts-builds)
 pnpm build
 
-# Run the MCP inspector for development/testing
+# Build, then open the MCP inspector for development/testing
 pnpm inspect
 
-# Build and run inspector in one command
+# Rebuild on every change (tsdown --watch)
 pnpm dev
+
+# Format, lint, typecheck, test and build in one go (run before committing)
+pnpm validate
 
 # Build and start the server via npx
 pnpm start
@@ -95,7 +98,7 @@ pnpm lint:fix
 
 1. **Reddit Client** (`src/client/reddit-client.ts`): Singleton pattern implementation that handles:
    - OAuth2 authentication (client credentials and password flow)
-   - Automatic token refresh via axios interceptors
+   - Token refresh before a request when the token has expired, and once more on a 401
    - Rate limiting and error handling
    - Keyless routing (RSS + Arctic Shift) when no OAuth credentials are available
    - Both read-only and authenticated operations
@@ -133,7 +136,9 @@ pnpm lint:fix
 
 ### Authentication Flow
 
-**Reddit now requires OAuth credentials for all API access** (mid-2026). Anonymous/unauthenticated requests are blocked with HTTP 403 across all networks. Self-service app creation at `/prefs/apps` was closed in November 2025 — new developers must request access through Reddit Developer Support.
+**Reddit now requires OAuth credentials for all API access** (mid-2026). Anonymous/unauthenticated requests are blocked with HTTP 403 across all networks. Self-service app creation at `/prefs/apps` was closed in November 2025, and from 2026-10-31 Reddit accepts no new requests for public API access.
+
+**Reddit is closing its public API.** Its own posts of 2026-09-30 set the dates ([r/redditdev](https://www.reddit.com/r/redditdev/comments/1wubcvf/), [r/modnews](https://www.reddit.com/r/modnews/comments/1wubgvt/)): no new API access requests from 2026-10-31; RSS feeds end 2026-11-13; API access starts closing for unregistered apps on 2027-01-12; public API access closes for everyone in March 2027. When that happens, the OAuth path and every write tool stop working. Arctic Shift [collects its data through Reddit's API](https://github.com/ArthurHeitmann/arctic_shift/blob/master/file_content_explanations.md), so the keyless archive may stop getting new posts then too. README.md's "Reddit is closing its public API" section is the user-facing version; keep the two in step.
 
 The server supports three authentication modes configured via `REDDIT_AUTH_MODE`:
 
@@ -173,11 +178,11 @@ The server includes optional safeguards to protect against Reddit's spam detecti
 
 - **Rate Limiting**: Enforces minimum delays between write operations to avoid spam flags
 - **Duplicate Detection**: Blocks identical content from being posted, with clear error messages
-- **Smart User-Agent**: Auto-generates Reddit-compliant User-Agent format (`typescript:reddit-mcp-server:1.1.0 (by /u/USERNAME)`) when username is provided
+- **Smart User-Agent**: Auto-generates Reddit-compliant User-Agent format (`typescript:reddit-mcp-server:<version> (by /u/USERNAME)`) when username is provided
 
 ### Response Caching (Rate-Limit Relief)
 
-Read-only GET requests are cached in-memory to reduce pressure on Reddit's tight rate limits (~10 req/min anonymous, 60-100 authenticated). Configured via `REDDIT_CACHE` (default `on`, set `off` to disable) and `REDDIT_CACHE_MAX_MB` (default `50`).
+Read-only GET requests are cached in-memory to reduce pressure on Reddit's rate limits (60-100 req/min with OAuth) and on the free Arctic Shift archive. Configured via `REDDIT_CACHE` (default `on`, set `off` to disable) and `REDDIT_CACHE_MAX_MB` (default `50`).
 
 - **Adaptive TTLs** (`src/client/response-cache.ts`): volatile listings (hot/new/rising) and comment threads cache for 60s; top/controversial, search, and user/subreddit `about` cache for 300s; everything else 120s.
 - **Bounded LRU**: total cached bytes are capped at `REDDIT_CACHE_MAX_MB`; least-recently-used entries are evicted first. A single response larger than the cap is never cached.
@@ -221,7 +226,7 @@ Environment variables:
 # Reddit API Credentials (optional — without them, reads are keyless: RSS feeds + the Arctic Shift archive)
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
-REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "RedditMCPServer/1.1.0"
+REDDIT_USER_AGENT=YourApp/1.0.0  # Optional, defaults to "typescript:reddit-mcp-server:<version> (by /u/<REDDIT_USERNAME or anonymous>)"
 
 # Reddit User Credentials (optional, for write operations)
 REDDIT_USERNAME=your_username
@@ -241,7 +246,8 @@ REDDIT_CACHE_MAX_MB=50           # Cache size cap in MB (LRU eviction beyond thi
 REDDIT_MAX_RETRIES=3             # Retries on HTTP 429 with Retry-After backoff (0 disables)
 
 # Transport Configuration
-# TRANSPORT_TYPE=stdio            # Uncomment for stdio mode (default: httpStream for node, stdio for npx/bin)
+# TRANSPORT_TYPE=httpStream       # Serve Streamable HTTP at /mcp (default: stdio)
+# HOST=127.0.0.1                  # HTTP bind address (default; the Docker image sets 0.0.0.0)
 PORT=3000                          # HTTP server port (default: 3000)
 
 # OAuth Authentication (for HTTP server)

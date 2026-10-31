@@ -29,15 +29,21 @@ expects an MCP client such as Claude Desktop or Claude Code on stdin/stdout.
   Run as HTTP:        TRANSPORT_TYPE=httpStream npx reddit-mcp-server
 
 Environment Variables:
-  REDDIT_CLIENT_ID      Reddit API client ID (optional, for OAuth)
-  REDDIT_CLIENT_SECRET  Reddit API client secret (optional, for OAuth)
+  REDDIT_CLIENT_ID      Reddit API client ID (optional; without it, reads are keyless)
+  REDDIT_CLIENT_SECRET  Reddit API client secret (optional, used with the client ID)
   REDDIT_USERNAME       Reddit username (optional, for write operations)
   REDDIT_PASSWORD       Reddit password (optional, for write operations)
   REDDIT_USER_AGENT     Custom user agent (optional)
-  REDDIT_AUTH_MODE      Authentication mode: auto, authenticated, anonymous (default: auto)
+  REDDIT_AUTH_MODE      Authentication mode: auto, authenticated (default: auto; anonymous is deprecated)
   REDDIT_SAFE_MODE      Spam protection: off, standard, strict (default: standard)
   REDDIT_BOT_DISCLOSURE Bot disclosure footer: auto, off (default: off)
   REDDIT_BOT_FOOTER     Custom bot footer text (optional, used with REDDIT_BOT_DISCLOSURE=auto)
+  TRANSPORT_TYPE        Set to httpStream to serve Streamable HTTP at /mcp (default: stdio)
+  PORT, HOST            HTTP port and bind address (defaults: 3000, 127.0.0.1)
+  OAUTH_ENABLED         Set to true to require a bearer token on HTTP (token from OAUTH_TOKEN)
+
+Without OAuth credentials, reads come from Reddit's RSS feeds (until 2026-11-13) and the
+Arctic Shift archive. Reddit closes its public API in March 2027.
 
 For more information, visit: https://github.com/jordanburke/reddit-mcp-server
 `)
