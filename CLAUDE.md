@@ -161,8 +161,8 @@ The server supports three authentication modes configured via `REDDIT_AUTH_MODE`
 
 The server includes optional safeguards to protect against Reddit's spam detection, configured via `REDDIT_SAFE_MODE`:
 
-1. **off (default)**: No safeguards, original behavior
-2. **standard**: Recommended for normal use
+1. **off**: No safeguards
+2. **standard (default)**: Recommended for normal use
    - 2-second delay between write operations
    - Duplicate content detection (tracks last 10 items)
 3. **strict**: For cautious automated posting
@@ -230,7 +230,7 @@ REDDIT_PASSWORD=your_password
 # Authentication Mode (optional, defaults to 'auto'; 'anonymous' is deprecated)
 REDDIT_AUTH_MODE=auto            # Options: auto, authenticated, anonymous
 
-# Safe Mode (optional, defaults to 'off')
+# Safe Mode (optional, defaults to 'standard')
 REDDIT_SAFE_MODE=standard        # Options: off, standard, strict
 
 # Response Caching (optional, defaults to 'on')

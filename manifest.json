@@ -34,24 +34,24 @@
   },
   "tools": [
     {
-      "name": "get_reddit_post",
-      "description": "Get a specific Reddit post with engagement analysis"
-    },
-    {
-      "name": "get_top_posts",
-      "description": "Get top posts from a subreddit or home feed"
-    },
-    {
-      "name": "get_post_comments",
-      "description": "Get comments from a post with threading"
-    },
-    {
-      "name": "search_reddit",
-      "description": "Search for posts across Reddit"
+      "name": "test_reddit_mcp_server",
+      "description": "Check server status and configuration"
     },
     {
       "name": "get_user_info",
       "description": "Get detailed user information"
+    },
+    {
+      "name": "get_me",
+      "description": "Get your own account info"
+    },
+    {
+      "name": "get_my_overview",
+      "description": "Get your own recent posts and comments"
+    },
+    {
+      "name": "get_my_saved",
+      "description": "Get your saved posts and comments"
     },
     {
       "name": "get_user_posts",
@@ -62,12 +62,36 @@
       "description": "Get comments by a specific user"
     },
     {
+      "name": "get_reddit_post",
+      "description": "Get a specific Reddit post with engagement analysis"
+    },
+    {
+      "name": "get_top_posts",
+      "description": "Get top posts from a subreddit or home feed"
+    },
+    {
+      "name": "browse_subreddit",
+      "description": "Browse a subreddit by hot, new, top, rising, or controversial"
+    },
+    {
       "name": "get_subreddit_info",
       "description": "Get subreddit details and statistics"
     },
     {
+      "name": "get_subreddit_rules",
+      "description": "Get a subreddit's posting rules"
+    },
+    {
+      "name": "get_post_flairs",
+      "description": "List a subreddit's available post flairs"
+    },
+    {
       "name": "get_trending_subreddits",
       "description": "Get currently trending subreddits"
+    },
+    {
+      "name": "search_reddit",
+      "description": "Search for posts across Reddit"
     },
     {
       "name": "create_post",
@@ -78,6 +102,14 @@
       "description": "Reply to a post or comment"
     },
     {
+      "name": "delete_post",
+      "description": "Delete your own post"
+    },
+    {
+      "name": "delete_comment",
+      "description": "Delete your own comment"
+    },
+    {
       "name": "edit_post",
       "description": "Edit your own post"
     },
@@ -86,12 +118,20 @@
       "description": "Edit your own comment"
     },
     {
-      "name": "delete_post",
-      "description": "Delete your own post"
+      "name": "save_content",
+      "description": "Save a post or comment"
     },
     {
-      "name": "delete_comment",
-      "description": "Delete your own comment"
+      "name": "unsave_content",
+      "description": "Remove a post or comment from your saved items"
+    },
+    {
+      "name": "get_post_comments",
+      "description": "Get comments from a post with threading"
+    },
+    {
+      "name": "get_more_comments",
+      "description": "Expand collapsed comments in a thread"
     }
   ],
   "keywords": ["reddit", "social-media", "api", "mcp", "write", "post", "comment", "search", "analysis"],

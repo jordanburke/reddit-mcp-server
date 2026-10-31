@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.0.0] - 2026-10-31
+
+A major version because HTTP clients lose `/sse` and `/ready`, and invalid arguments change shape. Stdio clients (Claude Desktop, Claude Code, `npx`) see no change.
 
 ### Changed
 
@@ -14,6 +16,8 @@ All notable changes to this project will be documented in this file.
 - Requests over 4 MiB get 413
 - 401 and 403 responses carry the standard reason phrases instead of custom ones; the status codes are unchanged
 - The Docker Compose health check probes `/health` instead of `/`, which was always 404
+- The Docker build downloads pnpm's native binary once per platform, with retries, in a cached layer. The runtime image runs on node alone, without pnpm, and shrinks from 129 MB to 72 MB
+- `manifest.json` lists all 25 tools; it listed 15
 - `functype` 1.22; `somamcp` 2.2.1, so `/health/detail` answers a wrong token with 403, as `/mcp` does
 
 ### Removed
