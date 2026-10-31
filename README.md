@@ -26,20 +26,20 @@ Reddit announced on 2026-09-30 that it is ending RSS feeds and its public Data A
 
 The server reads from three sources and uses the best one you have:
 
-| Source                                                                 | Needs                                         | Used for                                                              | Lasts until                                                                    |
-| ---------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Reddit's API (OAuth)                                                   | `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` | Every tool, with live data (writes also need username and password)   | March 2027, per Reddit                                                         |
-| Reddit's RSS feeds                                                     | Nothing                                       | Ranked listings (hot, top, rising, controversial) without credentials | 2026-11-13                                                                     |
-| [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive | Nothing                                       | Most read tools without credentials                                   | No announced end. It's free, run by one volunteer, and has no uptime guarantee |
+| Source                                                                 | Needs                                         | Used for                                                                                 | Lasts until                                                                                                     |
+| ---------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Reddit's API (OAuth)                                                   | `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` | Every tool, with live data (writes also need username and password)                      | March 2027, per Reddit                                                                                          |
+| Reddit's RSS feeds                                                     | Nothing                                       | Ranked listings (hot, top, rising, controversial) and the home feed, without credentials | 2026-11-13                                                                                                      |
+| [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive | Nothing                                       | Most read tools without credentials                                                      | No announced end. It's free, run by one volunteer, has no uptime guarantee, and gets its data from Reddit's API |
 
-Arctic Shift is a third-party copy of Reddit, not Reddit's API. Its scores and comment counts lag, and every result from it says so. See [Keyless Mode](#keyless-mode) for what each tool can do without credentials.
+Arctic Shift is a third-party copy of Reddit, not Reddit's API, though it [collects its data through Reddit's API](https://github.com/ArthurHeitmann/arctic_shift/blob/master/file_content_explanations.md). Its scores and comment counts lag, and every result from it says so. See [Keyless Mode](#keyless-mode) for what each tool can do without credentials.
 
 ### What it means for you
 
 - **You have OAuth credentials:** every read tool works. Write tools also need `REDDIT_USERNAME` and `REDDIT_PASSWORD`. Register your app at [developers.reddit.com/app-registration](https://developers.reddit.com/app-registration) before 2027-01-12, or Reddit may remove its access early.
 - **You don't have credentials:** most read tools work with no setup. Reddit no longer accepts new API access requests, so new users run in keyless mode.
-- **After 2026-11-13:** without credentials, ranked listings fall back to the archive's newest posts, because RSS is gone.
-- **After March 2027:** Reddit's plan ends the OAuth path, so the write tools and the OAuth-only reads stop working. Keyless reads keep working as long as Arctic Shift runs. Arctic Shift doesn't document where it gets its data, so Reddit's changes may affect it too.
+- **After 2026-11-13:** without credentials, ranked listings for a single subreddit fall back to the archive's newest posts, because RSS is gone. The home feed and multireddits have no keyless source after that date.
+- **After March 2027:** Reddit says public API access closes, and that is the path the OAuth tools use, so the write tools and the OAuth-only reads stop working. Arctic Shift says it collects all its data through Reddit's API, so the archive may stop getting new posts then. Keyless reads would still return what it already holds.
 
 ## Features at a Glance
 
@@ -131,8 +131,8 @@ Leave out the two variables to run keyless.
 
 | Variable                | Required | Default        | Description                                                           |
 | ----------------------- | -------- | -------------- | --------------------------------------------------------------------- |
-| `REDDIT_CLIENT_ID`      | Yes      | -              | Reddit app client ID (OAuth required since mid-2026)                  |
-| `REDDIT_CLIENT_SECRET`  | Yes      | -              | Reddit app client secret                                              |
+| `REDDIT_CLIENT_ID`      | No       | -              | Reddit app client ID (omit for keyless mode)                          |
+| `REDDIT_CLIENT_SECRET`  | No       | -              | Reddit app client secret                                              |
 | `REDDIT_USERNAME`       | No       | -              | Reddit username (for write operations)                                |
 | `REDDIT_PASSWORD`       | No       | -              | Reddit password (for write operations)                                |
 | `REDDIT_USER_AGENT`     | No       | Auto-generated | Custom User-Agent string                                              |
@@ -144,7 +144,7 @@ Leave out the two variables to run keyless.
 | `REDDIT_CACHE_MAX_MB`   | No       | `50`           | Cache size cap in MB (LRU eviction beyond this)                       |
 | `REDDIT_MAX_RETRIES`    | No       | `3`            | Retries on HTTP 429 with Retry-After backoff (`0` to disable)         |
 
-Reddit closed self-service app creation in November 2025. See [Authentication](#authentication) for how to get credentials.
+Reddit closed self-service app creation in November 2025. See [Authentication](#authentication) for what works without them.
 
 ### Full MCP Config Example
 
@@ -236,7 +236,7 @@ export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
 
 **Reddit is closing its public API.** See [Reddit is closing its public API](#reddit-is-closing-its-public-api) for the dates and what this server does about them.
 
-Reddit closed self-service OAuth app creation in November 2025, and as of 2026-10-31 it accepts no new requests for public API access. Existing OAuth credentials keep working until Reddit closes public API access in March 2027.
+Reddit closed self-service OAuth app creation in November 2025, and as of 2026-10-31 it accepts no new requests for public API access. Existing OAuth credentials keep working until March 2027 if the app is registered by 2027-01-12. Reddit starts removing access for unregistered apps on that date.
 
 ### Getting Credentials
 
@@ -250,7 +250,7 @@ Reddit closed self-service OAuth app creation in November 2025, and as of 2026-1
 | ----------------- | -------------- | ----------------- | ----------------------------------------------- | ------------- |
 | `auto` (default)  | 60-100 req/min | OAuth credentials | All tools                                       | Most users    |
 | `authenticated`   | 60-100 req/min | OAuth credentials | All tools                                       | Explicit mode |
-| `auto` (no creds) | Shared, free   | None              | Most read tools ([Keyless Mode](#keyless-mode)) | Quick testing |
+| `auto` (no creds) | Shared, free   | None              | Most read tools ([Keyless Mode](#keyless-mode)) | New users     |
 | `anonymous`       | Shared, free   | None              | Same as `auto` without credentials              | Legacy alias  |
 
 ### Keyless Mode
