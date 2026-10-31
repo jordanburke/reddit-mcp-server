@@ -11,6 +11,36 @@ A Model Context Protocol (MCP) server for interacting with Reddit - fetch posts,
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@jordanburke/reddit-mcp-server/badge" alt="reddit-mcp-server MCP server" />
 </a>
 
+## Reddit is closing its public API
+
+Reddit announced on 2026-09-30 that it is ending RSS feeds and its public Data API, and moving apps to its Developer Platform ([r/redditdev post](https://www.reddit.com/r/redditdev/comments/1wubcvf/), [r/modnews post](https://www.reddit.com/r/modnews/comments/1wubgvt/)):
+
+| Date       | What Reddit does                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| 2026-10-31 | Stops accepting new requests for public API access                                                      |
+| 2026-11-13 | Stops supporting RSS feeds                                                                              |
+| 2027-01-12 | Starts removing API access for apps and users that haven't registered or responded to Reddit's outreach |
+| March 2027 | Closes public API access for all remaining apps and users                                               |
+
+### What this server uses to keep working
+
+The server reads from three sources and uses the best one you have:
+
+| Source                                                                 | Needs                                         | Used for                                                              | Lasts until                                                                    |
+| ---------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Reddit's API (OAuth)                                                   | `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` | Every tool, with live data (writes also need username and password)   | March 2027, per Reddit                                                         |
+| Reddit's RSS feeds                                                     | Nothing                                       | Ranked listings (hot, top, rising, controversial) without credentials | 2026-11-13                                                                     |
+| [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive | Nothing                                       | Most read tools without credentials                                   | No announced end. It's free, run by one volunteer, and has no uptime guarantee |
+
+Arctic Shift is a third-party copy of Reddit, not Reddit's API. Its scores and comment counts lag, and every result from it says so. See [Keyless Mode](#keyless-mode) for what each tool can do without credentials.
+
+### What it means for you
+
+- **You have OAuth credentials:** every read tool works. Write tools also need `REDDIT_USERNAME` and `REDDIT_PASSWORD`. Register your app at [developers.reddit.com/app-registration](https://developers.reddit.com/app-registration) before 2027-01-12, or Reddit may remove its access early.
+- **You don't have credentials:** most read tools work with no setup. Reddit no longer accepts new API access requests, so new users run in keyless mode.
+- **After 2026-11-13:** without credentials, ranked listings fall back to the archive's newest posts, because RSS is gone.
+- **After March 2027:** Reddit's plan ends the OAuth path, so the write tools and the OAuth-only reads stop working. Keyless reads keep working as long as Arctic Shift runs. Arctic Shift doesn't document where it gets its data, so Reddit's changes may affect it too.
+
 ## Features at a Glance
 
 | Feature                         | reddit-mcp-server  | Other Reddit MCPs  |
@@ -39,7 +69,7 @@ Download and open the extension file - Claude Desktop will install it automatica
 
 ### Option 2: NPX (No install required)
 
-Add to your MCP config (Claude Desktop, Cursor, etc.) with Reddit OAuth credentials:
+Add to your MCP config (Claude Desktop, Cursor, etc.). Credentials are optional: without them the server runs in [keyless mode](#keyless-mode), and with them you get live data and every tool.
 
 ```json
 {
@@ -62,6 +92,8 @@ Add to your MCP config (Claude Desktop, Cursor, etc.) with Reddit OAuth credenti
 REDDIT_CLIENT_ID=your_client_id REDDIT_CLIENT_SECRET=your_client_secret \
   claude mcp add --transport stdio reddit -- npx reddit-mcp-server
 ```
+
+Leave out the two variables to run keyless.
 
 ## Features
 
@@ -202,15 +234,15 @@ export REDDIT_BOT_FOOTER=$'\n\n---\n^(🤖 Custom bot footer text)'
 
 **Anonymous mode no longer works.** As of mid-2026, Reddit blocks all unauthenticated API requests with HTTP 403. OAuth credentials are now required for any API access.
 
-**Reddit is shutting down its public API and RSS feeds.** Reddit announced on 2026-09-30 that it stops accepting new public API access requests on 2026-10-31, ends RSS feeds on 2026-11-13, starts removing unregistered apps on 2027-01-12, and closes public API access in March 2027. Without credentials, this server already reads from the [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive (see [Keyless Mode](#keyless-mode)).
+**Reddit is closing its public API.** See [Reddit is closing its public API](#reddit-is-closing-its-public-api) for the dates and what this server does about them.
 
-Additionally, Reddit closed self-service OAuth app creation in November 2025. New developers must request access through [Reddit's Developer Support](https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164). Existing OAuth credentials (obtained before November 2025) continue to work.
+Reddit closed self-service OAuth app creation in November 2025, and as of 2026-10-31 it accepts no new requests for public API access. Existing OAuth credentials keep working until Reddit closes public API access in March 2027.
 
 ### Getting Credentials
 
-**If you already have a Reddit app** (created at `/prefs/apps` before November 2025): use your existing client ID and secret — they still work at 60-100 req/min.
+**If you already have a Reddit app** (created at `/prefs/apps` before November 2025, or approved through Reddit's Developer Support): use your existing client ID and secret. They still work at 60-100 req/min. Register the app at [developers.reddit.com/app-registration](https://developers.reddit.com/app-registration) before 2027-01-12.
 
-**If you need new credentials**: submit a request through Reddit's Developer Support describing your use case. Approval is required and may take time.
+**If you don't have credentials**: Reddit no longer accepts new requests for public API access, so use [keyless mode](#keyless-mode).
 
 ### Mode Comparison
 
