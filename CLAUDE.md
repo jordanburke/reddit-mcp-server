@@ -220,7 +220,7 @@ Listing tools (`get_top_posts`, `browse_subreddit`, `search_reddit`, `get_user_p
 
 ## Environment Setup
 
-Environment variables:
+Environment variables (every one is read through `readEnv` in `src/utils/env.ts`, so a blank `KEY=` line counts as unset, matching a copied `.env.example`):
 
 ```bash
 # Reddit API Credentials (optional — without them, reads are keyless: RSS feeds + the Arctic Shift archive)
@@ -299,7 +299,7 @@ The HTTP server supports optional OAuth protection:
 - **Enable with**: `OAUTH_ENABLED=true`
 - **Token options**:
   - Provide your own: `OAUTH_TOKEN=your-secure-token`
-  - Auto-generate: Server creates a random 32-character token on startup
+  - Auto-generate: when `OAUTH_TOKEN` is unset or empty, the server creates a random 64-hex-character token and prints it at startup
 - **Usage**: Include `Authorization: Bearer <token>` header in requests to `/mcp`
 - **Responses**: no or malformed header → 401; wrong token → 403, on both `/mcp` and `/health/detail`. Ignored on stdio
 - **With OAuth off**, `/health/detail` always answers 401, because it has no token to check

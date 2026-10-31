@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- A blank environment value (`KEY=`, as in a copied `.env.example`) now counts as unset everywhere:
+  - `OAUTH_TOKEN=` with `OAUTH_ENABLED=true` generated no token and rejected every HTTP request; the server now generates one and prints it
+  - `REDDIT_AUTH_MODE=authenticated` with blank `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` started keyless; it now fails at startup, as documented
+  - Blank `REDDIT_USERNAME`/`REDDIT_PASSWORD` counted as write credentials, so `test_reddit_mcp_server` reported write access and write tools tried to log in
+  - Blank `PORT`, `HOST`, `TRANSPORT_TYPE`, `REDDIT_AUTH_MODE`, `REDDIT_SAFE_MODE`, cache and retry settings now take their defaults, instead of `NaN`, an empty bind address, or a startup error
+
 ## [2.0.0] - 2026-10-31
 
 A major version because HTTP clients lose `/sse` and `/ready`, and invalid arguments change shape. Stdio clients (Claude Desktop, Claude Code, `npx`) see no change.
