@@ -15,7 +15,7 @@ services:
     #   - REDDIT_PASSWORD=${REDDIT_PASSWORD}
     #   - REDDIT_USER_AGENT=${REDDIT_USER_AGENT}
     #   - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-    #   - OAUTH_TOKEN=${OAUTH_TOKEN}  # set it on the host; an empty value rejects every request
+    #   - OAUTH_TOKEN=${OAUTH_TOKEN}  # unset or empty: the server generates one and prints it
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]

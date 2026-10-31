@@ -356,7 +356,7 @@ export OAUTH_TOKEN=$(openssl rand -hex 32)
 TRANSPORT_TYPE=httpStream node dist/index.js
 ```
 
-If you leave `OAUTH_TOKEN` unset, the server generates one and prints it at startup. Make authenticated requests:
+If `OAUTH_TOKEN` is unset or empty, the server generates one and prints it at startup. Make authenticated requests:
 
 ```bash
 curl -H "Authorization: Bearer $OAUTH_TOKEN" \
@@ -402,8 +402,8 @@ services:
       - REDDIT_PASSWORD=${REDDIT_PASSWORD}
       - REDDIT_SAFE_MODE=standard
       - OAUTH_ENABLED=${OAUTH_ENABLED:-false}
-      # Set OAUTH_TOKEN on the host when OAUTH_ENABLED=true. An empty value rejects every request.
-      # - OAUTH_TOKEN=${OAUTH_TOKEN}
+      # Unset or empty: the server generates a token and prints it at startup
+      - OAUTH_TOKEN=${OAUTH_TOKEN}
     restart: unless-stopped
 ```
 

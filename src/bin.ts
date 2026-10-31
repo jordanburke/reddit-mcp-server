@@ -3,7 +3,8 @@
 declare const __VERSION__: string
 
 // Force stdio mode for CLI/npx usage (unless explicitly overridden)
-process.env.TRANSPORT_TYPE ??= "stdio"
+// A blank value (TRANSPORT_TYPE=) counts as unset, as it does in index.ts.
+if ((process.env.TRANSPORT_TYPE ?? "").trim() === "") process.env.TRANSPORT_TYPE = "stdio"
 
 // Handle command line arguments BEFORE any other imports
 const args = process.argv.slice(2)

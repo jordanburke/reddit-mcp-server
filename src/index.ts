@@ -17,6 +17,7 @@ import type {
   SafeModeConfig,
   UserContent,
 } from "./types"
+import { hasUserCredentials, readEnv } from "./utils/env"
 import {
   formatCommentInfo,
   formatPostInfo,
@@ -209,13 +210,14 @@ function formatUserContent(heading: string, content: UserContent): string {
 
 // Initialize Reddit client
 async function setupRedditClient() {
-  const clientId = process.env.REDDIT_CLIENT_ID
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET
-  const customUserAgent = process.env.REDDIT_USER_AGENT
-  const username = process.env.REDDIT_USERNAME
-  const password = process.env.REDDIT_PASSWORD
-  const authMode = (process.env.REDDIT_AUTH_MODE ?? "auto") as RedditAuthMode
-  const safeMode = (process.env.REDDIT_SAFE_MODE ?? "standard") as RedditSafeMode
+  // readEnv treats a blank value as unset, so a copied .env.example's `KEY=` lines mean "not configured".
+  const clientId = readEnv("REDDIT_CLIENT_ID").orUndefined()
+  const clientSecret = readEnv("REDDIT_CLIENT_SECRET").orUndefined()
+  const customUserAgent = readEnv("REDDIT_USER_AGENT").orUndefined()
+  const username = readEnv("REDDIT_USERNAME").orUndefined()
+  const password = readEnv("REDDIT_PASSWORD").orUndefined()
+  const authMode = readEnv("REDDIT_AUTH_MODE").orElse("auto") as RedditAuthMode
+  const safeMode = readEnv("REDDIT_SAFE_MODE").orElse("standard") as RedditSafeMode
 
   // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
@@ -247,24 +249,24 @@ async function setupRedditClient() {
   const safeModeConfig = buildSafeModeConfig(safeMode)
 
   // Build bot disclosure config
-  const botDisclosureMode = process.env.REDDIT_BOT_DISCLOSURE ?? "off"
+  const botDisclosureMode = readEnv("REDDIT_BOT_DISCLOSURE").orElse("off")
   const defaultFooter =
     "\n\n---\n^(🤖 I am a bot | Built with) [^reddit-mcp-server](https://github.com/jordanburke/reddit-mcp-server)"
   const botDisclosureConfig: BotDisclosureConfig = {
     enabled: botDisclosureMode === "auto",
-    footer: botDisclosureMode === "auto" ? (process.env.REDDIT_BOT_FOOTER ?? defaultFooter) : "",
+    footer: botDisclosureMode === "auto" ? readEnv("REDDIT_BOT_FOOTER").orElse(defaultFooter) : "",
   }
 
   // Build cache config (enabled by default to ease Reddit rate limits; opt out with REDDIT_CACHE=off)
-  const cacheEnabled = (process.env.REDDIT_CACHE ?? "on") !== "off"
-  const cacheMaxMb = Number(process.env.REDDIT_CACHE_MAX_MB ?? "50")
+  const cacheEnabled = readEnv("REDDIT_CACHE").orElse("on") !== "off"
+  const cacheMaxMb = Number(readEnv("REDDIT_CACHE_MAX_MB").orElse("50"))
   const cacheConfig: CacheConfig = {
     enabled: cacheEnabled,
     maxBytes: (Number.isFinite(cacheMaxMb) && cacheMaxMb > 0 ? cacheMaxMb : 50) * 1024 * 1024,
   }
 
   // Retry on HTTP 429 with Retry-After backoff (opt out with REDDIT_MAX_RETRIES=0)
-  const maxRetriesRaw = Number(process.env.REDDIT_MAX_RETRIES ?? "3")
+  const maxRetriesRaw = Number(readEnv("REDDIT_MAX_RETRIES").orElse("3"))
   const retryConfig: RetryConfig = {
     maxRetries: Number.isFinite(maxRetriesRaw) && maxRetriesRaw >= 0 ? Math.floor(maxRetriesRaw) : 3,
     baseDelayMs: 1000,
@@ -343,8 +345,9 @@ async function setupRedditClient() {
 }
 
 // OAuth token: generate once at startup, never expose in responses
-const oauthToken = process.env.OAUTH_TOKEN ?? crypto.randomBytes(32).toString("hex")
-if (process.env.OAUTH_ENABLED === "true" && process.env.OAUTH_TOKEN === undefined) {
+const configuredOauthToken = readEnv("OAUTH_TOKEN")
+const oauthToken = configuredOauthToken.orElse(crypto.randomBytes(32).toString("hex"))
+if (readEnv("OAUTH_ENABLED").orElse("false") === "true" && configuredOauthToken.isNone()) {
   console.error(`[Auth] Generated OAuth token: ${oauthToken}`)
 }
 
@@ -368,7 +371,8 @@ function authenticateBearer(request: Request | undefined): Promise<Record<string
   return Promise.resolve({ authenticated: true })
 }
 
-const useHttp = process.env.TRANSPORT_TYPE === "httpStream" || process.env.TRANSPORT_TYPE === "http"
+const transportType = readEnv("TRANSPORT_TYPE").orElse("stdio")
+const useHttp = transportType === "httpStream" || transportType === "http"
 
 const server = createServer({
   name: "reddit-mcp-server",
@@ -398,7 +402,7 @@ IMPORTANT - Reddit Responsible Builder Policy compliance:
 For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy`,
 
   // On stdio somamcp calls authenticate once with no request, so only HTTP gets the bearer check.
-  ...(useHttp && process.env.OAUTH_ENABLED === "true" ? { authenticate: authenticateBearer } : {}),
+  ...(useHttp && readEnv("OAUTH_ENABLED").orElse("false") === "true" ? { authenticate: authenticateBearer } : {}),
   // test_reddit_mcp_server already reports server health; keep the tool list to Reddit's tools.
   enableIntrospection: false,
   // Keep /health and /health/detail; FastMCP served no /info or /dashboard.
@@ -426,8 +430,7 @@ server.addTool({
       () => "✗",
       () => "✓",
     )
-    const hasWriteAccess =
-      process.env.REDDIT_USERNAME !== undefined && process.env.REDDIT_PASSWORD !== undefined ? "✓" : "✗"
+    const hasWriteAccess = hasUserCredentials() ? "✓" : "✗"
 
     return Promise.resolve(`Reddit MCP Server Status:
 - Server: ✓ Running
@@ -1200,7 +1203,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1255,7 +1258,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1268,7 +1271,7 @@ server.addTool({
 
 ## Comment Details
 - Posted to: ${args.post_id}
-- Author: u/${process.env.REDDIT_USERNAME}
+- Author: u/${readEnv("REDDIT_USERNAME").orElse("")}
 - Comment ID: ${comment.id}
 
 Your reply has been successfully posted.`,
@@ -1297,7 +1300,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1336,7 +1339,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1378,7 +1381,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1424,7 +1427,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1467,7 +1470,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1504,7 +1507,7 @@ server.addTool({
   execute: async (args) => {
     const client = unwrapClient()
 
-    if (process.env.REDDIT_USERNAME === undefined || process.env.REDDIT_PASSWORD === undefined) {
+    if (!hasUserCredentials()) {
       return toolError(
         "User authentication required. Please set REDDIT_USERNAME and REDDIT_PASSWORD environment variables.",
       )
@@ -1665,8 +1668,8 @@ ${commentList}${archiveDisclaimer(client)}`
 async function main() {
   await setupRedditClient()
 
-  const port = parseInt(process.env.PORT ?? "3000")
-  const host = process.env.HOST ?? "127.0.0.1"
+  const port = parseInt(readEnv("PORT").orElse("3000"))
+  const host = readEnv("HOST").orElse("127.0.0.1")
 
   if (useHttp) {
     console.error(`[Setup] Starting HTTP server on ${host}:${port}`)
