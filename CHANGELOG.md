@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 2026-11-14
+
+### Fixed
+
+- In `auto` mode, a failed startup credential check (Reddit rejects the client id or secret, or can't be reached) no longer stops the server. It logs a warning and starts, so registries that start it with placeholder credentials, such as Glama, can list its tools. Each tool call that needs OAuth retries authentication and reports the error. `REDDIT_AUTH_MODE=authenticated` still exits at startup
+- Startup logs say "User credentials set for" instead of "User authenticated as", since the username and password are not checked at startup, and the keyless message notes that Reddit said it would end RSS feeds on 2026-11-13
+
 ## [2.0.1] - 2026-10-31
 
 ### Fixed
