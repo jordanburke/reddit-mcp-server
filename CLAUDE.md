@@ -144,11 +144,12 @@ The server supports three authentication modes configured via `REDDIT_AUTH_MODE`
 
 1. **auto (default)**: Uses OAuth when credentials are provided, keyless mode otherwise
    - With REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET: full API access at 60-100 req/min
+   - If the startup credential check fails (bad secret, Reddit down), the server logs a warning and starts anyway, so registries that start it with placeholder values (Glama) can still list its tools; each OAuth call retries authentication and returns the error
    - Without credentials: keyless mode (`RedditClient.keyless`). Ranked listings use RSS; `sort=new` and the other read tools use the Arctic Shift archive; a failed RSS feed for a named subreddit falls back to the archive's newest posts with a `notice`
    - Still OAuth-only: `get_trending_subreddits`, `get_post_flairs`, `get_me`, `get_my_overview`, `get_my_saved`, `search_reddit type=user`, and all writes (`NotAuthenticatedError`)
 
 2. **authenticated**: Explicitly requires OAuth credentials
-   - Server fails to start if credentials are missing
+   - Server fails to start if credentials are missing or Reddit rejects them at startup
    - 60-100 req/min
    - Use for production environments
 

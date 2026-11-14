@@ -264,6 +264,8 @@ Reddit closed self-service OAuth app creation in November 2025, and as of 2026-1
 | `auto` (no creds) | Shared, free   | None              | Most read tools ([Keyless Mode](#keyless-mode)) | New users     |
 | `anonymous`       | Shared, free   | None              | Same as `auto` without credentials              | Legacy alias  |
 
+If Reddit rejects your credentials at startup, `auto` logs a warning and starts anyway, and each tool call reports the error. `authenticated` exits instead.
+
 ### Keyless Mode
 
 Without OAuth credentials, reads come from two free sources:

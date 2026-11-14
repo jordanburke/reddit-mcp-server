@@ -297,7 +297,7 @@ async function setupRedditClient() {
 
   if (authMode === "anonymous" || !hasCredentials) {
     console.error("[Setup] Keyless mode — no OAuth credentials detected.")
-    console.error("[Setup] Reads come from RSS feeds (ranked listings, until Reddit retires them 2026-11-13)")
+    console.error("[Setup] Reads come from RSS feeds (ranked listings; Reddit said it would end them 2026-11-13)")
     console.error("[Setup] and the Arctic Shift archive (a free third-party Reddit archive; scores lag).")
     console.error("[Setup] Existing REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET still give live data (60-100 req/min).")
     console.error("[Setup] Reddit takes no new API access requests and closes its public API in March 2027.")
@@ -306,18 +306,24 @@ async function setupRedditClient() {
     console.error("[Setup] Testing Reddit API connection...")
     const isConnected = await client.checkAuthentication()
 
-    if (!isConnected) {
+    if (isConnected) {
+      console.error("[Setup] ✓ Reddit API connection successful")
+      console.error("[Setup] Using OAuth Reddit API (60-100 req/min)")
+    } else if (authMode === "authenticated") {
       console.error("[Error] ✗ Failed to connect to Reddit API")
       console.error("[Error] Please check your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
       process.exit(1)
+    } else {
+      // In auto mode a bad secret or a Reddit outage must not kill the server: it still lists its tools,
+      // and each OAuth call retries authentication and returns the error to the caller.
+      console.error("[Warning] ✗ Could not authenticate with the Reddit API; starting anyway")
+      console.error("[Warning] Check REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET. Tool calls retry and report the error")
+      console.error("[Warning] Set REDDIT_AUTH_MODE=authenticated to exit on this instead")
     }
-
-    console.error("[Setup] ✓ Reddit API connection successful")
-    console.error("[Setup] Using OAuth Reddit API (60-100 req/min)")
   }
 
   if (username !== undefined && password !== undefined) {
-    console.error(`[Setup] ✓ User authenticated as: ${username}`)
+    console.error(`[Setup] ✓ User credentials set for: ${username}`)
     console.error("[Setup] Write operations enabled (posting, replying, editing, deleting)")
   } else {
     console.error("[Setup] Read-only mode (no user credentials)")
