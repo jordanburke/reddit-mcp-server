@@ -326,6 +326,7 @@ pnpm build          # Build TypeScript
 pnpm dev            # Rebuild on every change
 pnpm inspect        # Build and open the MCP inspector
 pnpm validate       # Format, lint, typecheck, test and build
+pnpm run ci         # validate's checks without fixing, as CI runs them (type `run`: `pnpm ci` is a clean install)
 pnpm test           # Run tests
 pnpm lint           # Lint code
 pnpm format         # Format code

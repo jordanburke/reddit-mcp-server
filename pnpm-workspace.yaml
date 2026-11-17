@@ -5,9 +5,9 @@ allowBuilds:
   msw: true
   tldjs: true
 minimumReleaseAgeExclude:
-  - "ts-builds"
+  - ts-builds
+  - somamcp
   - "*functype*"
-  - "somamcp"
 
 publicHoistPattern:
   - "*eslint*"
