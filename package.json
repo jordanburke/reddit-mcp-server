@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "validate": "ts-builds validate",
+    "ci": "ts-builds ci",
     "format": "ts-builds format",
     "format:check": "ts-builds format:check",
     "lint": "ts-builds lint",
@@ -36,7 +37,7 @@
     "dev": "ts-builds dev",
     "build:watch": "tsdown --watch",
     "check:versions": "tsx scripts/check-versions.ts",
-    "prepublishOnly": "pnpm check:versions && pnpm validate",
+    "prepublishOnly": "pnpm check:versions && pnpm run ci",
     "inspect": "pnpm build && npx @modelcontextprotocol/inspector dist/index.js",
     "start": "pnpm build && npx reddit-mcp-server",
     "serve": "pnpm build && node dist/index.js",
@@ -81,7 +82,7 @@
     "cross-env": "^10.1.0",
     "msw": "^3.0.3",
     "rimraf": "^6.1.3",
-    "ts-builds": "^4.0.2",
+    "ts-builds": "^4.7.0",
     "tsdown": "^0.23.2",
     "tsx": "^4.23.15"
   },

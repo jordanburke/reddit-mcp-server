@@ -77,6 +77,7 @@ pnpm dev
 pnpm validate
 
 # Build and start the server via npx
+pnpm run ci    # validate's checks without fixing, as CI runs them (type `run`: `pnpm ci` is a clean install)
 pnpm start
 
 # Format code with Prettier
