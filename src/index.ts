@@ -150,7 +150,10 @@ const SEARCH_ABOUT_MAX_LENGTH = 200
 // One search hit. Subreddit (type=sr) and user (type=user) hits ride in the RedditPost shape with
 // the subscriber or karma count in the title, so they skip the post-only fields.
 function formatSearchResult(post: RedditPost, index: number, type: string, source?: string): string {
-  const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
+  const flags: ReadonlyArray<string> = [
+    ...(post.over18 ? ["**NSFW**"] : []),
+    ...(post.spoiler === true ? ["**Spoiler**"] : []),
+  ]
   const heading = `### ${index + 1}. ${[post.title, ...flags].join(" ")}`
   const created = new Date(post.createdUtc * 1000).toLocaleString()
   const link = `- Link: https://reddit.com${post.permalink}`
@@ -358,7 +361,6 @@ if (readEnv("OAUTH_ENABLED").getOrElse(() => "false") === "true" && configuredOa
 }
 
 // Bearer-token check for the HTTP transport. Rejecting with a Response sends that response.
-// eslint-disable-next-line functype/prefer-option -- somamcp's authenticate signature
 function authenticateBearer(request: Request | undefined): Promise<Record<string, unknown>> {
   const authHeader = getRequestHeader(request, "authorization")
   if (!authHeader?.startsWith("Bearer ")) {
@@ -408,7 +410,9 @@ IMPORTANT - Reddit Responsible Builder Policy compliance:
 For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy`,
 
   // On stdio somamcp calls authenticate once with no request, so only HTTP gets the bearer check.
-  ...(useHttp && readEnv("OAUTH_ENABLED").getOrElse(() => "false") === "true" ? { authenticate: authenticateBearer } : {}),
+  ...(useHttp && readEnv("OAUTH_ENABLED").getOrElse(() => "false") === "true"
+    ? { authenticate: authenticateBearer }
+    : {}),
   // test_reddit_mcp_server already reports server health; keep the tool list to Reddit's tools.
   enableIntrospection: false,
   // Keep /health and /health/detail; FastMCP served no /info or /dashboard.
@@ -639,7 +643,10 @@ server.addTool({
 
         const postSummaries = posts
           .map((post, index) => {
-            const flags = [...(post.over18 ? ["**NSFW**"] : []), ...(post.spoiler === true ? ["**Spoiler**"] : [])]
+            const flags: ReadonlyArray<string> = [
+              ...(post.over18 ? ["**NSFW**"] : []),
+              ...(post.spoiler === true ? ["**Spoiler**"] : []),
+            ]
 
             return [
               `### ${index + 1}. ${[post.title, ...flags].join(" ")}`,

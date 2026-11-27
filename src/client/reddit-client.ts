@@ -111,7 +111,7 @@ export class RedditClient {
 
   private lastWriteTime: number = 0
 
-  private recentContentRecords: ContentRecord[] = []
+  private recentContentRecords: ReadonlyArray<ContentRecord> = []
 
   constructor(config: RedditClientConfig) {
     this.clientId = config.clientId
@@ -171,7 +171,7 @@ export class RedditClient {
 
       if (requiresAuth && (Date.now() >= this.tokenExpiry || !this.authenticated)) {
         const authResult = await this.authenticate()
-        authResult.orThrow()
+        authResult.orThrow((e) => e)
       }
 
       const headers: Record<string, string> = {
@@ -327,19 +327,16 @@ export class RedditClient {
       )
     }
 
-    this.recentContentRecords.push({
-      hash,
-      subreddit: subreddit ?? "",
-      timestamp: Date.now(),
-    })
-
-    this.recentContentRecords = this.recentContentRecords.slice(-this.safeMode.maxRecentHashes)
+    this.recentContentRecords = [
+      ...this.recentContentRecords,
+      { hash, subreddit: subreddit ?? "", timestamp: Date.now() },
+    ].slice(-this.safeMode.maxRecentHashes)
   }
 
   // Re-authenticate and return a fresh Bearer header value (throws via orThrow on failure).
   private async reauthorize(): Promise<string> {
     const result = await this.authenticate()
-    result.orThrow()
+    result.orThrow((e) => e)
     return `Bearer ${this.accessToken}`
   }
 
@@ -471,7 +468,7 @@ export class RedditClient {
     if (this.keyless) return this.arctic.getUser(username)
     const context = `Failed to get user info for ${username}`
     const attempt = await Try.async(async (): Promise<RedditUser> => {
-      const response = (await this.makeRequest(`/user/${normalizeUsername(username)}/about.json`)).orThrow()
+      const response = (await this.makeRequest(`/user/${normalizeUsername(username)}/about.json`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -499,7 +496,7 @@ export class RedditClient {
   // Fetch + split a mixed user listing (saved/overview) into posts (t3) and comments (t1).
   private async getUserContent(path: string, context: string): Promise<Either<RedditError, UserContent>> {
     const attempt = await Try.async(async (): Promise<UserContent> => {
-      const response = (await this.makeRequest(path)).orThrow()
+      const response = (await this.makeRequest(path)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -561,7 +558,7 @@ export class RedditClient {
     }
     const context = "Failed to get authenticated user info"
     const attempt = await Try.async(async (): Promise<RedditUser> => {
-      const response = (await this.makeRequest("/api/v1/me")).orThrow()
+      const response = (await this.makeRequest("/api/v1/me")).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -588,7 +585,7 @@ export class RedditClient {
     if (this.keyless) return this.arctic.getSubredditInfo(subredditName)
     const context = `Failed to get subreddit info for ${subredditName}`
     const attempt = await Try.async(async (): Promise<RedditSubreddit> => {
-      const response = (await this.makeRequest(`/r/${normalizeSubreddit(subredditName)}/about.json`)).orThrow()
+      const response = (await this.makeRequest(`/r/${normalizeSubreddit(subredditName)}/about.json`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -604,7 +601,9 @@ export class RedditClient {
     if (this.keyless) return this.arctic.getSubredditRules(subreddit)
     const context = `Failed to get rules for r/${subreddit}`
     const attempt = await Try.async(async (): Promise<readonly RedditRule[]> => {
-      const response = (await this.makeRequest(`/r/${normalizeSubreddit(subreddit)}/about/rules.json`)).orThrow()
+      const response = (await this.makeRequest(`/r/${normalizeSubreddit(subreddit)}/about/rules.json`)).orThrow(
+        (e) => e,
+      )
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -620,7 +619,9 @@ export class RedditClient {
     if (this.keyless) return this.requiresOAuthError("get_post_flairs")
     const context = `Failed to get post flairs for r/${subreddit}`
     const attempt = await Try.async(async (): Promise<readonly RedditFlair[]> => {
-      const response = (await this.makeRequest(`/r/${normalizeSubreddit(subreddit)}/api/link_flair_v2.json`)).orThrow()
+      const response = (await this.makeRequest(`/r/${normalizeSubreddit(subreddit)}/api/link_flair_v2.json`)).orThrow(
+        (e) => e,
+      )
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -659,7 +660,7 @@ export class RedditClient {
     const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const name = normalizeSubreddit(subreddit)
       const endpoint = name !== "" ? `/r/${name}/top.json` : "/top.json"
-      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
+      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to get top posts: HTTP ${response.status}`)
       }
@@ -702,7 +703,7 @@ export class RedditClient {
     const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const name = normalizeSubreddit(subreddit)
       const endpoint = name !== "" ? `/r/${name}/${sort}.json` : `/${sort}.json`
-      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
+      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to browse r/${home}: HTTP ${response.status}`)
       }
@@ -725,7 +726,7 @@ export class RedditClient {
         () => `/api/info.json?id=t3_${id}`,
         (sr) => `/r/${normalizeSubreddit(sr)}/comments/${id}.json`,
       )
-      const response = (await this.makeRequest(endpoint)).orThrow()
+      const response = (await this.makeRequest(endpoint)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -751,7 +752,7 @@ export class RedditClient {
     const context = `Failed to get trending subreddits`
 
     const attempt = await Try.async(async (): Promise<readonly string[]> => {
-      const response = (await this.makeRequest(`/subreddits/popular.json?${params}`)).orThrow()
+      const response = (await this.makeRequest(`/subreddits/popular.json?${params}`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -803,7 +804,7 @@ export class RedditClient {
           },
           body: params.toString(),
         })
-      ).orThrow()
+      ).orThrow((e) => e)
 
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to create post: HTTP ${response.status}`)
@@ -822,7 +823,7 @@ export class RedditClient {
         throw new ApiError("No post ID returned from Reddit")
       }
 
-      return (await this.getPost(postId, targetSubreddit)).orThrow()
+      return (await this.getPost(postId, targetSubreddit)).orThrow((e) => e)
     })
 
     return attempt.toEither((error) => classifyRedditError(error))
@@ -830,7 +831,7 @@ export class RedditClient {
 
   async checkPostExists(postId: string): Promise<boolean> {
     const attempt = await Try.async(async (): Promise<boolean> => {
-      const response = (await this.makeRequest(`/api/info.json?id=t3_${normalizeThingId(postId)}`)).orThrow()
+      const response = (await this.makeRequest(`/api/info.json?id=t3_${normalizeThingId(postId)}`)).orThrow((e) => e)
       if (!response.ok) {
         return false
       }
@@ -871,7 +872,7 @@ export class RedditClient {
           },
           body: params.toString(),
         })
-      ).orThrow()
+      ).orThrow((e) => e)
 
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to reply: HTTP ${response.status}`)
@@ -923,7 +924,7 @@ export class RedditClient {
           },
           body: params.toString(),
         })
-      ).orThrow()
+      ).orThrow((e) => e)
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -978,7 +979,7 @@ export class RedditClient {
           },
           body: params.toString(),
         })
-      ).orThrow()
+      ).orThrow((e) => e)
 
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to edit: HTTP ${response.status}`)
@@ -1028,7 +1029,7 @@ export class RedditClient {
           },
           body: params.toString(),
         })
-      ).orThrow()
+      ).orThrow((e) => e)
 
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to ${saved ? "save" : "unsave"}: HTTP ${response.status}`)
@@ -1083,7 +1084,7 @@ export class RedditClient {
         () => "/search.json",
         (sr) => `/r/${normalizeSubreddit(sr)}/search.json`,
       )
-      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow()
+      const response = (await this.makeRequest(`${endpoint}?${params}`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to search Reddit: HTTP ${response.status}`)
       }
@@ -1123,7 +1124,7 @@ export class RedditClient {
         await this.makeRequest(
           `/r/${normalizeSubreddit(subreddit)}/comments/${normalizeThingId(postId)}.json?${params}`,
         )
-      ).orThrow()
+      ).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `Failed to get comments: HTTP ${response.status}`)
       }
@@ -1156,7 +1157,7 @@ export class RedditClient {
         link_id: normalizeFullname(linkId, "t3"),
         children: commentIds.map((id) => normalizeThingId(id)).join(","),
       })
-      const response = (await this.makeRequest(`/api/morechildren?${params}`)).orThrow()
+      const response = (await this.makeRequest(`/api/morechildren?${params}`)).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -1198,7 +1199,7 @@ export class RedditClient {
     const attempt = await Try.async(async (): Promise<Page<RedditPost>> => {
       const response = (
         await this.makeRequest(`/user/${normalizeUsername(username)}/submitted.json?${params}`)
-      ).orThrow()
+      ).orThrow((e) => e)
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
@@ -1237,9 +1238,9 @@ export class RedditClient {
     const context = `Failed to get comments for user ${username}`
 
     const attempt = await Try.async(async (): Promise<Page<RedditComment>> => {
-      const response = (
-        await this.makeRequest(`/user/${normalizeUsername(username)}/comments.json?${params}`)
-      ).orThrow()
+      const response = (await this.makeRequest(`/user/${normalizeUsername(username)}/comments.json?${params}`)).orThrow(
+        (e) => e,
+      )
       if (!response.ok) {
         throw new HttpError(response.status, `${context}: HTTP ${response.status}`)
       }
