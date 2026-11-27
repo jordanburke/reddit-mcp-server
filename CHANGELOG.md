@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.3] - 2026-11-26
+
+### Changed
+
+- Every dependency is updated to its latest release: functype 2.2.2, somamcp 2.11.1, ts-builds 5.0.0, `@types/node` 26 and the latest patches of dotenv, fast-xml-parser, msw, rimraf and tsdown
+- From somamcp, over HTTP the server advertises only the `logging` and `tools` capabilities. `prompts/list`, `resources/list` and `resources/templates/list`, which returned empty lists, now answer "method not found". The server registers no prompts or resources, and stdio is unchanged
+- From somamcp, an invalid-argument error names the argument, as in `limit: Too big: expected number to be <=100`
+- The random HTTP bearer token is built only when `OAUTH_TOKEN` is unset, instead of on every start
+
 ## [2.0.2] - 2026-11-14
 
 ### Fixed
