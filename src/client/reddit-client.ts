@@ -442,7 +442,7 @@ export class RedditClient {
     const archived = await this.arctic.listSubredditPosts(subreddit, limit, after)
     return archived.map((page) => ({
       ...page,
-      notice: `The RSS feed ${rssProblem.orElse("failed")}, so these are the newest posts from the Arctic Shift archive, not "${sort}" ranking.`,
+      notice: `The RSS feed ${rssProblem.getOrElse(() => "failed")}, so these are the newest posts from the Arctic Shift archive, not "${sort}" ranking.`,
     }))
   }
 
@@ -839,7 +839,7 @@ export class RedditClient {
       return json.data.children.length > 0
     })
 
-    return attempt.orElse(false)
+    return attempt.getOrElse(() => false)
   }
 
   async replyToPost(postId: string, content: string): Promise<Either<RedditError, RedditComment>> {

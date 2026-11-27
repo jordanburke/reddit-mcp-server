@@ -176,7 +176,7 @@ export class ArcticShiftClient {
     const { status, body, resetSeconds } =
       cached !== undefined ? { ...cached, resetSeconds: Option.none<number>() } : await this.fetchBody(url)
 
-    const json = Try(() => JSON.parse(body) as ArcticResponse<T>).orElse({ data: null, error: `HTTP ${status}` })
+    const json = Try(() => JSON.parse(body) as ArcticResponse<T>).getOrElse(() => ({ data: null, error: `HTTP ${status}` }))
     if (status < 200 || status >= 300 || json.error !== undefined || json.data === null) {
       const detail = (json.error ?? `HTTP ${status}`).slice(0, ERROR_TEXT_MAX_LENGTH)
       if (status === 429 || /timeout|timed out/i.test(detail)) {

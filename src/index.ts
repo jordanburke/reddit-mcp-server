@@ -216,8 +216,8 @@ async function setupRedditClient() {
   const customUserAgent = readEnv("REDDIT_USER_AGENT").orUndefined()
   const username = readEnv("REDDIT_USERNAME").orUndefined()
   const password = readEnv("REDDIT_PASSWORD").orUndefined()
-  const authMode = readEnv("REDDIT_AUTH_MODE").orElse("auto") as RedditAuthMode
-  const safeMode = readEnv("REDDIT_SAFE_MODE").orElse("standard") as RedditSafeMode
+  const authMode = readEnv("REDDIT_AUTH_MODE").getOrElse(() => "auto") as RedditAuthMode
+  const safeMode = readEnv("REDDIT_SAFE_MODE").getOrElse(() => "standard") as RedditSafeMode
 
   // Validate auth mode
   if (!["auto", "authenticated", "anonymous"].includes(authMode)) {
@@ -249,24 +249,24 @@ async function setupRedditClient() {
   const safeModeConfig = buildSafeModeConfig(safeMode)
 
   // Build bot disclosure config
-  const botDisclosureMode = readEnv("REDDIT_BOT_DISCLOSURE").orElse("off")
+  const botDisclosureMode = readEnv("REDDIT_BOT_DISCLOSURE").getOrElse(() => "off")
   const defaultFooter =
     "\n\n---\n^(🤖 I am a bot | Built with) [^reddit-mcp-server](https://github.com/jordanburke/reddit-mcp-server)"
   const botDisclosureConfig: BotDisclosureConfig = {
     enabled: botDisclosureMode === "auto",
-    footer: botDisclosureMode === "auto" ? readEnv("REDDIT_BOT_FOOTER").orElse(defaultFooter) : "",
+    footer: botDisclosureMode === "auto" ? readEnv("REDDIT_BOT_FOOTER").getOrElse(() => defaultFooter) : "",
   }
 
   // Build cache config (enabled by default to ease Reddit rate limits; opt out with REDDIT_CACHE=off)
-  const cacheEnabled = readEnv("REDDIT_CACHE").orElse("on") !== "off"
-  const cacheMaxMb = Number(readEnv("REDDIT_CACHE_MAX_MB").orElse("50"))
+  const cacheEnabled = readEnv("REDDIT_CACHE").getOrElse(() => "on") !== "off"
+  const cacheMaxMb = Number(readEnv("REDDIT_CACHE_MAX_MB").getOrElse(() => "50"))
   const cacheConfig: CacheConfig = {
     enabled: cacheEnabled,
     maxBytes: (Number.isFinite(cacheMaxMb) && cacheMaxMb > 0 ? cacheMaxMb : 50) * 1024 * 1024,
   }
 
   // Retry on HTTP 429 with Retry-After backoff (opt out with REDDIT_MAX_RETRIES=0)
-  const maxRetriesRaw = Number(readEnv("REDDIT_MAX_RETRIES").orElse("3"))
+  const maxRetriesRaw = Number(readEnv("REDDIT_MAX_RETRIES").getOrElse(() => "3"))
   const retryConfig: RetryConfig = {
     maxRetries: Number.isFinite(maxRetriesRaw) && maxRetriesRaw >= 0 ? Math.floor(maxRetriesRaw) : 3,
     baseDelayMs: 1000,
@@ -352,8 +352,8 @@ async function setupRedditClient() {
 
 // OAuth token: generate once at startup, never expose in responses
 const configuredOauthToken = readEnv("OAUTH_TOKEN")
-const oauthToken = configuredOauthToken.orElse(crypto.randomBytes(32).toString("hex"))
-if (readEnv("OAUTH_ENABLED").orElse("false") === "true" && configuredOauthToken.isNone()) {
+const oauthToken = configuredOauthToken.getOrElse(() => crypto.randomBytes(32).toString("hex"))
+if (readEnv("OAUTH_ENABLED").getOrElse(() => "false") === "true" && configuredOauthToken.isNone()) {
   console.error(`[Auth] Generated OAuth token: ${oauthToken}`)
 }
 
@@ -377,7 +377,7 @@ function authenticateBearer(request: Request | undefined): Promise<Record<string
   return Promise.resolve({ authenticated: true })
 }
 
-const transportType = readEnv("TRANSPORT_TYPE").orElse("stdio")
+const transportType = readEnv("TRANSPORT_TYPE").getOrElse(() => "stdio")
 const useHttp = transportType === "httpStream" || transportType === "http"
 
 const server = createServer({
@@ -408,7 +408,7 @@ IMPORTANT - Reddit Responsible Builder Policy compliance:
 For details: https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy`,
 
   // On stdio somamcp calls authenticate once with no request, so only HTTP gets the bearer check.
-  ...(useHttp && readEnv("OAUTH_ENABLED").orElse("false") === "true" ? { authenticate: authenticateBearer } : {}),
+  ...(useHttp && readEnv("OAUTH_ENABLED").getOrElse(() => "false") === "true" ? { authenticate: authenticateBearer } : {}),
   // test_reddit_mcp_server already reports server health; keep the tool list to Reddit's tools.
   enableIntrospection: false,
   // Keep /health and /health/detail; FastMCP served no /info or /dashboard.
@@ -1277,7 +1277,7 @@ server.addTool({
 
 ## Comment Details
 - Posted to: ${args.post_id}
-- Author: u/${readEnv("REDDIT_USERNAME").orElse("")}
+- Author: u/${readEnv("REDDIT_USERNAME").getOrElse(() => "")}
 - Comment ID: ${comment.id}
 
 Your reply has been successfully posted.`,
@@ -1674,8 +1674,8 @@ ${commentList}${archiveDisclaimer(client)}`
 async function main() {
   await setupRedditClient()
 
-  const port = parseInt(readEnv("PORT").orElse("3000"))
-  const host = readEnv("HOST").orElse("127.0.0.1")
+  const port = parseInt(readEnv("PORT").getOrElse(() => "3000"))
+  const host = readEnv("HOST").getOrElse(() => "127.0.0.1")
 
   if (useHttp) {
     console.error(`[Setup] Starting HTTP server on ${host}:${port}`)

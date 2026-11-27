@@ -18,7 +18,7 @@ export function formatTimestamp(timestamp: number): string {
       .toISOString()
       .replace("T", " ")
       .replace(/\.\d+Z$/, " UTC")
-  }).orElse(String(timestamp))
+  }).getOrElse(() => String(timestamp))
 }
 
 export function analyzeUserActivity(karmaRatio: number, isMod: boolean, accountAgeDays: number): string {
