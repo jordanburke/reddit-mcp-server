@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser"
 import type { Either } from "functype"
-import { Try } from "functype"
+import { Option, Try } from "functype"
 
 import type { Page, RedditPost } from "../types"
 import { normalizeSubreddit } from "../utils/reddit-identifiers"
@@ -57,9 +57,10 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&amp;/g, "&")
 }
 
-function extractLinkUrl(contentHtml: string): string | undefined {
-  const match = contentHtml.match(/href="([^"]+)">\[link\]/)
-  return match?.[1] ? decodeHtmlEntities(match[1]) : undefined
+function extractLinkUrl(contentHtml: string): Option<string> {
+  return Option(contentHtml.match(/href="([^"]+)">\[link\]/)?.[1])
+    .filter((href) => href !== "")
+    .map(decodeHtmlEntities)
 }
 
 function extractSelfText(contentHtml: string): string {
@@ -71,8 +72,9 @@ function extractSelfText(contentHtml: string): string {
 export function atomEntryToRedditPost(entry: AtomEntry): RedditPost {
   const permalink = entry.link?.["@_href"] ?? ""
   const contentHtml = contentText(entry.content)
-  const externalUrl = extractLinkUrl(contentHtml)
-  const isSelf = !externalUrl || externalUrl.includes("/comments/")
+  // A link to a Reddit thread is a self post's own permalink, not an external link.
+  const externalUrl = extractLinkUrl(contentHtml).filter((href) => !href.includes("/comments/"))
+  const isSelf = externalUrl.isNone()
   const author = (entry.author?.name ?? "").replace(/^\/u\//, "")
   const subreddit = entry.category?.["@_term"] ?? ""
   const thingId = entry.id ?? ""
@@ -84,7 +86,7 @@ export function atomEntryToRedditPost(entry: AtomEntry): RedditPost {
     author,
     subreddit,
     selftext: extractSelfText(contentHtml),
-    url: isSelf ? permalink : (externalUrl ?? permalink),
+    url: externalUrl.getOrElse(() => permalink),
     score: 0,
     upvoteRatio: 0,
     numComments: 0,
@@ -108,6 +110,10 @@ export class RssClient {
     this.userAgent = userAgent
   }
 
+  /**
+   * @interop Same boundary as reddit-client.ts: the `throw`s are control flow inside this method's
+   * `Try.async`, which `classifyRedditError` turns into the returned `Either`; none escapes the method.
+   */
   async fetchSubredditPosts(
     subreddit: string,
     sort: string,

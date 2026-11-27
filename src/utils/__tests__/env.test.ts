@@ -20,7 +20,7 @@ describe("readEnv", () => {
   })
 
   it("falls back to a default for an empty value", () => {
-    expect(readEnv("PORT", { PORT: "" }).orElse("3000")).toBe("3000")
+    expect(readEnv("PORT", { PORT: "" }).getOrElse(() => "3000")).toBe("3000")
   })
 })
 
